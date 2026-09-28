@@ -1,10 +1,10 @@
-# AGENTS.md — doops
+# AGENTS.md — oops
 
 Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-**doops** is a text-to-image web system for e-commerce customers. Users describe
+**oops** is a text-to-image web system for e-commerce customers. Users describe
 requirements (and upload product assets) in a chat box, pick a specialized
 design agent, and receive generated product-detail images, posters, and
 atmosphere/scene images.
