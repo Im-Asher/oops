@@ -145,3 +145,8 @@ vite.config.ts.timestamp-*
 .codebuddy/
 openspec
 .claude/
+# Next.js CNA additions
+.DS_Store
+*.pem
+.vercel
+next-env.d.ts
