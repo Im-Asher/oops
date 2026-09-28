@@ -1,6 +1,5 @@
 "use client";
 
-import { CanvasEmptyState } from "@/components/canvas/canvas-empty-state";
 import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { FloatingChatPanel } from "@/components/chat/floating-chat-panel";
 import { canvasReducer, initialCanvasState } from "@/lib/canvas/canvas-reducer";
@@ -154,15 +153,10 @@ export default function ChatPage() {
 
   return (
     <main className="dark fixed inset-0 overflow-hidden bg-[#0A0A0A]">
-      <CanvasStage>
-        {canvas.active ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt="激活图" className="max-h-full max-w-full object-contain" src={canvas.active.url} />
-        ) : (
-          <CanvasEmptyState />
-        )}
-      </CanvasStage>
+      <CanvasStage image={canvas.active} view={canvas.view} />
       <FloatingChatPanel
+        activeUrl={canvas.active?.url ?? null}
+        onActivateImage={(image) => dispatch({ type: "activate", image })}
         agentId={agentId}
         agents={agents}
         busy={busy}

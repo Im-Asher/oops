@@ -10,11 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { CanvasImage } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, SessionInfo, UIMessage } from "@/types/chat";
 import { MessageSquareIcon, PanelLeftCloseIcon, PlusIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface FloatingChatPanelProps {
+  activeUrl?: string | null;
+  onActivateImage?: (image: CanvasImage) => void;
   agents: AgentInfo[];
   agentId: string;
   onAgentChange: (id: string) => void;
@@ -34,6 +37,8 @@ interface FloatingChatPanelProps {
  * 仅替换简版布局的容器，消息流与会话逻辑由页面持有（见 chat-streaming delta spec）。
  */
 export function FloatingChatPanel({
+  activeUrl,
+  onActivateImage,
   agents,
   agentId,
   onAgentChange,
@@ -135,7 +140,11 @@ export function FloatingChatPanel({
         </Select>
       </div>
 
-      <MessageList messages={messages} />
+      <MessageList
+        activeUrl={activeUrl}
+        messages={messages}
+        onActivateImage={onActivateImage}
+      />
 
       <div className="flex gap-2 border-t border-zinc-800 p-2">
         <Input
