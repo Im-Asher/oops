@@ -27,6 +27,14 @@ export type CanvasAction =
 
 export const DEFAULT_VIEW: CanvasView = { scale: 1, x: 0, y: 0 };
 
+/** 缩放区间 25%~400%（canvas-workspace spec）。 */
+export const MIN_SCALE = 0.25;
+export const MAX_SCALE = 4;
+
+export function clampScale(scale: number): number {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+}
+
 export const initialCanvasState: CanvasState = { active: null, view: DEFAULT_VIEW };
 
 export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {

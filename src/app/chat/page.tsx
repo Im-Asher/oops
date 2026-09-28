@@ -2,7 +2,11 @@
 
 import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { FloatingChatPanel } from "@/components/chat/floating-chat-panel";
-import { canvasReducer, initialCanvasState } from "@/lib/canvas/canvas-reducer";
+import {
+  canvasReducer,
+  initialCanvasState,
+  type CanvasView,
+} from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useState } from "react";
 
@@ -15,6 +19,13 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
+
+  // dispatch 引用稳定，回调保持同一身份，避免画布每渲染都重挂滚轮监听。
+  const handleViewChange = useCallback(
+    (view: CanvasView) => dispatch({ type: "setView", view }),
+    [],
+  );
+  const handleResetView = useCallback(() => dispatch({ type: "resetView" }), []);
 
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
@@ -153,7 +164,12 @@ export default function ChatPage() {
 
   return (
     <main className="dark fixed inset-0 overflow-hidden bg-[#0A0A0A]">
-      <CanvasStage image={canvas.active} view={canvas.view} />
+      <CanvasStage
+        image={canvas.active}
+        onResetView={handleResetView}
+        onViewChange={handleViewChange}
+        view={canvas.view}
+      />
       <FloatingChatPanel
         activeUrl={canvas.active?.url ?? null}
         onActivateImage={(image) => dispatch({ type: "activate", image })}
