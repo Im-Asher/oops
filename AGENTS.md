@@ -29,6 +29,18 @@ Key characteristics:
 
 See `docs/ARCHITECTURE.md` for the full architecture and data model.
 
+## Documentation maintenance
+
+- `docs/ARCHITECTURE.md` and this file must stay in sync with the actual
+  implementation. When a change alters architecture decisions, agents/tools,
+  commands, conventions, or security requirements, update the relevant doc
+  **in the same change** — doc updates are part of the definition of done.
+- Sync rules and deferred doc TODOs live in `IMPROVEMENT.md`; it is **not** a
+  change log — doc-update history is tracked in git commits, never duplicated
+  in a manual table. If docs and code conflict, code wins — fix the doc
+  immediately.
+
+
 ## Tech stack (summary)
 
 | Layer          | Choice                                              |
@@ -149,13 +161,4 @@ Package manager is **pnpm 11** — do not use npm/yarn. Lockfile is
 - **Error handling:** return structured errors to clients; never leak stack
   traces, SQL, or internal paths in responses. Log server-side with request IDs.
 
-## Documentation maintenance
 
-- `docs/ARCHITECTURE.md` and this file must stay in sync with the actual
-  implementation. When a change alters architecture decisions, agents/tools,
-  commands, conventions, or security requirements, update the relevant doc
-  **in the same change** — doc updates are part of the definition of done.
-- Sync rules and deferred doc TODOs live in `IMPROVEMENT.md`; it is **not** a
-  change log — doc-update history is tracked in git commits, never duplicated
-  in a manual table. If docs and code conflict, code wins — fix the doc
-  immediately.
