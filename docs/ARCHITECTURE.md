@@ -1,4 +1,4 @@
-# doops 架构与技术栈
+# oops 架构与技术栈
 
 > 面向电商客户的文生图 Web 系统：用户在聊天框中描述需求并上传商品素材，选择设计 Agent，产出商品详情长图、海报、氛围图等电商图片。
 
@@ -152,7 +152,7 @@ tasks      生成任务    id, type(image_gen|html_render), status, payload(JSON
 ## 8. 项目目录
 
 ```
-doops/
+oops/
 ├── src/
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
 │   │   ├── page.tsx                # 新会话
