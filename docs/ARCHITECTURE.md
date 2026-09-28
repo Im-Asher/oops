@@ -17,7 +17,7 @@ Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
                                       └── tool: save_asset ──► 图片存储
    │
    ▼
-Drizzle ORM (SQLite)  +  存储抽象（本地磁盘，兼容 OSS/S3）
+Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose 部署）
 ```
 
 核心决策（已确认）：
@@ -42,9 +42,9 @@ Drizzle ORM (SQLite)  +  存储抽象（本地磁盘，兼容 OSS/S3）
 | Agent 运行时 | `@earendil-works/pi-agent-core` | agentLoop / Agent / AgentHarness 分层，事件流驱动，工具调用与状态管理 |
 | LLM 协议 | `pi-ai` | 多 Provider 统一请求/响应协议，屏蔽底层模型差异 |
 | 包管理 | pnpm 11 | |
-| 数据库 | SQLite + Drizzle ORM | MVP 零运维；`drizzle-kit` 管理 migrations |
+| 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发 |
-| 图片存储 | 本地磁盘（`data/assets/`）→ 存储抽象 | 接口兼容 OSS/S3/R2 |
+| 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
 | 认证 | 口令/邀请码 + cookie session | 自实现（HttpOnly/Secure/SameSite），不引入 next-auth |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
@@ -134,9 +134,11 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 
 原则：代码不做语义判断，prompt 不做安全兜底；追问优先于猜测（省生图 API 费用）。
 
-## 7. 数据模型（Drizzle + SQLite）
+## 7. 数据模型（Drizzle + PostgreSQL）
 
 所有表带 `userId` 列（多租户演进预留，MVP 恒为 owner）。
+
+Schema 方言（pg）：`JSON` → `jsonb`；`type`/`kind`/`status` 用 `pgEnum`（或 `varchar` + 应用约束）；时间列用 `timestamp`。
 
 ```
 sessions   会话        id, userId, agentId, title, createdAt, updatedAt
@@ -181,7 +183,7 @@ oops/
 │   ├── components/                 # chat/ agent-picker/ gallery/
 │   ├── lib/                        # 共享 utils、config
 │   └── types/                      # 共享类型
-└── data/                           # sqlite 文件 + 本地图片（gitignore）
+└── data/                           # 已废弃：原 sqlite 文件 + 本地图片；现改用 Postgres + MinIO（可删除）
 ```
 
 **分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import（ESLint `no-restricted-imports` 强制）；`src/lib` 与 `src/types` 前后端共享。
@@ -189,6 +191,6 @@ oops/
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
 - **多租户 SaaS**：userId 已预留，补注册/登录、配额/积分、团队隔离。
-- **多实例部署**：task executor 换 BullMQ + Redis；本地存储切 OSS/S3（存储抽象已兼容）。
+- **多实例部署**：存储已为 MinIO（S3 兼容）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
 - **Agent 市场**：AgentRegistry 已是配置驱动，可平移到 DB 存储开放自定义。
 - **局部重绘/抠图**：作为新工具加入 ToolRegistry，Agent 按需引用。

@@ -37,7 +37,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Language       | TypeScript (strict)                                 |
 | UI             | shadcn/ui + AI Elements + Tailwind CSS v4           |
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
-| Database       | SQLite via Drizzle ORM                              |
+| Database       | PostgreSQL via Drizzle ORM                          |
 | Rendering      | `playwright-core` + headless Chromium               |
 | Package mgr    | pnpm 11                                             |
 
