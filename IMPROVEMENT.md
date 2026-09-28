@@ -52,7 +52,7 @@
 > 仅登记**尚未实施**的改进与文档 TODO；每月复核一次，实现或放弃后删除并标注 `done/ dropped`。
 > 复核时在最右侧标 `reviewed-on`，避免无限膨胀。
 
-- [ ] **实施计划文档**：创建 `docs/plans/` 实施拆分（任务/里程碑），完成后在 ARCHITECTURE 对应小节补充。
+- [x] **实施计划文档**：已建 `docs/plans/2026-09-28-docker-postgres-design.md`（Docker Compose + PostgreSQL + MinIO 设计）；实现时同步 ARCHITECTURE 对应小节。
 - [ ] **任务恢复策略**：`task-executor` 目前进程重启后 pending 任务标记失败；待多实例需求出现时评估 BullMQ + Redis，并同步 ARCHITECTURE.md §4。
 - [ ] **批量生图工具**：`schedule_batch`（提交即返回 taskId）未实现，属于刻意延后项；实现后需在 ARCHITECTURE.md 工具语义表补充。
 - [ ] **生图 Provider 抽象稳定化**：首批只接 Seedream；接入第二家（万相）后把 provider 接口固化并补接口文档。
