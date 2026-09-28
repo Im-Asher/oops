@@ -58,4 +58,5 @@
 - [ ] **生图 Provider 抽象稳定化**：首批只接 Seedream；接入第二家（万相）后把 provider 接口固化并补接口文档。
 - [ ] **渲染沙箱网络白名单**：Playwright 出网限制目前是设计要求（AGENTS.md Security），实现时需细化白名单配置项并补充示例。
 - [ ] **数据模型演进**：`userId` 已预留但未启用；启动多租户时同步更新 ARCHITECTURE.md §7 与认证设计。
+- [ ] **认证延后（foundation）**：当前以固定 `OWNER_ID`（`src/lib/config.ts`）作为唯一用户，Route Handler 不做会话校验；待补充口令/邀请码 + cookie-session，届时恢复 AGENTS.md / ARCHITECTURE.md §2 的会话校验要求与实现。
 - [ ] **修复基线语义冲突**：`AGENTS.md` 称任务「persisted and retryable」，而 `ARCHITECTURE.md` §4 称「重启后 pending 标记失败」。需统一表述（任务级不恢复 vs 工具级可重试）。

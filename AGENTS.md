@@ -81,13 +81,11 @@ pnpm start              # Start production server
 pnpm lint               # ESLint (includes import-boundary rules)
 pnpm typecheck          # tsc --noEmit
 pnpm test               # Run unit tests (Vitest)
-pnpm test:watch         # Watch mode
 pnpm db:generate        # Generate Drizzle migrations
-pnpm db:migrate         # Apply migrations
-pnpm db:studio          # Drizzle Studio (DB browser)
+pnpm db:migrate         # Apply migrations (requires running Postgres + .env.local)
 ```
 
-Package manager is **pnpm 11** — do not use npm/yarn. Lockfile is
+Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 `pnpm-lock.yaml` and must be committed.
 
 ## Code style guidelines
@@ -147,6 +145,9 @@ Package manager is **pnpm 11** — do not use npm/yarn. Lockfile is
   Handler must verify the session before touching DB or spawning tasks.
   MVP passcode/invite-code auth is intentionally minimal — do not weaken it
   further (no query-string tokens).
+  **状态（2026-09-28，foundation 阶段）：认证有意延后**——当前全部请求以固定
+  `OWNER_ID`（`src/lib/config.ts`）作为唯一用户，无任何会话校验；cookie-session
+  认证待后续 change 补充，届时同步本节并恢复上面的校验要求。
 - **Uploads:** validate MIME type and size on upload (images only, hard cap);
   store with generated filenames (never user-supplied names); serve user
   files through the `files` route with correct `Content-Type` and

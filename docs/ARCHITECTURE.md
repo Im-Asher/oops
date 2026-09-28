@@ -41,11 +41,11 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | 样式 | Tailwind CSS v4 | |
 | Agent 运行时 | `@earendil-works/pi-agent-core` | agentLoop / Agent / AgentHarness 分层，事件流驱动，工具调用与状态管理 |
 | LLM 协议 | `pi-ai` | 多 Provider 统一请求/响应协议，屏蔽底层模型差异 |
-| 包管理 | pnpm 11 | |
+| 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发 |
 | 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
-| 认证 | 口令/邀请码 + cookie session | 自实现（HttpOnly/Secure/SameSite），不引入 next-auth |
+| 认证 | 口令/邀请码 + cookie session（**foundation 阶段延后**，当前以固定 OWNER_ID 作为唯一用户） | 自实现（HttpOnly/Secure/SameSite），不引入 next-auth |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
 
@@ -136,65 +136,78 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 
 ## 7. 数据模型（Drizzle + PostgreSQL）
 
-所有表带 `userId` 列（多租户演进预留，MVP 恒为 owner）。
-
-Schema 方言（pg）：`JSON` → `jsonb`；`type`/`kind`/`status` 用 `pgEnum`（或 `varchar` + 应用约束）；时间列用 `timestamp`。
+> 以下为 **foundation 阶段**已落库的 MVP 表（已 `pnpm db:migrate` 应用）。所有表带
+> `userId` 列（多租户演进预留，当前恒为 `OWNER_ID`）；时间列 `timestamp with time zone`；
+> `meta`/`payload`/`result`/`tool_calls` 用 `jsonb`；`role`/`kind`/`type`/`status` 用 `pgEnum`。
 
 ```
-sessions   会话        id, userId, agentId, title, createdAt, updatedAt
-messages   消息        id, sessionId, role, parts(JSON)①, createdAt
-assets     素材/作品   id, sessionId?, kind(upload|generated), storagePath,
-                       mimeType, width, height, meta(JSON), createdAt
-tasks      生成任务    id, type(image_gen|html_render), status, payload(JSON),
-                       resultAssetId, error, createdAt
+chat_sessions  会话      id(uuid), user_id(text), title(text?), created_at, updated_at
+messages       消息      id(uuid), session_id(uuid→sessions FK), user_id, role(enum),
+                        content(text), tool_calls(jsonb?), created_at
+assets         素材/作品 id(uuid), user_id, session_id?(→sessions, set null),
+                        kind(enum image|json|other), storage_key(text), mime_type(text),
+                        width(int?), height(int?), prompt(text?), model(text?),
+                        source_url(text?), meta(jsonb, 默认 {}), created_at
+tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(enum),
+                        status(enum), payload(jsonb, 默认 {}), result(jsonb?),
+                        error(text?), created_at, updated_at
 ```
 
-① `parts` 直接存 AI Elements 兼容的 UIMessage 结构（text / tool-* / image），会话重建零转换。
+枚举取值：
+
+- `message_role`：`user` / `assistant` / `system`
+- `asset_kind`：`image` / `json` / `other`
+- `task_type`：`generate_image` / `render_html` / `export`
+- `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
+
+> 注：完整愿景中的 `agentId` 列、`messages.parts`（AI Elements UIMessage 结构）、
+> `assets.resultAssetId` 等，将在 `chat-image-gen` / Agent 运行时 change 中补齐，
+> 届时不破坏现有表（以 `ALTER`/新增迁移演进）。
+
+Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列用 `timestamp with time zone`。
 
 ## 8. 项目目录
+
+> 以下为 **foundation 阶段**实际存在的文件；标注「（规划）」的为后续 change 才落地。
 
 ```
 oops/
 ├── src/
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
-│   │   ├── page.tsx                # 新会话
-│   │   ├── chat/[id]/page.tsx
-│   │   ├── gallery/page.tsx        # 作品库
-│   │   ├── login/page.tsx
-│   │   └── api/
-│   │       ├── chat/route.ts           # SSE agent 流
-│   │       ├── agents/route.ts         # agent 元数据
-│   │       ├── upload/route.ts
-│   │       └── files/[...path]/route.ts
+│   │   ├── page.tsx                # 默认首页（暂未接入聊天，待 chat-image-gen）
+│   │   ├── files/[...path]/route.ts # 资产代理读取（安全响应头）
+│   │   └── upload/route.ts         # 图片上传（MIME 白名单 + 大小上限）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
-│   │   ├── domain/                 # 纯领域：实体 + 仓储接口 + 领域逻辑
-│   │   │   ├── sessions/           # 会话生命周期
-│   │   │   │   └── session.repo.ts
-│   │   │   ├── messages/           # 消息持久化、UIMessage 重建
-│   │   │   │   └── message.repo.ts
-│   │   │   ├── assets/             # 资产元数据实体 + 仓储（落库对象 key）
-│   │   │   │   └── asset.repo.ts
-│   │   │   └── tasks/              # 生成任务实体 + 状态机
-│   │   │       ├── task.repo.ts
-│   │   │       └── task-executor.ts # 进程内 Worker 编排（调 domain + infra）
-│   │   ├── infra/                  # 基础设施实现（具体技术，藏在接口后）
-│   │   │   ├── db/                 # Drizzle client + schema + migrations
-│   │   │   ├── storage/            # MinIO / S3 客户端（原 asset 存储）
-│   │   │   ├── providers/          # Seedream / 万相 生图客户端
-│   │   │   └── render/            # Playwright HTML 截图
-│   │   └── agent/                  # 声明式 Agent 运行时（独立关注点，保持不动）
-│   │       ├── registry.ts         # Agent 扫描加载
-│   │       ├── runtime.ts          # agentLoop ↔ SSE 桥接 + 持久化
-│   │       ├── agents/             # 声明式 Agent 定义（一文件一 Agent）
-│   │       ├── prompts/            # system prompt（md）
-│   │       └── tools/              # ToolRegistry + 工具实现（内部调 domain/infra）
-│   ├── components/                 # chat/ agent-picker/ gallery/
-│   ├── lib/                        # 共享 utils、config
-│   └── types/                      # 共享类型
-└── data/                           # 已废弃：原 sqlite 文件 + 本地图片；现改用 Postgres + MinIO（可删除）
+│   │   ├── db/                     # Drizzle client + schema + 仓储
+│   │   │   ├── schema.ts           # 四表 + 枚举定义
+│   │   │   ├── index.ts            # pg Pool 单例（惰性）
+│   │   │   ├── session.repo.ts     # 会话 仓储（接口 + 实现）
+│   │   │   ├── message.repo.ts     # 消息 仓储
+│   │   │   ├── asset.repo.ts       # 资产 仓储
+│   │   │   ├── task.repo.ts        # 任务 仓储
+│   │   │   └── mock-db.ts          # 仓储单测用的 drizzle 查询 mock
+│   │   └── infra/
+│   │       └── storage/            # 存储抽象（MinIO / S3 兼容）
+│   │           ├── s3.ts           # S3Client 封装 + key 生成
+│   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
+│   │           └── upload.ts       # 上传校验 + 处理
+│   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
+│   ├── lib/                        # 客户端安全共享：config / utils（+ 单测）
+│   └── (types/ 规划)               # 共享类型，后续 change 引入
+├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
+├── drizzle.config.ts               # drizzle-kit 配置（加载 .env.local）
+├── drizzle/                        # 生成的迁移 SQL（已提交）
+├── vitest.config.ts / vitest.setup.ts
+└── .env.example                    # 环境变量模板（.env* 均 gitignored）
 ```
 
-**分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import（ESLint `no-restricted-imports` 强制）；`src/lib` 与 `src/types` 前后端共享。`src/server/domain` 为纯领域（不依赖具体 Provider / 框架），`src/server/infra` 为基础设施实现并藏在接口后，`src/server/agent` 为声明式 Agent 运行时（独立关注点）。
+**分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import
+（ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
+`src/server/db` 为领域仓储层（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
+
+> 规划中尚未落地（属于后续 change）：`src/server/domain/`（领域聚合 / 任务状态机）、
+> `src/server/agent/`（声明式 Agent 运行时：registry / runtime / agents / tools）、
+> `src/server/infra/providers/`、`src/server/infra/render/`、`/api/chat` SSE、`gallery` 页面。
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
