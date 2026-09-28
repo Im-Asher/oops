@@ -55,8 +55,9 @@
 - [x] **实施计划文档**：已建 `docs/plans/2026-09-28-docker-postgres-design.md`（Docker Compose + PostgreSQL + MinIO 设计）；实现时同步 ARCHITECTURE 对应小节。
 - [ ] **任务恢复策略**：`task-executor` 目前进程重启后 pending 任务标记失败；待多实例需求出现时评估 BullMQ + Redis，并同步 ARCHITECTURE.md §4。
 - [ ] **批量生图工具**：`schedule_batch`（提交即返回 taskId）未实现，属于刻意延后项；实现后需在 ARCHITECTURE.md 工具语义表补充。
-- [ ] **生图 Provider 抽象稳定化**：首批只接 Seedream；接入第二家（万相）后把 provider 接口固化并补接口文档。
+- [ ] **生图 Provider 抽象稳定化**：已实现 DashScope 万相 `wan2.7-image` 经 pi-ai `createImagesProvider` 自定义接入（`src/server/infra/providers/dashscope-images.ts`，Token Plan China 同步端点，返回 base64）；provider 抽象即 pi-ai 的 `createImagesProvider` / `createImagesModels` 接口。待补充：多 provider 选择、接口文档与联调固化。
 - [ ] **渲染沙箱网络白名单**：Playwright 出网限制目前是设计要求（AGENTS.md Security），实现时需细化白名单配置项并补充示例。
+- [ ] **入口敏感词词表**：`src/server/agent/moderation.ts` 机制已接好（聊天路由进入 LLM 前拦截），但 `DEFAULT_BLOCKLIST` 当前为空，词表待策略补充。
 - [ ] **数据模型演进**：`userId` 已预留但未启用；启动多租户时同步更新 ARCHITECTURE.md §7 与认证设计。
 - [ ] **认证延后（foundation）**：当前以固定 `OWNER_ID`（`src/lib/config.ts`）作为唯一用户，Route Handler 不做会话校验；待补充口令/邀请码 + cookie-session，届时恢复 AGENTS.md / ARCHITECTURE.md §2 的会话校验要求与实现。
-- [ ] **修复基线语义冲突**：`AGENTS.md` 称任务「persisted and retryable」，而 `ARCHITECTURE.md` §4 称「重启后 pending 标记失败」。需统一表述（任务级不恢复 vs 工具级可重试）。
+- [ ] **修复基线语义冲突**：`AGENTS.md` 称任务「persisted and retryable」，而 `ARCHITECTURE.md` §4 称「重启后 running 标记 failed」。统一表述：任务记录持久化（可手动重试/排查），但进程重启不自动恢复，running 任务标记 failed 后由用户重发。

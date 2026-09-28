@@ -51,6 +51,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
 | Database       | PostgreSQL via Drizzle ORM                          |
 | Rendering      | `playwright-core` + headless Chromium               |
+| Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
 | Package mgr    | pnpm 11                                             |
 
 ## Project structure

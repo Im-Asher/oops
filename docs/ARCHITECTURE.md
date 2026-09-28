@@ -43,7 +43,8 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | LLM 协议 | `pi-ai` | 多 Provider 统一请求/响应协议，屏蔽底层模型差异 |
 | 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
-| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发 |
+| 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
+| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发（`render_html` 工具延后） |
 | 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
 | 认证 | 口令/邀请码 + cookie session（**foundation 阶段延后**，当前以固定 OWNER_ID 作为唯一用户） | 自实现（HttpOnly/Secure/SameSite），不引入 next-auth |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
@@ -53,24 +54,23 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 
 **两张注册表解耦：ToolRegistry + AgentRegistry。**
 
-- **ToolRegistry**：工具实现一次、集中注册（`generate_image`、`render_html`、`save_asset`），Agent 配置按名字引用。
-- **AgentRegistry**：启动时扫描 `src/server/agent/agents/` 自动加载，并导出轻量元数据（id/name/description/icon/greeting）给前端 `/api/agents`。
+- **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落 MinIO→assets 的原子语义）；`render_html`/`save_asset` 属刻意延后项。
+- **AgentRegistry**：启动时扫描 `src/server/agent/agents/` 自动加载，并导出轻量元数据（id/name/description/tools，不含 systemPrompt）给前端 `GET /api/agents`。
 
 新增 Agent = 新增一个文件：
 
 ```ts
-// src/server/agent/agents/poster-designer.ts
-export default defineAgent({
-  id: 'poster-designer',
-  name: '海报设计师',
-  description: '电商促销海报、大促主视觉',
-  icon: 'palette',
-  systemPrompt: loadPrompt('poster-designer'),   // prompts/poster-designer.md
-  tools: ['render_html', 'generate_image', 'save_asset'],
-  defaults: { imageSize: '1080x1440', llm: 'doubao-seed-1.6' },
-  greeting: '告诉我活动主题、利益点和尺寸，我来出海报。',
-})
+// src/server/agent/agents/atmosphere-designer.ts
+export const atmosphereDesigner = defineAgent({
+  id: "atmosphere-designer",
+  name: "氛围图设计师",
+  description: "专注氛围/场景图与产品图的文生图助手",
+  tools: ["generate_image"],     // 按名引用已注册工具（越权工具被拦截）
+  systemPrompt,                 // 外置到 prompts/atmosphere-designer.md
+});
 ```
+
+> 注：v1 的 Agent 定义为 `{ id, name, description, tools, systemPrompt }`；`icon` / `greeting` / `defaults` 属规划中的元数据扩展（前端选择器当前仅消费 id/name/description/tools），以代码为准。
 
 - system prompt 外置到 `src/server/agent/prompts/*.md`，独立调优。
 - 切换 Agent = 换 systemPrompt + tools 子集重新进入 `agentLoop`，无子 Agent 黑盒编排（符合 Pi 反黑盒理念）。
@@ -81,11 +81,12 @@ export default defineAgent({
 **Service 层：所有生图/截图都是任务。**
 
 ```
-generateImage({ prompt, size, provider })
+generate_image({ prompt, size, aspectRatio })
   → 写 tasks 表 (pending)
-  → 进程内 executor（单例，并发 2~3，超时/重试）
-  → 调生图 API（Seedream/万相为提交+轮询的异步任务协议，封装在 service 内）
-  → 完成 → assets 表落库，task 流转 pending → running → done/failed
+  → 进程内 executor（单例，并发 2，单任务超时 90s；重启后 running 标记 failed）
+  → 调 DashScope Token Plan 万相 wan2.7-image（POST multimodal-generation，同步返回 base64）
+  → provider 内把返回图下载/转 base64 → 写入 MinIO → assets 表落库
+  → task 流转 pending → running → succeeded/failed
 ```
 
 - Playwright 截图同样任务化（CPU/内存密集，并发限 1~2）。
@@ -107,8 +108,8 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ① 前端：PromptInput 提交消息+附件 → POST /api/chat { sessionId, agentId, ... } → SSE 连接
 ② Route Handler：鉴权 → 用户消息落库 → AgentRegistry 取配置 → 加载历史 → agentLoop
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
-④ 工具执行：generate_image（出背景图）→ render_html（HTML+素材 → 截图）→ 返回 asset
-⑤ agent 拿到工具结果继续推理 → 输出总结 → finish
+④ 工具执行：generate_image（出图 → 下载转 base64 → 落 MinIO → assets 落库）返回自有 `/files` URL
+⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
 ⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 作品库可见
 ```
 
@@ -160,23 +161,31 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 - `task_type`：`generate_image` / `render_html` / `export`
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
 
-> 注：完整愿景中的 `agentId` 列、`messages.parts`（AI Elements UIMessage 结构）、
-> `assets.resultAssetId` 等，将在 `chat-image-gen` / Agent 运行时 change 中补齐，
-> 届时不破坏现有表（以 `ALTER`/新增迁移演进）。
+> 注：`chat-image-gen` 已落地：① `chat_sessions` 新增 `agent_id` 列（迁移 `0001`）；
+> ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
+> `src/server/agent/transcript.ts` 确定性重建为可直接渲染的 UIMessage parts（零转换，前端不需字段映射）；
+> ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
+> `assets.resultAssetId` 等扩展属后续按需演进。
 
 Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列用 `timestamp with time zone`。
 
 ## 8. 项目目录
 
-> 以下为 **foundation 阶段**实际存在的文件；标注「（规划）」的为后续 change 才落地。
+> 以下为当前实际存在的文件；标注「（后续 change）」的为尚未落地项。
 
 ```
 oops/
 ├── src/
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
-│   │   ├── page.tsx                # 默认首页（暂未接入聊天，待 chat-image-gen）
+│   │   ├── page.tsx                # 默认首页
 │   │   ├── files/[...path]/route.ts # 资产代理读取（安全响应头）
-│   │   └── upload/route.ts         # 图片上传（MIME 白名单 + 大小上限）
+│   │   ├── upload/route.ts
+│   │   ├── chat/page.tsx           # 简版聊天页（会话列表 + 消息流 + 输入，自定义 SSE）
+│   │   └── api/
+│   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
+│   │       ├── sessions/route.ts   # 会话 CRUD
+│   │       ├── sessions/[id]/route.ts # GET 会话历史（UIMessage 重建）
+│   │       └── chat/route.ts       # POST SSE 聊天（敏感词初筛 + 落库 + 流式）         # 图片上传（MIME 白名单 + 大小上限）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── db/                     # Drizzle client + schema + 仓储
 │   │   │   ├── schema.ts           # 四表 + 枚举定义
@@ -186,11 +195,20 @@ oops/
 │   │   │   ├── asset.repo.ts       # 资产 仓储
 │   │   │   ├── task.repo.ts        # 任务 仓储
 │   │   │   └── mock-db.ts          # 仓储单测用的 drizzle 查询 mock
-│   │   └── infra/
-│   │       └── storage/            # 存储抽象（MinIO / S3 兼容）
+│   │   ├── infra/
+│   │       ├── storage/            # 存储抽象（MinIO / S3 兼容）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
 │   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
-│   │           └── upload.ts       # 上传校验 + 处理
+│   │           ├── upload.ts
+│   │   │   └── providers/          # 外部 Provider 接入
+│   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
+│   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider
+│   │   ├── domain/
+│   │   │   └── tasks/task-executor.ts # 进程内任务执行器（并发 2 / 超时 90s / 重启清理）
+│   │   └── agent/                  # 声明式 Agent 运行时
+│   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts
+│   │       ├── agents/             # 各 Agent 定义 + prompts/<id>.md
+│   │       └── tools/              # ToolRegistry + 工具实现（generate-image 等）       # 上传校验 + 处理
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
 │   ├── lib/                        # 客户端安全共享：config / utils（+ 单测）
 │   └── (types/ 规划)               # 共享类型，后续 change 引入
@@ -205,9 +223,8 @@ oops/
 （ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
 `src/server/db` 为领域仓储层（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
 
-> 规划中尚未落地（属于后续 change）：`src/server/domain/`（领域聚合 / 任务状态机）、
-> `src/server/agent/`（声明式 Agent 运行时：registry / runtime / agents / tools）、
-> `src/server/infra/providers/`、`src/server/infra/render/`、`/api/chat` SSE、`gallery` 页面。
+> 后续 change 才落地（尚未实现）：`src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）、
+> `gallery` 作品库页（当前以 `/files` 路由 + 会话历史呈现图片）；领域聚合/任务状态机等按需演进（`task-executor` 已落地）。
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
