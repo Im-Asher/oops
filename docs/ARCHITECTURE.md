@@ -167,26 +167,34 @@ oops/
 │   │       ├── upload/route.ts
 │   │       └── files/[...path]/route.ts
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
-│   │   ├── agent/
-│   │   │   ├── registry.ts         # Agent 扫描加载
-│   │   │   ├── runtime.ts          # agentLoop ↔ SSE 桥接 + 持久化
-│   │   │   ├── agents/             # 声明式 Agent 定义（一文件一 Agent）
-│   │   │   ├── prompts/            # system prompt（md）
-│   │   │   └── tools/              # ToolRegistry + 工具实现
-│   │   ├── services/
-│   │   │   ├── image-generation.ts # 生图 Provider 封装
-│   │   │   ├── render.ts           # Playwright HTML 截图
-│   │   │   ├── task-executor.ts    # 进程内 Worker
-│   │   │   ├── asset.ts            # 存储抽象
-│   │   │   └── session.ts
-│   │   └── db/                     # Drizzle schema + migrations
+│   │   ├── domain/                 # 纯领域：实体 + 仓储接口 + 领域逻辑
+│   │   │   ├── sessions/           # 会话生命周期
+│   │   │   │   └── session.repo.ts
+│   │   │   ├── messages/           # 消息持久化、UIMessage 重建
+│   │   │   │   └── message.repo.ts
+│   │   │   ├── assets/             # 资产元数据实体 + 仓储（落库对象 key）
+│   │   │   │   └── asset.repo.ts
+│   │   │   └── tasks/              # 生成任务实体 + 状态机
+│   │   │       ├── task.repo.ts
+│   │   │       └── task-executor.ts # 进程内 Worker 编排（调 domain + infra）
+│   │   ├── infra/                  # 基础设施实现（具体技术，藏在接口后）
+│   │   │   ├── db/                 # Drizzle client + schema + migrations
+│   │   │   ├── storage/            # MinIO / S3 客户端（原 asset 存储）
+│   │   │   ├── providers/          # Seedream / 万相 生图客户端
+│   │   │   └── render/            # Playwright HTML 截图
+│   │   └── agent/                  # 声明式 Agent 运行时（独立关注点，保持不动）
+│   │       ├── registry.ts         # Agent 扫描加载
+│   │       ├── runtime.ts          # agentLoop ↔ SSE 桥接 + 持久化
+│   │       ├── agents/             # 声明式 Agent 定义（一文件一 Agent）
+│   │       ├── prompts/            # system prompt（md）
+│   │       └── tools/              # ToolRegistry + 工具实现（内部调 domain/infra）
 │   ├── components/                 # chat/ agent-picker/ gallery/
 │   ├── lib/                        # 共享 utils、config
 │   └── types/                      # 共享类型
 └── data/                           # 已废弃：原 sqlite 文件 + 本地图片；现改用 Postgres + MinIO（可删除）
 ```
 
-**分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import（ESLint `no-restricted-imports` 强制）；`src/lib` 与 `src/types` 前后端共享。
+**分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import（ESLint `no-restricted-imports` 强制）；`src/lib` 与 `src/types` 前后端共享。`src/server/domain` 为纯领域（不依赖具体 Provider / 框架），`src/server/infra` 为基础设施实现并藏在接口后，`src/server/agent` 为声明式 Agent 运行时（独立关注点）。
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 

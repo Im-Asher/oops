@@ -58,9 +58,12 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 ```
 src/
 ├── app/            # Thin routing shell: pages + Route Handlers only
-├── server/         # SERVER-ONLY: agent runtime, services, db
+├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
+│   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
+│   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
+│   └── agent/      # 声明式 Agent 运行时（registry/runtime/agents/tools）
 ├── components/     # React components (client)
-├── lib/            # Shared utilities (client-safe)
+├── lib/            # Shared utilities (client-safe, 含 config)
 └── types/          # Shared TypeScript types
 ```
 
@@ -93,7 +96,9 @@ Package manager is **pnpm 11** — do not use npm/yarn. Lockfile is
   or proper types. Export explicit types from `src/types/` when shared.
 - **Layering convention:**
   - `src/app/` is a thin shell: pages, `route.ts` handlers, minimal glue.
-    Business logic belongs in `src/server/services/` or `src/server/agent/`.
+    Pure domain logic belongs in `src/server/domain/`; infrastructure
+    (providers/storage/db/render) lives in `src/server/infra/` behind
+    interfaces; `src/server/agent/` holds the declarative agent runtime.
   - Route Handlers validate input (zod), call server services, and return
     responses. They must stay short.
   - Shared UI helpers go in `src/lib/`; components in `src/components/`.
@@ -112,7 +117,7 @@ Package manager is **pnpm 11** — do not use npm/yarn. Lockfile is
   prefer server components. AI Elements components are the base for all chat
   UI — do not hand-roll message/attachment/tool UI.
 - **Async tasks:** image generation and HTML rendering must go through
-  `src/server/services/task-executor.ts`. Never call provider APIs or
+  `src/server/domain/tasks/task-executor.ts`. Never call provider APIs or
   Playwright directly from tools/route handlers with unbounded concurrency.
 - **Comments:** explain *why*, not *what*. No narration comments.
 - **Commits:** conventional commits (`feat:`, `fix:`, `chore:`, `docs:`...).
