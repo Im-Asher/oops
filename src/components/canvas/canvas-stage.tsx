@@ -3,6 +3,7 @@
 import { CanvasEmptyState } from "@/components/canvas/canvas-empty-state";
 import { CropOverlay, type CropArea } from "@/components/canvas/crop-overlay";
 import { EditToolbar } from "@/components/canvas/edit-toolbar";
+import { FilterPanel } from "@/components/canvas/filter-panel";
 import { ViewToolbar } from "@/components/canvas/view-toolbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,9 @@ import {
   type CanvasImage,
   type CanvasView,
   type CropRect,
+  type Filters,
 } from "@/lib/canvas/canvas-reducer";
+import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const ZOOM_STEP = 1.2;
@@ -20,9 +23,12 @@ interface CanvasStageProps {
   image: CanvasImage | null;
   view: CanvasView;
   crop: CropRect | null;
+  filters: Filters;
   onViewChange: (view: CanvasView) => void;
   onResetView: () => void;
   onCropApply: (crop: CropRect) => void;
+  onFiltersChange: (filters: Partial<Filters>) => void;
+  onResetFilters: () => void;
 }
 
 /** 已应用的裁剪用 clip-path 预览：与导出共用同一套归一化坐标。 */
@@ -43,9 +49,12 @@ export function CanvasStage({
   image,
   view,
   crop,
+  filters,
   onViewChange,
   onResetView,
   onCropApply,
+  onFiltersChange,
+  onResetFilters,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -54,6 +63,7 @@ export function CanvasStage({
   // 裁剪会话绑定激活图 url：换图自动失效，无需在 effect 里重置状态。
   const [cropSession, setCropSession] = useState<{ url: string; area: CropArea } | null>(null);
   const [draft, setDraft] = useState<CropRect | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const cropping = cropSession !== null && image?.url === cropSession.url;
   const dragRef = useRef<{
     pointerId: number;
@@ -135,6 +145,7 @@ export function CanvasStage({
     if (!naturalWidth || !naturalHeight || !base.width || !base.height) return;
 
     onResetView();
+    setFiltersOpen(false);
     const fit = Math.min(1, base.width / naturalWidth, base.height / naturalHeight);
     const width = naturalWidth * fit;
     const height = naturalHeight * fit;
@@ -165,6 +176,8 @@ export function CanvasStage({
     setCropSession(null);
     setDraft(null);
   };
+
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
 
   const confirmCropping = () => {
     if (!draft) return;
@@ -256,12 +269,27 @@ export function CanvasStage({
               transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
               // 裁剪模式下展示整图，便于重新框选
               clipPath: cropping ? undefined : clipPathOf(crop),
+              // 与导出共用 filtersToCss，故预览与导出视觉一致
+              filter: filtersToCssOrNone(filters),
             }}
           />
           {cropping && cropSession ? (
             <CropOverlay area={cropSession.area} draft={draft} onDraftChange={setDraft} />
           ) : null}
-          <EditToolbar cropping={cropping} onToggleCrop={cropping ? cancelCropping : startCropping} />
+          <EditToolbar
+            cropping={cropping}
+            filtersOpen={filtersOpen && !cropping}
+            onToggleCrop={cropping ? cancelCropping : startCropping}
+            onToggleFilters={() => setFiltersOpen((open) => !open)}
+          />
+          {filtersOpen && !cropping ? (
+            <FilterPanel
+              filters={filters}
+              onChange={onFiltersChange}
+              onClose={closeFilters}
+              onReset={onResetFilters}
+            />
+          ) : null}
           {cropping ? (
             <div
               className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-2 py-1 backdrop-blur"

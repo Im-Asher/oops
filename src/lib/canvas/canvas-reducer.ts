@@ -25,11 +25,18 @@ export interface CropRect {
   height: number;
 }
 
-/** 滤镜参数，单位与 CSS filter 一致（%，100 为原始值）。 */
+/**
+ * 滤镜参数，取值与 CSS filter 语法一致。
+ * 预览（CSS filter）与导出（ctx.filter）共用这一份参数，保证零色差。
+ */
 export interface Filters {
   brightness: number;
   contrast: number;
   saturate: number;
+  /** 暖调用 */
+  sepia: number;
+  /** 冷调用，单位 deg */
+  hueRotate: number;
 }
 
 export interface CanvasEditState {
@@ -55,7 +62,13 @@ export type CanvasAction =
 
 export const DEFAULT_VIEW: CanvasView = { scale: 1, x: 0, y: 0 };
 
-export const DEFAULT_FILTERS: Filters = { brightness: 100, contrast: 100, saturate: 100 };
+export const DEFAULT_FILTERS: Filters = {
+  brightness: 100,
+  contrast: 100,
+  saturate: 100,
+  sepia: 0,
+  hueRotate: 0,
+};
 
 /** 缩放区间 25%~400%（canvas-workspace spec）。 */
 export const MIN_SCALE = 0.25;
@@ -100,11 +113,13 @@ export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 }
 
-function isDefaultFilters(filters: Filters): boolean {
+export function isDefaultFilters(filters: Filters): boolean {
   return (
     filters.brightness === DEFAULT_FILTERS.brightness &&
     filters.contrast === DEFAULT_FILTERS.contrast &&
-    filters.saturate === DEFAULT_FILTERS.saturate
+    filters.saturate === DEFAULT_FILTERS.saturate &&
+    filters.sepia === DEFAULT_FILTERS.sepia &&
+    filters.hueRotate === DEFAULT_FILTERS.hueRotate
   );
 }
 

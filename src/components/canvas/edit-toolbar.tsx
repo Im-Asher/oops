@@ -1,15 +1,22 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CropIcon } from "lucide-react";
+import { CropIcon, SlidersHorizontalIcon } from "lucide-react";
 
 interface EditToolbarProps {
   cropping: boolean;
+  filtersOpen: boolean;
   onToggleCrop: () => void;
+  onToggleFilters: () => void;
 }
 
-/** 右上编辑工具条（设计稿 §3.4）。后续任务追加滤镜、导出、重置。 */
-export function EditToolbar({ cropping, onToggleCrop }: EditToolbarProps) {
+/** 右上编辑工具条（设计稿 §3.4）。导出与重置由后续任务追加。 */
+export function EditToolbar({
+  cropping,
+  filtersOpen,
+  onToggleCrop,
+  onToggleFilters,
+}: EditToolbarProps) {
   return (
     <div
       className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/90 px-1.5 py-1 backdrop-blur"
@@ -25,6 +32,16 @@ export function EditToolbar({ cropping, onToggleCrop }: EditToolbarProps) {
         variant={cropping ? "secondary" : "ghost"}
       >
         <CropIcon />
+      </Button>
+      <Button
+        aria-label="滤镜面板"
+        aria-pressed={filtersOpen}
+        className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+        onClick={onToggleFilters}
+        size="icon-sm"
+        variant={filtersOpen ? "secondary" : "ghost"}
+      >
+        <SlidersHorizontalIcon />
       </Button>
     </div>
   );

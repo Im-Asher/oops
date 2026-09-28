@@ -74,10 +74,10 @@ describe("canvasReducer", () => {
 
   it("setFilters 按字段局部合并，resetFilters 回到默认", () => {
     const partial = canvasReducer(zoomed(), { type: "setFilters", filters: { brightness: 120 } });
-    expect(partial.edit.filters).toEqual({ brightness: 120, contrast: 100, saturate: 100 });
+    expect(partial.edit.filters).toEqual({ ...DEFAULT_FILTERS, brightness: 120 });
 
     const further = canvasReducer(partial, { type: "setFilters", filters: { saturate: 60 } });
-    expect(further.edit.filters).toEqual({ brightness: 120, contrast: 100, saturate: 60 });
+    expect(further.edit.filters).toEqual({ ...DEFAULT_FILTERS, brightness: 120, saturate: 60 });
 
     expect(canvasReducer(further, { type: "resetFilters" }).edit.filters).toEqual(DEFAULT_FILTERS);
   });

@@ -7,6 +7,7 @@ import {
   initialCanvasState,
   type CanvasView,
   type CropRect,
+  type Filters,
 } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useState } from "react";
@@ -31,6 +32,11 @@ export default function ChatPage() {
     (crop: CropRect) => dispatch({ type: "setCrop", crop }),
     [],
   );
+  const handleFiltersChange = useCallback(
+    (filters: Partial<Filters>) => dispatch({ type: "setFilters", filters }),
+    [],
+  );
+  const handleResetFilters = useCallback(() => dispatch({ type: "resetFilters" }), []);
 
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
@@ -171,8 +177,11 @@ export default function ChatPage() {
     <main className="dark fixed inset-0 overflow-hidden bg-[#0A0A0A]">
       <CanvasStage
         crop={canvas.edit.crop}
+        filters={canvas.edit.filters}
         image={canvas.active}
         onCropApply={handleCropApply}
+        onFiltersChange={handleFiltersChange}
+        onResetFilters={handleResetFilters}
         onResetView={handleResetView}
         onViewChange={handleViewChange}
         view={canvas.view}
