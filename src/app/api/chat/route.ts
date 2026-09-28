@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runAgent } from "@/server/agent/runtime";
+import { screenInput } from "@/server/agent/moderation";
 import "@/server/agent/agents"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { createMessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo } from "@/server/db/session.repo";
@@ -27,6 +28,11 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { sessionId, message } = parsed.data;
+  const blocked = screenInput(message);
+  if (blocked) {
+    return Response.json({ error: { code: "BLOCKED", message: blocked } }, { status: 400 });
+  }
+
   const session = await createSessionRepo().get(sessionId);
   if (!session) {
     return Response.json({ error: { code: "NOT_FOUND", message: "会话不存在" } }, { status: 404 });
