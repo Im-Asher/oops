@@ -1,9 +1,11 @@
 "use client";
 
+import { CanvasEmptyState } from "@/components/canvas/canvas-empty-state";
 import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { FloatingChatPanel } from "@/components/chat/floating-chat-panel";
+import { canvasReducer, initialCanvasState } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 
 export default function ChatPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -13,6 +15,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
+  const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
 
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
@@ -40,11 +43,20 @@ export default function ChatPage() {
   }, [currentId]);
 
   async function selectSession(id: string) {
+    dispatch({ type: "clear" });
     setCurrentId(id);
     const res = await fetch(`/api/sessions/${id}`);
     if (res.ok) {
       const data = (await res.json()) as { messages: UIMessage[] };
       setMessages(data.messages);
+      // 加载会话时把激活图回落到最近一张图；不持久化视图状态（design Non-Goals）。
+      const latest = [...data.messages]
+        .reverse()
+        .flatMap((m) => m.parts)
+        .find((p) => p.type === "image");
+      if (latest?.type === "image") {
+        dispatch({ type: "activate", image: { assetId: latest.assetId, url: latest.url } });
+      }
     }
   }
 
@@ -58,6 +70,7 @@ export default function ChatPage() {
       const data = (await res.json()) as SessionInfo;
       setSessions((s) => [data, ...s]);
       setMessages([]);
+      dispatch({ type: "clear" });
       setCurrentId(data.id);
     }
   }
@@ -141,7 +154,14 @@ export default function ChatPage() {
 
   return (
     <main className="dark fixed inset-0 overflow-hidden bg-[#0A0A0A]">
-      <CanvasStage />
+      <CanvasStage>
+        {canvas.active ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt="激活图" className="max-h-full max-w-full object-contain" src={canvas.active.url} />
+        ) : (
+          <CanvasEmptyState />
+        )}
+      </CanvasStage>
       <FloatingChatPanel
         agentId={agentId}
         agents={agents}
