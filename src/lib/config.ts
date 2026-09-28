@@ -48,6 +48,8 @@ export const IMAGE_DEFAULT_SIZE = process.env.IMAGE_DEFAULT_SIZE ?? "1024*1024";
 export const IMAGE_ENDPOINT =
   process.env.IMAGE_ENDPOINT ??
   "https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
+/** Token Plan China API key，图像生成与 LLM 共用（DashScope Bearer 鉴权）。 */
+export const QWEN_TOKEN_PLAN_CN_API_KEY = process.env.QWEN_TOKEN_PLAN_CN_API_KEY;
 
 export type AppConfig = z.infer<typeof envSchema>;
 

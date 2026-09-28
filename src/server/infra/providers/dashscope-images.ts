@@ -8,7 +8,7 @@ import {
   type ImagesOptions,
   type MutableImagesModels,
 } from "@earendil-works/pi-ai";
-import { IMAGE_ENDPOINT, IMAGE_MODELS } from "@/lib/config";
+import { IMAGE_ENDPOINT, IMAGE_MODELS, QWEN_TOKEN_PLAN_CN_API_KEY } from "@/lib/config";
 
 export const DASHSCOPE_IMAGE_PROVIDER = "dashscope-token-plan";
 export const DASHSCOPE_IMAGE_MODEL = "wan2.7-image";
@@ -104,16 +104,22 @@ function buildProvider() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 90_000);
       try {
+        const apiKey = options?.apiKey ?? QWEN_TOKEN_PLAN_CN_API_KEY;
         const res = await fetch(IMAGE_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+            ...(options?.headers ?? {}),
+          },
           body: JSON.stringify({
             model: model.id,
-            input: { prompt },
+            input: {
+              messages: [{ role: "user", content: [{ text: prompt }] }],
+            },
             parameters: {
               size: meta.size,
               n: 1,
-              ...(meta.aspectRatio ? { aspect_ratio: meta.aspectRatio } : {}),
             },
           }),
           signal: controller.signal,
