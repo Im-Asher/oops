@@ -30,7 +30,9 @@ const envSchema = z.object({
 export type AppConfig = z.infer<typeof envSchema>;
 
 /** 解析并校验环境变量；非法时抛出 ZodError（缺 key 早报错）。单独导出以便测试。 */
-export function parseEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function parseEnv(
+  env: Record<string, string | undefined> = process.env,
+): AppConfig {
   return envSchema.parse(env);
 }
 

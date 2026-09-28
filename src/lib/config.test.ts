@@ -7,7 +7,7 @@ const validEnv = {
   MINIO_ACCESS_KEY: "minioadmin",
   MINIO_SECRET_KEY: "minioadmin",
   MINIO_BUCKET: "oops-assets",
-} satisfies NodeJS.ProcessEnv;
+};
 
 describe("parseEnv", () => {
   it("parses a full valid env with defaults applied", () => {
