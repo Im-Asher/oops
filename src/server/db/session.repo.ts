@@ -4,7 +4,7 @@ import { sessions, type Session } from "./schema";
 import { OWNER_ID } from "@/lib/config";
 
 export interface SessionRepo {
-  create(input?: { title?: string; userId?: string }): Promise<Session>;
+  create(input?: { title?: string; agentId?: string; userId?: string }): Promise<Session>;
   list(userId?: string): Promise<Session[]>;
   get(id: string, userId?: string): Promise<Session | undefined>;
   rename(id: string, title: string): Promise<Session | undefined>;
@@ -16,7 +16,11 @@ export function createSessionRepo(db: typeof defaultDb = defaultDb): SessionRepo
     async create(input = {}) {
       const [row] = await db
         .insert(sessions)
-        .values({ title: input.title, userId: input.userId ?? OWNER_ID })
+        .values({
+          title: input.title,
+          agentId: input.agentId,
+          userId: input.userId ?? OWNER_ID,
+        })
         .returning();
       return row;
     },

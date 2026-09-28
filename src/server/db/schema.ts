@@ -35,6 +35,7 @@ export const sessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   // 认证延后：恒为 OWNER_ID，多租户预留
   userId: text("user_id").notNull().default(OWNER_ID),
+  agentId: text("agent_id"),
   title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

@@ -25,7 +25,29 @@ const envSchema = z.object({
   MINIO_BUCKET: z.string().min(1, "MINIO_BUCKET 缺失"),
   QWEN_TOKEN_PLAN_CN_API_KEY: z.string().min(1).optional(),
   OWNER_ID: z.string().min(1).default("owner"),
+  IMAGE_MODELS: z
+    .string()
+    .default("wan2.7-image")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+  IMAGE_DEFAULT_SIZE: z.string().default("1024*1024"),
+  IMAGE_ENDPOINT: z
+    .string()
+    .default(
+      "https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+    ),
 });
+
+/** 图像生成可用模型白名单（provider 配置校验）。 */
+export const IMAGE_MODELS = (process.env.IMAGE_MODELS ?? "wan2.7-image")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+/** 图像生成默认像素尺寸（DashScope size 格式，如 "1024*1024"）。 */
+export const IMAGE_DEFAULT_SIZE = process.env.IMAGE_DEFAULT_SIZE ?? "1024*1024";
+/** Token Plan 多模态生成同步接口地址。 */
+export const IMAGE_ENDPOINT =
+  process.env.IMAGE_ENDPOINT ??
+  "https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
 
 export type AppConfig = z.infer<typeof envSchema>;
 
