@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import {
   integer,
   jsonb,
@@ -9,8 +8,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { OWNER_ID } from "@/lib/config";
-
-const now = sql`now()`;
 
 export const messageRole = pgEnum("message_role", [
   "user",
