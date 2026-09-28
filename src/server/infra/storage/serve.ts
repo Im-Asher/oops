@@ -85,5 +85,7 @@ export async function buildAssetResponse(
   if (typeof object.ContentLength === "number") {
     headers.set("Content-Length", String(object.ContentLength));
   }
-  return new Response(body, { headers });
+  // 拷贝为普通 ArrayBuffer 支撑的 Uint8Array，满足新版 TS 的 BodyInit 类型
+  const plain = new Uint8Array(body);
+  return new Response(plain, { headers });
 }
