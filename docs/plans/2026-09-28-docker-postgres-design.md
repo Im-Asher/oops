@@ -21,7 +21,7 @@
 最终栈 `app + postgres + minio`，本地开发只起后两者。
 
 - `docker-compose.yaml` 只定义 `postgres` 与 `minio` 两个服务；Next.js 用本机 `pnpm dev` 跑（热更新），不进 compose。两者挂 named volume 持久化，minio 开 console 端口。
-- 连接走环境变量：`DATABASE_URL=postgres://doops:doops@localhost:5432/doops`（compose 端口映射宿主机）、`MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET`。`src/lib/config.ts` 统一读取。
+- 连接走环境变量：`DATABASE_URL=postgres://oops:oops@localhost:5432/oops`（compose 端口映射宿主机）、`MINIO_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET`。`src/lib/config.ts` 统一读取。
 - Drizzle 切 pg 方言：驱动 `drizzle-orm/postgres-js` + `postgres`；`pnpm db:generate` / `db:migrate` 改连 PostgreSQL，不再有 SQLite 文件。
 - Schema 方言调整：`parts`/`meta` 的 `JSON` → `jsonb`；`type`/`kind`/`status` 用 `pgEnum`（或 `varchar` + 应用约束）；时间列 → `timestamp`。`userId` 预留列不变。
 - 迁移产物落 `src/server/db/migrations/`，`db:migrate` 应用。
