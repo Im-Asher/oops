@@ -39,7 +39,8 @@ export function toUIMessage(
 
   if (Array.isArray(toolCalls)) {
     for (const tc of toolCalls as StoredToolCall[]) {
-      if (tc?.type === "generate_image" && tc.url) {
+      // 生成图与编辑导出图都渲染为图片 part；后者无 prompt/model 血缘。
+      if ((tc?.type === "generate_image" || tc?.type === "edited_image") && tc.url) {
         parts.push({
           type: "image",
           url: tc.url,

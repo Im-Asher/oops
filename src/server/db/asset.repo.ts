@@ -7,7 +7,7 @@ export interface AssetInput {
   storageKey: string;
   mimeType: string;
   sessionId?: string;
-  kind?: "image" | "json" | "other";
+  kind?: "image" | "json" | "other" | "edited";
   width?: number;
   height?: number;
   prompt?: string;

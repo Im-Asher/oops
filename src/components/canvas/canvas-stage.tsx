@@ -29,6 +29,12 @@ interface CanvasStageProps {
   onCropApply: (crop: CropRect) => void;
   onFiltersChange: (filters: Partial<Filters>) => void;
   onResetFilters: () => void;
+  dirty: boolean;
+  exporting: boolean;
+  busy: boolean;
+  exportError: string | null;
+  onExport: () => void;
+  onResetEdits: () => void;
 }
 
 /** 已应用的裁剪用 clip-path 预览：与导出共用同一套归一化坐标。 */
@@ -55,6 +61,12 @@ export function CanvasStage({
   onCropApply,
   onFiltersChange,
   onResetFilters,
+  dirty,
+  exporting,
+  busy,
+  exportError,
+  onExport,
+  onResetEdits,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -277,8 +289,13 @@ export function CanvasStage({
             <CropOverlay area={cropSession.area} draft={draft} onDraftChange={setDraft} />
           ) : null}
           <EditToolbar
+            busy={busy}
             cropping={cropping}
+            dirty={dirty}
+            exporting={exporting}
             filtersOpen={filtersOpen && !cropping}
+            onExport={onExport}
+            onResetEdits={onResetEdits}
             onToggleCrop={cropping ? cancelCropping : startCropping}
             onToggleFilters={() => setFiltersOpen((open) => !open)}
           />
@@ -321,6 +338,14 @@ export function CanvasStage({
               scale={view.scale}
             />
           )}
+          {exportError ? (
+            <p
+              className="absolute bottom-4 left-1/2 z-20 max-w-[90%] -translate-x-1/2 rounded-lg border border-red-900/60 bg-red-950/90 px-3 py-2 text-xs text-red-200"
+              role="alert"
+            >
+              {exportError}
+            </p>
+          ) : null}
         </>
       ) : (
         <CanvasEmptyState />

@@ -1,19 +1,34 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { CropIcon, SlidersHorizontalIcon } from "lucide-react";
+import {
+  CropIcon,
+  DownloadIcon,
+  RotateCcwIcon,
+  SlidersHorizontalIcon,
+} from "lucide-react";
 
 interface EditToolbarProps {
+  busy: boolean;
   cropping: boolean;
+  dirty: boolean;
+  exporting: boolean;
   filtersOpen: boolean;
+  onExport: () => void;
+  onResetEdits: () => void;
   onToggleCrop: () => void;
   onToggleFilters: () => void;
 }
 
-/** 右上编辑工具条（设计稿 §3.4）。导出与重置由后续任务追加。 */
+/** 右上编辑工具条（设计稿 §3.4）：裁剪、滤镜、导出、重置。 */
 export function EditToolbar({
+  busy,
   cropping,
+  dirty,
+  exporting,
   filtersOpen,
+  onExport,
+  onResetEdits,
   onToggleCrop,
   onToggleFilters,
 }: EditToolbarProps) {
@@ -43,6 +58,30 @@ export function EditToolbar({
       >
         <SlidersHorizontalIcon />
       </Button>
+      {!cropping ? (
+        <>
+          <Button
+            aria-label="重置编辑"
+            className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+            disabled={!dirty}
+            onClick={onResetEdits}
+            size="icon-sm"
+            variant="ghost"
+          >
+            <RotateCcwIcon />
+          </Button>
+          <Button
+            aria-label="导出为图片"
+            className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+            disabled={!dirty || exporting || busy}
+            onClick={onExport}
+            size="icon-sm"
+            variant="ghost"
+          >
+            <DownloadIcon />
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }

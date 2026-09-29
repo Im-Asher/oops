@@ -15,6 +15,13 @@
       "when": 1790608280156,
       "tag": "0001_fair_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790687045817,
+      "tag": "0002_broad_paladin",
+      "breakpoints": true
     }
   ]
 }

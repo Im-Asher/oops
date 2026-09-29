@@ -15,7 +15,8 @@ export const messageRole = pgEnum("message_role", [
   "system",
 ]);
 
-export const assetKind = pgEnum("asset_kind", ["image", "json", "other"]);
+// edited：由画布编辑导出的派生图，与原始生成图（image）区分，meta 记录 sourceAssetId 血缘
+export const assetKind = pgEnum("asset_kind", ["image", "json", "other", "edited"]);
 
 export const taskType = pgEnum("task_type", [
   "generate_image",
