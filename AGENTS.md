@@ -132,7 +132,7 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
     services.
   - **Manual smoke path** after changes to the chat flow: login → create
     session → pick agent → send message → observe SSE stream → verify
-    generated asset appears in gallery.
+    generated asset appears on the canvas (thumbnail, clickable to promote).
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
 - Playwright screenshot rendering is covered by a service-level test using a
   minimal HTML fixture; keep it hermetic (no network).

@@ -7,7 +7,7 @@
 一体化 Next.js 全栈应用（无独立后端），Route Handlers 承载 SSE 流与上传接口。
 
 ```
-浏览器 (shadcn/ui + AI Elements 聊天界面)
+浏览器 (shadcn/ui：全屏画布工作台 + 左侧悬浮聊天面板；生图以缩略图上屏)
    │  SSE 流式消息 / 工具调用状态
    ▼
 Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
@@ -157,7 +157,7 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 枚举取值：
 
 - `message_role`：`user` / `assistant` / `system`
-- `asset_kind`：`image` / `json` / `other`
+- `asset_kind`：`image` / `json` / `other` / `edited`
 - `task_type`：`generate_image` / `render_html` / `export`
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
 
@@ -165,6 +165,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
 > `src/server/agent/transcript.ts` 确定性重建为可直接渲染的 UIMessage parts（零转换，前端不需字段映射）；
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
+> `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
+> `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
 Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列用 `timestamp with time zone`。
@@ -180,7 +182,7 @@ oops/
 │   │   ├── page.tsx                # 默认首页
 │   │   ├── files/[...path]/route.ts # 资产代理读取（安全响应头）
 │   │   ├── upload/route.ts
-│   │   ├── chat/page.tsx           # 简版聊天页（会话列表 + 消息流 + 输入，自定义 SSE）
+│   │   ├── chat/page.tsx           # 画布工作台页（全屏画布 + 悬浮聊天面板，自定义 SSE）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
 │   │       ├── sessions/route.ts   # 会话 CRUD
@@ -223,8 +225,9 @@ oops/
 （ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
 `src/server/db` 为领域仓储层（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
 
-> 后续 change 才落地（尚未实现）：`src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）、
-> `gallery` 作品库页（当前以 `/files` 路由 + 会话历史呈现图片）；领域聚合/任务状态机等按需演进（`task-executor` 已落地）。
+> 后续 change 才落地（尚未实现）：`src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）；
+> 领域聚合/任务状态机等按需演进（`task-executor` 已落地）。
+> 图片浏览/编辑已在 `chat/page.tsx` 的**画布工作台**承载（缩略图上屏 + 裁剪/滤镜/导出），不再单独规划 `gallery` 作品库页。
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
