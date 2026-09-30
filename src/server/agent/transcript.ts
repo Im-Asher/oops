@@ -1,3 +1,4 @@
+import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { createMessageRepo } from "@/server/db/message.repo";
 
 export type UIMessagePart =
@@ -65,4 +66,82 @@ export async function loadSessionMessages(sessionId: string): Promise<UIMessage[
   return rows.map((row, i) =>
     toUIMessage(row.id ?? `m${i}`, row.role as "user" | "assistant" | "system", row.content ?? "", row.toolCalls),
   );
+}
+
+// ---------------------------------------------------------------------------
+// LLM 视图（transcript 列）：写侧清洗 + 序列化。
+// 硬约束：thinking 块不持久化；base64 图片不落库（写入时即文本化）。
+// ---------------------------------------------------------------------------
+
+export const TRANSCRIPT_VERSION = 1 as const;
+
+export interface SerializedTranscript {
+  v: typeof TRANSCRIPT_VERSION;
+  messages: Message[];
+}
+
+function isImageContent(c: unknown): c is ImageContent {
+  return typeof c === "object" && c !== null && (c as { type?: string }).type === "image";
+}
+
+/** 从工具结果 details 中提取图片引用（generate_image / 编辑导出等均落 url/assetId）。 */
+function imageRefFromDetails(details: unknown): { url?: string; assetId?: string } {
+  if (typeof details !== "object" || details === null) return {};
+  const d = details as { url?: unknown; assetId?: unknown };
+  return {
+    url: typeof d.url === "string" ? d.url : undefined,
+    assetId: typeof d.assetId === "string" ? d.assetId : undefined,
+  };
+}
+
+function imagePlaceholder(ref: { url?: string; assetId?: string }): TextContent {
+  const url = ref.url ?? "(无引用信息)";
+  const asset = ref.assetId ? ` (assetId: ${ref.assetId})` : "";
+  return { type: "text", text: `[已生成图片: ${url}${asset}]` };
+}
+
+/**
+ * 清洗单条 message：assistant 剥 thinking；user/toolResult 的图片块文本化。
+ * 注意：details 字段原样保留（当前工具契约下 details 只含小型元数据，图片 base64
+ * 只出现在 content 中——新增工具 MUST NOT 把图片数据放进 details，否则绕过清洗）。
+ */
+function sanitizeMessage(message: Message): Message {
+  if (message.role === "assistant") {
+    return {
+      ...message,
+      content: message.content.filter((c) => c.type !== "thinking"),
+    };
+  }
+  if (message.role === "toolResult") {
+    const ref = imageRefFromDetails(message.details);
+    return {
+      ...message,
+      content: message.content.map((c) => (isImageContent(c) ? imagePlaceholder(ref) : c)),
+    };
+  }
+  if (message.role === "user" && Array.isArray(message.content)) {
+    return {
+      ...message,
+      content: message.content.map((c) =>
+        isImageContent(c) ? { type: "text", text: "[图片附件]" } : c,
+      ),
+    };
+  }
+  return message;
+}
+
+/** 校验序列化 blob 是否为当前版本的 transcript（供读取侧容错，坏数据返回空）。 */
+export function isSerializedTranscript(raw: unknown): raw is SerializedTranscript {
+  if (typeof raw !== "object" || raw === null) return false;
+  const r = raw as { v?: unknown; messages?: unknown };
+  return r.v === TRANSCRIPT_VERSION && Array.isArray(r.messages);
+}
+
+/**
+ * 写侧清洗 + 序列化：深拷贝后剥 thinking、图片文本化，附加版本标记。
+ * 产物将存入 messages.transcript（jsonb），MUST NOT 含 base64 数据。
+ */
+export function sanitizeTranscript(messages: Message[]): SerializedTranscript {
+  const cleaned = structuredClone(messages).map(sanitizeMessage);
+  return { v: TRANSCRIPT_VERSION, messages: cleaned };
 }
