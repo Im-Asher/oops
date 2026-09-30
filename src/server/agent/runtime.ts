@@ -1,7 +1,9 @@
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
+import { createSessionRepo, type SessionRepo } from "@/server/db/session.repo";
 import { getChatModel, getChatModels } from "@/server/infra/providers/llm";
 import { agentRegistry } from "./agents/registry";
+import { compactSessionHistory, summaryPrefixMessage } from "./compact";
 import { toolRegistry } from "./tools/registry";
 import { buildReplayHistory, sanitizeTranscript } from "./transcript";
 import type { SseEvent } from "./types";
@@ -17,7 +19,7 @@ export interface RunAgentArgs {
   userMessageId: string;
   signal: AbortSignal;
   onEvent: (event: SseEvent) => void;
-  repos?: { message: MessageRepo };
+  repos?: { message: MessageRepo; session?: SessionRepo };
 }
 
 /**
@@ -34,11 +36,61 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
   const model = getChatModel();
   const tools = agentRegistry.getAgentTools(args.agentId);
   const messageRepo = args.repos?.message ?? createMessageRepo();
+  const sessionRepo = args.repos?.session ?? createSessionRepo();
 
-  // 重建回放历史：拼接会话 transcript，排除本轮 user 行（其文本由 prompt() 注入），
-  // 消息数硬上限兜底（compact 之前的最后防线）
   const rows = await messageRepo.list(args.sessionId);
-  const history = buildReplayHistory(rows, args.userMessageId, REPLAY_MAX_MESSAGES);
+
+  // compact：被动触发（估算超阈值才压缩，同步执行；详见 design D3/D4）。
+  // 失败降级：按现有摘要/水位线继续回放（原文未删、last-40 兜底仍在），不中断用户回合
+  const session = await sessionRepo.get(args.sessionId);
+  let compactResult: Awaited<ReturnType<typeof compactSessionHistory>> = {
+    compacted: false,
+    summary: session?.summary ?? null,
+    watermark: session?.summarizedUpTo ?? null,
+  };
+  try {
+    compactResult = await compactSessionHistory({
+      sessionId: args.sessionId,
+      rows,
+      currentSummary: session?.summary ?? null,
+      currentWatermark: session?.summarizedUpTo ?? null,
+      excludeMessageId: args.userMessageId,
+      deps: {
+        summarize: async (systemPrompt, input) => {
+          const result = await getChatModels().completeSimple(model, {
+            systemPrompt,
+            messages: [{ role: "user", content: input, timestamp: Date.now() }],
+          });
+          // completeSimple 对 provider 错误 resolve 而非 reject，必须显式检查
+          if (result.stopReason === "error" || result.stopReason === "aborted") {
+            throw new Error(`摘要生成失败：${result.errorMessage ?? result.stopReason}`);
+          }
+          return result.content
+            .filter((c): c is Extract<typeof c, { type: "text" }> => c.type === "text")
+            .map((c) => c.text)
+            .join("")
+            .trim();
+        },
+        updateSummary: (id, input) => sessionRepo.updateSummary(id, input),
+      },
+    });
+  } catch (err) {
+    console.error("[compact] 摘要压缩失败，本轮降级跳过:", err);
+  }
+
+  // 重建回放历史：水位线之后的行回放原文（水位线前由摘要替代），套 last-40 兜底，
+  // 排除本轮 user 行（其文本由 prompt() 注入）。
+  // 摘要有效性与 compact 口径一致：空白摘要视同无摘要，此时按水位线切片会丢失水位线前内容
+  const summary = compactResult.summary?.trim() ? compactResult.summary : null;
+  const watermarkIdx =
+    summary && compactResult.watermark
+      ? rows.findIndex((r) => r.id === compactResult.watermark)
+      : -1;
+  const afterRows = watermarkIdx >= 0 ? rows.slice(watermarkIdx + 1) : rows;
+  let history = buildReplayHistory(afterRows, args.userMessageId, REPLAY_MAX_MESSAGES);
+  if (summary) {
+    history = [summaryPrefixMessage(summary), ...history];
+  }
 
   const agent = new Agent({
     streamFn: (m, c, o) => getChatModels().streamSimple(m, c, o),
