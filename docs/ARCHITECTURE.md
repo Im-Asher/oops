@@ -72,7 +72,7 @@ export const atmosphereDesigner = defineAgent({
 
 > 注：v1 的 Agent 定义为 `{ id, name, description, tools, systemPrompt }`；`icon` / `greeting` / `defaults` 属规划中的元数据扩展（前端选择器当前仅消费 id/name/description/tools），以代码为准。
 
-- system prompt 外置到 `src/server/agent/prompts/*.md`，独立调优。
+- system prompt 外置到 `src/server/agent/agents/prompts/*.md`，独立调优（compact 摘要骨架 `session-summary.md` 同目录）。
 - 切换 Agent = 换 systemPrompt + tools 子集重新进入 `agentLoop`，无子 Agent 黑盒编排（符合 Pi 反黑盒理念）。
 - 前端 Agent 选择器消费元数据列表，新增 Agent 前端零改动。
 
@@ -118,6 +118,29 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 - **事件即持久化**：每个 SSE 事件边推边存，刷新页面从 DB 重建完整会话，无需重放 agent。
 - **失败回喂**：工具失败返回结构化错误给 agent，由 agent 用自然语言解释并建议重试，会话不崩。
 
+### 5.1 会话记忆：双视图持久化与上下文压缩（compact）
+
+**双视图**：`messages` 每行同时存两个视图——UI 视图（`content` + `tool_calls`，渲染零转换）
+与 LLM 视图（`transcript` jsonb，pi-ai `Message[]` 序列带 `v:1` 版本标记）。写入时清洗：
+assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本占位（base64 绝不落库）；
+读取时坏行（缺 transcript / 未知版本）整行跳过，不抛错。
+
+**上下文重建**（每回合开始前，`runtime.ts`）：
+
+```
+摘要（sessions.summary，覆盖水位线之前轮次）
++ 水位线之后各行的 transcript 原文（排除本轮 user 行，避免与 prompt() 重复）
+→ last-40 消息数硬上限（对齐完整轮边界，摘要前缀不占预算）
+→ Agent initialState.messages
+```
+
+**compact**（`compact.ts`，回合开始前同步执行）：以字符近似估算 token（中文 ~1.5 字/token），
+有效上下文（摘要 + 水位线后原文）超 **30k** 触发；压缩范围 = 水位线后的较早行（行边界天然
+对齐完整轮），交 LLM 按固定骨架（用户目标 / 已确定设计要求 / 已生成资产清单 / 未完成意图）
+生成摘要写入 `sessions.summary`，并单调推进水位线 `sessions.summarized_up_to`（目标压到
+~10k 以内）。**原文永不删除**——摘要幂等可重算；compact 失败降级为按现有摘要/水位线回放，
+不中断用户回合；摘要被清空时下次 compact 从原文重建。
+
 ## 6. 不可控输入的分流
 
 不引入独立意图分类器——**LLM 本身就是意图路由器**，三层分工：
@@ -142,9 +165,11 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 > `meta`/`payload`/`result`/`tool_calls` 用 `jsonb`；`role`/`kind`/`type`/`status` 用 `pgEnum`。
 
 ```
-chat_sessions  会话      id(uuid), user_id(text), title(text?), created_at, updated_at
+chat_sessions  会话      id(uuid), user_id(text), agent_id(uuid?), title(text?),
+                        summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
+                        created_at, updated_at
 messages       消息      id(uuid), session_id(uuid→sessions FK), user_id, role(enum),
-                        content(text), tool_calls(jsonb?), created_at
+                        content(text), tool_calls(jsonb?), transcript(jsonb?, LLM 视图), created_at
 assets         素材/作品 id(uuid), user_id, session_id?(→sessions, set null),
                         kind(enum image|json|other), storage_key(text), mime_type(text),
                         width(int?), height(int?), prompt(text?), model(text?),
@@ -167,6 +192,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
 > `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
+> `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
+> `summarized_up_to`（compact 水位线，迁移 `0003`），存量数据零回填（见 5.1）。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
 Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列用 `timestamp with time zone`。
@@ -208,8 +235,8 @@ oops/
 │   │   ├── domain/
 │   │   │   └── tasks/task-executor.ts # 进程内任务执行器（并发 2 / 超时 90s / 重启清理）
 │   │   └── agent/                  # 声明式 Agent 运行时
-│   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts
-│   │       ├── agents/             # 各 Agent 定义 + prompts/<id>.md
+│   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts / compact.ts
+│   │       ├── agents/             # 各 Agent 定义 + prompts/<id>.md（含 compact 摘要骨架）
 │   │       └── tools/              # ToolRegistry + 工具实现（generate-image 等）       # 上传校验 + 处理
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
 │   ├── lib/                        # 客户端安全共享：config / utils（+ 单测）

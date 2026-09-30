@@ -23,6 +23,12 @@ Key characteristics:
   protected from client imports by ESLint.
 - **Task-based generation** — all image work runs through an in-process task
   executor with concurrency limits; tasks are persisted and retryable.
+- **In-session memory & compact** — every turn rebuilds LLM context from the
+  persisted `messages.transcript` view (dual-view: UI parts + LLM transcript on
+  the same row), capped by a last-40 fallback. When the estimated context
+  exceeds ~30k tokens (char-approx), older turns are compacted into a skeleton
+  LLM summary (`sessions.summary` + `summarized_up_to` watermark, originals
+  never deleted). Thinking blocks and base64 images are never persisted.
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.
@@ -62,7 +68,7 @@ src/
 ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
 │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
 │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
-│   └── agent/      # 声明式 Agent 运行时（registry/runtime/agents/tools）
+│   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/agents/tools）
 ├── components/     # React components (client)
 ├── lib/            # Shared utilities (client-safe, 含 config)
 └── types/          # Shared TypeScript types
@@ -105,9 +111,11 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
   functions/variables `camelCase`; constants `SCREAMING_SNAKE_CASE`.
 - **Agent definition (declarative):** one file per agent in
   `src/server/agent/agents/<agent-id>.ts` calling `defineAgent({...})`.
-  System prompts live in `src/server/agent/prompts/<agent-id>.md` — never
-  inline long prompts in code. Tools are referenced **by name** from the
-  ToolRegistry; do not implement ad-hoc tools inside agent files.
+  System prompts live in `src/server/agent/agents/prompts/<agent-id>.md` —
+  never inline long prompts in code (the compact summary skeleton
+  `session-summary.md` lives in the same directory). Tools are referenced
+  **by name** from the ToolRegistry; do not implement ad-hoc tools inside
+  agent files.
 - **Tools:** implementations live in `src/server/agent/tools/`, registered in
   the ToolRegistry with zod schemas for inputs. Tools return structured
   results; errors are returned as structured error payloads (the agent
