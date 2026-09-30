@@ -3,12 +3,15 @@ import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
 import { getChatModel, getChatModels } from "@/server/infra/providers/llm";
 import { agentRegistry } from "./agents/registry";
 import { toolRegistry } from "./tools/registry";
+import { sanitizeTranscript } from "./transcript";
 import type { SseEvent } from "./types";
 
 export interface RunAgentArgs {
   sessionId: string;
   agentId: string;
   userText: string;
+  // 本轮 user 消息的落库行 id：重建历史时排除该行，避免与 prompt() 重复注入
+  userMessageId: string;
   signal: AbortSignal;
   onEvent: (event: SseEvent) => void;
   repos?: { message: MessageRepo };
@@ -42,6 +45,9 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
 
   let assistantText = "";
   const toolResults: Record<string, unknown>[] = [];
+  // 回合基线：state.messages 含回放的历史（3.1 起 initialState.messages 非空），
+  // 落库只取 prompt 之后新增的部分，避免 assistant 行携带全历史
+  const turnBaseline = agent.state.messages.length;
 
   agent.subscribe((event: AgentEvent) => {
     switch (event.type) {
@@ -88,11 +94,17 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
   }
 
   if (assistantText || toolResults.length > 0) {
+    // LLM 视图：从 agent 状态取本轮增量消息（权威 transcript）。user 消息已随 route 层
+    // 落库（user 行），此处只收 assistant 与工具结果；写入前经清洗（无 thinking/无 base64）。
+    const turnMessages = agent.state.messages
+      .slice(turnBaseline)
+      .filter((m) => m.role === "assistant" || m.role === "toolResult");
     await messageRepo.create({
       sessionId: args.sessionId,
       role: "assistant",
       content: assistantText,
       toolCalls: toolResults.length ? toolResults : undefined,
+      transcript: turnMessages.length > 0 ? sanitizeTranscript(turnMessages) : undefined,
     });
   }
 }

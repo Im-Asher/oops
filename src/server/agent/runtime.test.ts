@@ -1,16 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // 用脚本化 Agent 验证 runtime 桥接逻辑（事件→SSE 映射 + 回合级持久化），
-// 不依赖真实 LLM：Agent 被 mock 为按脚本派发 AgentEvent。
-const h = vi.hoisted(() => ({ scripted: [] as Record<string, unknown>[] }));
+// 不依赖真实 LLM：Agent 被 mock 为按脚本派发 AgentEvent，state.messages 由测试注入。
+const h = vi.hoisted(() => ({
+  scripted: [] as Record<string, unknown>[],
+  stateMessages: [] as unknown[],
+}));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     private cb: (e: unknown) => void = () => {};
+    state: { messages: unknown[] } = { messages: [] };
     subscribe(cb: (e: unknown) => void) {
       this.cb = cb;
     }
     async prompt() {
+      this.state = { messages: [...h.stateMessages] };
       for (const ev of h.scripted) this.cb(ev);
     }
   },
@@ -60,6 +65,7 @@ async function run(script: Record<string, unknown>[], repo: MessageRepo, agentId
     sessionId: "s1",
     agentId,
     userText: "hi",
+    userMessageId: "mu1",
     signal: new AbortController().signal,
     onEvent: (e: Record<string, unknown>) => events.push(e),
     repos: { message: repo },
@@ -68,6 +74,10 @@ async function run(script: Record<string, unknown>[], repo: MessageRepo, agentId
 }
 
 describe("runAgent (runtime bridge)", () => {
+  beforeEach(() => {
+    h.stateMessages = [];
+  });
+
   it("纯文字回复：message_delta + finish，并落库 assistant 文本", async () => {
     const { repo, create } = makeRepo();
     const events = await run(
@@ -145,5 +155,115 @@ describe("runAgent (runtime bridge)", () => {
     const te = events.find((e) => e.type === "tool_end") as { details: ToolEndDetails };
     expect(te.details.error).toBe("generation_failed");
     expect(create).toHaveBeenCalled();
+  });
+
+  it("assistant 行 transcript 含本轮 assistant 与 toolResult（无 thinking、无图片 base64、排除 system/user）", async () => {
+    const { repo, create } = makeRepo();
+    h.stateMessages = [
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "hi", timestamp: 0 },
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "secret reasoning LEAKMARK" },
+          { type: "text", text: "生成中" },
+          { type: "toolCall", id: "c1", name: "generate_image", arguments: { prompt: "苹果" } },
+        ],
+        api: "openai-completions",
+        provider: "test",
+        model: "m",
+        stopReason: "toolUse",
+        timestamp: 1,
+      },
+      {
+        role: "toolResult",
+        toolCallId: "c1",
+        toolName: "generate_image",
+        content: [{ type: "image", data: "IMGDATA_LEAKMARK", mimeType: "image/png" }],
+        details: { assetId: "a1", url: "/files/x.png" },
+        isError: false,
+        timestamp: 2,
+      },
+    ];
+    await run(
+      [
+        { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "生成中" } },
+        {
+          type: "tool_execution_end",
+          toolCallId: "c1",
+          toolName: "generate_image",
+          result: {
+            content: [{ type: "image", data: "IMGDATA_LEAKMARK", mimeType: "image/png" }],
+            details: { assetId: "a1", url: "/files/x.png" },
+          },
+        },
+        { type: "agent_end" },
+      ],
+      repo as never,
+    );
+    const persisted = create.mock.calls[0][0] as {
+      transcript: { v: number; messages: { role: string; content: { type: string }[] }[] };
+    };
+    expect(persisted.transcript.v).toBe(1);
+    const roles = persisted.transcript.messages.map((m) => m.role);
+    expect(roles).toEqual(["assistant", "toolResult"]); // user 消息不重复落库
+    const serialized = JSON.stringify(persisted.transcript);
+    expect(serialized).not.toContain("LEAKMARK"); // thinking 与 base64 均被清洗
+    expect(persisted.transcript.messages[0].content.map((c) => c.type)).toEqual(["text", "toolCall"]);
+  });
+
+  it("多工具回合：transcript 保留全部 toolResult（toolCallId/toolName/details 不丢）", async () => {
+    const { repo, create } = makeRepo();
+    h.stateMessages = [
+      {
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "c1", name: "generate_image", arguments: { prompt: "a" } },
+          { type: "toolCall", id: "c2", name: "generate_image", arguments: { prompt: "b" } },
+        ],
+        api: "openai-completions",
+        provider: "test",
+        model: "m",
+        stopReason: "toolUse",
+        timestamp: 1,
+      },
+      {
+        role: "toolResult",
+        toolCallId: "c1",
+        toolName: "generate_image",
+        content: [{ type: "text", text: "ok1" }],
+        details: { assetId: "a1", url: "/files/1.png" },
+        isError: false,
+        timestamp: 2,
+      },
+      {
+        role: "toolResult",
+        toolCallId: "c2",
+        toolName: "generate_image",
+        content: [{ type: "text", text: "ok2" }],
+        details: { assetId: "a2", url: "/files/2.png" },
+        isError: false,
+        timestamp: 3,
+      },
+    ];
+    await run(
+      [
+        {
+          type: "tool_execution_end",
+          toolCallId: "c2",
+          toolName: "generate_image",
+          result: { content: [{ type: "text", text: "ok2" }], details: { assetId: "a2" } },
+        },
+        { type: "agent_end" },
+      ],
+      repo as never,
+    );
+    const persisted = create.mock.calls[0][0] as {
+      transcript: { messages: { role: string; toolCallId?: string; details?: unknown }[] };
+    };
+    const toolResults = persisted.transcript.messages.filter((m) => m.role === "toolResult");
+    expect(toolResults).toHaveLength(2);
+    expect(toolResults.map((m) => m.toolCallId)).toEqual(["c1", "c2"]);
+    expect(toolResults[1].details).toMatchObject({ assetId: "a2", url: "/files/2.png" });
   });
 });
