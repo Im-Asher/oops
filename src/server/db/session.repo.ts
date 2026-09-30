@@ -8,6 +8,11 @@ export interface SessionRepo {
   list(userId?: string): Promise<Session[]>;
   get(id: string, userId?: string): Promise<Session | undefined>;
   rename(id: string, title: string): Promise<Session | undefined>;
+  // compact 产物落库；水位线单调性由调用方（compact 模块）基于消息列表位置保证
+  updateSummary(
+    id: string,
+    input: { summary: string; summarizedUpTo: string | null },
+  ): Promise<Session | undefined>;
   remove(id: string): Promise<void>;
 }
 
@@ -47,6 +52,19 @@ export function createSessionRepo(db: typeof defaultDb = defaultDb): SessionRepo
       const [row] = await db
         .update(sessions)
         .set({ title, updatedAt: new Date() })
+        .where(eq(sessions.id, id))
+        .returning();
+      return row;
+    },
+
+    async updateSummary(id, input) {
+      const [row] = await db
+        .update(sessions)
+        .set({
+          summary: input.summary,
+          summarizedUpTo: input.summarizedUpTo,
+          updatedAt: new Date(),
+        })
         .where(eq(sessions.id, id))
         .returning();
       return row;

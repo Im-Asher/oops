@@ -27,6 +27,24 @@ describe("session repo", () => {
     expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
   });
 
+  it("updateSummary persists summary and watermark", async () => {
+    const mock = makeMockDb();
+    const repo = createSessionRepo(mock.db);
+    const row = await repo.updateSummary("s1", {
+      summary: "用户要做海边海报",
+      summarizedUpTo: "m1",
+    });
+    expect(row).toMatchObject({ summary: "用户要做海边海报", summarizedUpTo: "m1" });
+    expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
+  });
+
+  it("updateSummary accepts null watermark to reset", async () => {
+    const mock = makeMockDb();
+    const repo = createSessionRepo(mock.db);
+    const row = await repo.updateSummary("s1", { summary: "重算占位", summarizedUpTo: null });
+    expect(row).toMatchObject({ summarizedUpTo: null });
+  });
+
   it("remove issues delete with id filter", async () => {
     const mock = makeMockDb();
     const repo = createSessionRepo(mock.db);

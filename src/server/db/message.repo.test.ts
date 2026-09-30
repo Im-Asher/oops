@@ -16,6 +16,28 @@ describe("message repo", () => {
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
   });
 
+  it("create roundtrips transcript column", async () => {
+    const mock = makeMockDb();
+    const repo = createMessageRepo(mock.db);
+    const transcript = [
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+    ];
+    const row = await repo.create({
+      sessionId: "s1",
+      role: "user",
+      content: "hi",
+      transcript,
+    });
+    expect(row).toMatchObject({ transcript });
+  });
+
+  it("create allows missing transcript (nullable)", async () => {
+    const mock = makeMockDb();
+    const repo = createMessageRepo(mock.db);
+    const row = await repo.create({ sessionId: "s1", role: "assistant", content: "ok" });
+    expect(row).not.toHaveProperty("transcript", expect.anything());
+  });
+
   it("list orders by createdAt ascending", async () => {
     const mock = makeMockDb({ selectResult: [{ id: "m1" }, { id: "m2" }] });
     const repo = createMessageRepo(mock.db);

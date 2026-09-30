@@ -38,6 +38,10 @@ export const sessions = pgTable("chat_sessions", {
   userId: text("user_id").notNull().default(OWNER_ID),
   agentId: text("agent_id"),
   title: text("title"),
+  // compact 产物：LLM 生成的会话摘要（骨架式），与 summarizedUpTo 水位线配套
+  summary: text("summary"),
+  // 摘要水位线：指向 messages.id，水位线之前的原文轮次已被摘要覆盖；原文永不删除
+  summarizedUpTo: uuid("summarized_up_to"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -56,6 +60,9 @@ export const messages = pgTable("messages", {
   content: text("content").notNull().default(""),
   // 工具调用与结果（generate_image / render_html 等），结构化 JSON
   toolCalls: jsonb("tool_calls"),
+  // LLM 视图 transcript：该消息对应的 pi-ai Message 序列（user 行 [UserMessage]，
+  // assistant 行 [AssistantMessage, ...ToolResultMessage]），经清洗（无 thinking、无 base64）
+  transcript: jsonb("transcript"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
