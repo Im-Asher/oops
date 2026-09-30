@@ -102,7 +102,10 @@ export async function compactSessionHistory(input: CompactInput): Promise<Compac
   const scopedRows =
     hasValidSummary && currentIdx >= 0 ? rows.slice(currentIdx + 1) : rows;
 
-  const replay = buildReplayHistory(scopedRows, excludeMessageId);
+  // 触发估算 = 有效上下文（摘要 + 水位线后历史原文 + 本轮 user 文本）。
+  // 本轮行虽由 prompt() 注入而非回放，但同样进入 LLM 上下文，必须计入——
+  // 否则单条超长消息会系统性漏触发（其体量要到下一轮才被当作历史看到）
+  const replay = buildReplayHistory(scopedRows);
   const estimated =
     estimateTokens(JSON.stringify(replay)) +
     (currentSummary ? estimateTokens(currentSummary) : 0);

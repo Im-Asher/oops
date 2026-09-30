@@ -240,6 +240,32 @@ describe("compactSessionHistory", () => {
     expect(summaryInput).not.toContain("丙");
   });
 
+  it("本轮超长消息计入触发估算（防漏触发），且本轮行不进压缩范围", async () => {
+    // 历史 ~26k 低于触发线；本轮 user 23k 将被 prompt() 注入 LLM → 合计 ~49k 必须触发
+    const rows = [
+      row("m1", textOfTokens(16_000, "甲")),
+      row("m2", textOfTokens(10_000, "乙")),
+      row("mu1", textOfTokens(23_000, "丙")),
+    ];
+    const out = await compactSessionHistory({
+      sessionId: "s1",
+      rows,
+      currentSummary: null,
+      currentWatermark: null,
+      excludeMessageId: "mu1",
+      deps,
+    });
+    expect(out.compacted).toBe(true);
+    expect(out.watermark).toBe("m1"); // 预算收下 m2（原文保留），m1 进压缩范围
+    const [, summaryInput] = (deps.summarize as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      string,
+    ];
+    expect(summaryInput).toContain("甲");
+    expect(summaryInput).not.toContain("乙"); // 预算内保留行不进摘要
+    expect(summaryInput).not.toContain("丙"); // 本轮行永不进摘要
+  });
+
   it("水位线行已删除时按无水位线处理，放行重算", async () => {
     const rows = [row("m1", textOfTokens(31_000)), row("m2", textOfTokens(8_000))];
     const out = await compactSessionHistory({
