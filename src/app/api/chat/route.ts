@@ -1,6 +1,8 @@
 import { z } from "zod";
+import type { UserMessage } from "@earendil-works/pi-ai";
 import { runAgent } from "@/server/agent/runtime";
 import { screenInput } from "@/server/agent/moderation";
+import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent/agents"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { createMessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo } from "@/server/db/session.repo";
@@ -40,7 +42,14 @@ export async function POST(req: Request): Promise<Response> {
   const agentId = session.agentId ?? parsed.data.agentId;
 
   const messageRepo = createMessageRepo();
-  await messageRepo.create({ sessionId, role: "user", content: message });
+  // user 消息双视图落库：UI 摘要 + LLM 视图 transcript（显式传 id 供 runAgent 排除本轮，防重复注入）
+  const userMessage: UserMessage = { role: "user", content: message, timestamp: Date.now() };
+  const userRow = await messageRepo.create({
+    sessionId,
+    role: "user",
+    content: message,
+    transcript: sanitizeTranscript([userMessage]),
+  });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -55,6 +64,7 @@ export async function POST(req: Request): Promise<Response> {
           sessionId,
           agentId,
           userText: message,
+          userMessageId: userRow.id,
           signal: ac.signal,
           onEvent: send,
           repos: { message: messageRepo },

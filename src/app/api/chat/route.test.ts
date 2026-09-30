@@ -6,12 +6,15 @@ const h = vi.hoisted(() => ({
   events: [] as string[],
   sessionExists: true,
   runAgentCalls: 0,
+  runAgentArgs: [] as Record<string, unknown>[],
+  messageCreates: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/server/agent/agents", () => ({ default: {} }));
 vi.mock("@/server/agent/runtime", () => ({
   runAgent: vi.fn(async (args: { onEvent: (e: unknown) => void }) => {
     h.runAgentCalls += 1;
+    h.runAgentArgs.push(args as Record<string, unknown>);
     for (const e of h.events) args.onEvent(JSON.parse(e));
   }),
 }));
@@ -21,7 +24,12 @@ vi.mock("@/server/db/session.repo", () => ({
   }),
 }));
 vi.mock("@/server/db/message.repo", () => ({
-  createMessageRepo: () => ({ create: vi.fn(async (i: Record<string, unknown>) => ({ ...i, id: "m1" })) }),
+  createMessageRepo: () => ({
+    create: vi.fn(async (i: Record<string, unknown>) => {
+      h.messageCreates.push(i);
+      return { ...i, id: "m1" };
+    }),
+  }),
 }));
 vi.mock("@/server/agent/moderation", () => ({
   screenInput: (text: string) => (text.includes("禁用") ? "输入包含受限内容，已被系统拦截" : null),
@@ -68,5 +76,21 @@ describe("POST /api/chat", () => {
     const body = await res.text();
     expect(body).toContain("event: finish");
     expect(body).toContain("event: message_delta");
+  });
+
+  it("user 消息双视图落库：transcript 含 v:1 标记与 UserMessage，且 userMessageId 透传给 runAgent", async () => {
+    h.sessionExists = true;
+    h.events = [];
+    h.messageCreates = [];
+    h.runAgentArgs = [];
+    await post("画一颗苹果");
+    expect(h.messageCreates).toHaveLength(1);
+    const created = h.messageCreates[0];
+    expect(created).toMatchObject({ sessionId: "s1", role: "user", content: "画一颗苹果" });
+    const transcript = created.transcript as { v: number; messages: { role: string }[] };
+    expect(transcript.v).toBe(1);
+    expect(transcript.messages).toHaveLength(1);
+    expect(transcript.messages[0].role).toBe("user");
+    expect(h.runAgentArgs[0]).toMatchObject({ userMessageId: "m1", userText: "画一颗苹果" });
   });
 });
