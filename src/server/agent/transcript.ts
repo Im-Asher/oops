@@ -137,6 +137,42 @@ export function isSerializedTranscript(raw: unknown): raw is SerializedTranscrip
   return r.v === TRANSCRIPT_VERSION && Array.isArray(r.messages);
 }
 
+export interface TranscriptRowLike {
+  id?: string | null;
+  transcript?: unknown;
+}
+
+/**
+ * 读取侧重建：拼接各落库行的 transcript 为回放历史（按行序，即时间升序）。
+ * - excludeMessageId：本轮 user 行（其文本将由 prompt() 注入，不重复）
+ * - 无 transcript 的行（旧数据/清洗失败的坏数据）整行跳过，不抛错
+ * - maxMessages：回放消息数硬上限（兜底），从最新往旧截取，截断对齐行边界
+ *   （不拆行内消息组；已收集非空时才截断——单行自身超限时仍整行保留，
+ *   避免"空历史"退化，宁超不缺）
+ */
+export function buildReplayHistory(
+  rows: TranscriptRowLike[],
+  excludeMessageId?: string,
+  maxMessages?: number,
+): Message[] {
+  const collected: Message[] = [];
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    if (excludeMessageId && row.id && row.id === excludeMessageId) continue;
+    if (!isSerializedTranscript(row.transcript)) continue;
+    const messages = row.transcript.messages;
+    if (
+      maxMessages !== undefined &&
+      collected.length > 0 &&
+      collected.length + messages.length > maxMessages
+    ) {
+      break;
+    }
+    collected.unshift(...messages);
+  }
+  return collected;
+}
+
 /**
  * 写侧清洗 + 序列化：深拷贝后剥 thinking、图片文本化，附加版本标记。
  * 产物将存入 messages.transcript（jsonb），MUST NOT 含 base64 数据。

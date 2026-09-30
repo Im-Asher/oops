@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
-import { isSerializedTranscript, sanitizeTranscript, toUIMessage } from "./transcript";
+import {
+  buildReplayHistory,
+  isSerializedTranscript,
+  sanitizeTranscript,
+  toUIMessage,
+} from "./transcript";
 describe("toUIMessage", () => {
   it("纯文本消息重建为单文本 part", () => {
     const msg = toUIMessage("m1", "user", "你好", undefined);
@@ -179,5 +184,63 @@ describe("sanitizeTranscript（写侧清洗）", () => {
     ]);
     const [tr] = out.messages as ToolResultMessage[];
     expect(tr.content).toEqual([{ type: "text", text: "[已生成图片: (无引用信息)]" }]);
+  });
+});
+
+describe("buildReplayHistory（读取侧重建）", () => {
+  const userMsg = (text: string): Message => ({ role: "user", content: text, timestamp: 1 });
+
+  function row(id: string, messages: Message[]) {
+    return { id, transcript: { v: 1, messages } };
+  }
+
+  it("按行序拼接 transcript", () => {
+    const rows = [row("m1", [userMsg("a")]), row("m2", [userMsg("b")])];
+    expect(buildReplayHistory(rows).map((m) => m.content)).toEqual(["a", "b"]);
+  });
+
+  it("排除本轮行；跳过无 transcript 与非法版本的行", () => {
+    const rows = [
+      row("m1", [userMsg("a")]),
+      { id: "mu1", transcript: { v: 1, messages: [userMsg("本轮")] } },
+      { id: "m3" },
+      { id: "m4", transcript: { v: 99, messages: [userMsg("未来版本")] } },
+    ];
+    expect(buildReplayHistory(rows, "mu1").map((m) => m.content)).toEqual(["a"]);
+  });
+
+  it("maxMessages 硬上限：从最新往旧截取，对齐行边界（不拆行内消息组）", () => {
+    // 三行：行内分别 1 / 39 / 1 条消息，上限 40 → 保留最新的两行（1+39），
+    // 最老的一行整行丢弃（哪怕只差 1 条）
+    const rows = [
+      row("m1", [userMsg("oldest")]),
+      row("m2", Array.from({ length: 39 }, (_, i) => userMsg(`mid${i}`))),
+      row("m3", [userMsg("newest")]),
+    ];
+    const history = buildReplayHistory(rows, undefined, 40);
+    expect(history).toHaveLength(40);
+    expect(history.map((m) => m.content)).toContain("newest");
+    expect(history.map((m) => m.content)).not.toContain("oldest");
+  });
+
+  it("不指定 maxMessages 时全量回放", () => {
+    const rows = [row("m1", [userMsg("a")]), row("m2", [userMsg("b")])];
+    expect(buildReplayHistory(rows)).toHaveLength(2);
+  });
+
+  it("单行自身超限时仍整行保留（宁超不缺，避免空历史退化）", () => {
+    const rows = [row("m1", Array.from({ length: 50 }, (_, i) => userMsg(`m${i}`)))];
+    const history = buildReplayHistory(rows, undefined, 40);
+    expect(history).toHaveLength(50);
+  });
+
+  it("排除本轮行与连续 user 行组合", () => {
+    const rows = [
+      row("m1", [userMsg("失败前问句1")]),
+      row("m2", [userMsg("失败前问句2")]),
+      { id: "mu1", transcript: { v: 1, messages: [userMsg("本轮")] } },
+    ];
+    const history = buildReplayHistory(rows, "mu1", 40);
+    expect(history.map((m) => m.content)).toEqual(["失败前问句1", "失败前问句2"]);
   });
 });

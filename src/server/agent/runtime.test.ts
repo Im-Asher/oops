@@ -5,17 +5,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   scripted: [] as Record<string, unknown>[],
   stateMessages: [] as unknown[],
+  capturedInitialState: undefined as Record<string, unknown> | undefined,
 }));
 
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     private cb: (e: unknown) => void = () => {};
     state: { messages: unknown[] } = { messages: [] };
+    constructor(opts: {
+      initialState?: { messages?: unknown[] };
+    }) {
+      h.capturedInitialState = opts as Record<string, unknown>;
+      // 贴近真实 Agent：构造时 initialState.messages 成为 state 起始内容
+      this.state = { messages: [...(opts.initialState?.messages ?? [])] };
+    }
     subscribe(cb: (e: unknown) => void) {
       this.cb = cb;
     }
     async prompt() {
-      this.state = { messages: [...h.stateMessages] };
+      // 贴近真实 Agent：prompt 将本轮消息追加到历史之后（不整体替换）
+      this.state = { messages: [...this.state.messages, ...h.stateMessages] };
       for (const ev of h.scripted) this.cb(ev);
     }
   },
@@ -35,7 +44,7 @@ interface ToolEndDetails {
   error?: string;
 }
 
-function makeRepo() {
+function makeRepo(listResult: Record<string, unknown>[] = []) {
   const calls: Record<string, unknown>[] = [];
   const create = vi.fn(async (input: Record<string, unknown>) => {
     calls.push(input);
@@ -43,7 +52,7 @@ function makeRepo() {
   });
   const repo = {
     create,
-    list: vi.fn(async () => []),
+    list: vi.fn(async () => listResult),
     remove: vi.fn(async () => {}),
   } as unknown as MessageRepo;
   return { calls, create, repo };
@@ -265,5 +274,103 @@ describe("runAgent (runtime bridge)", () => {
     expect(toolResults).toHaveLength(2);
     expect(toolResults.map((m) => m.toolCallId)).toEqual(["c1", "c2"]);
     expect(toolResults[1].details).toMatchObject({ assetId: "a2", url: "/files/2.png" });
+  });
+
+  it("历史重建：transcript 拼接后注入 initialState.messages（场景 1）", async () => {
+    const { repo } = makeRepo([
+      {
+        id: "m1",
+        transcript: { v: 1, messages: [{ role: "user", content: "做张海报", timestamp: 1 }] },
+      },
+      {
+        id: "m2",
+        transcript: {
+          v: 1,
+          messages: [
+            { role: "assistant", content: [{ type: "text", text: "好的" }], timestamp: 2 },
+            {
+              role: "toolResult",
+              toolCallId: "c1",
+              toolName: "generate_image",
+              content: [{ type: "text", text: "[已生成图片: /files/x.png]" }],
+              isError: false,
+              timestamp: 3,
+            },
+          ],
+        },
+      },
+    ]);
+    await run([{ type: "agent_end" }], repo as never);
+    const initial = (h.capturedInitialState?.initialState ?? {}) as {
+      messages: { role: string }[];
+      systemPrompt: string;
+    };
+    expect(initial.systemPrompt).toBe("x");
+    expect(initial.messages.map((m) => m.role)).toEqual(["user", "assistant", "toolResult"]);
+  });
+
+  it("本轮排除：userMessageId 对应行不进入回放历史（场景 2，不重复注入）", async () => {
+    const { repo } = makeRepo([
+      { id: "m1", transcript: { v: 1, messages: [{ role: "user", content: "第一轮", timestamp: 1 }] } },
+      // 本轮 user 行（route.ts 刚落库）
+      { id: "mu1", transcript: { v: 1, messages: [{ role: "user", content: "hi", timestamp: 9 }] } },
+    ]);
+    await run([{ type: "agent_end" }], repo as never);
+    const initial = (h.capturedInitialState?.initialState ?? {}) as {
+      messages: { role: string; content: unknown }[];
+    };
+    expect(initial.messages).toHaveLength(1);
+    expect(initial.messages[0]).toMatchObject({ role: "user", content: "第一轮" });
+  });
+
+  it("坏数据容错：无 transcript 行与非法版本行跳过；连续 user 行不抛错", async () => {    const { repo } = makeRepo([
+      { id: "m1" }, // 旧数据：无 transcript
+      { id: "m2", transcript: { v: 99, messages: [] } }, // 未来版本：跳过
+      { id: "m3", transcript: { v: 1, messages: [{ role: "user", content: "第一句", timestamp: 1 }] } },
+      { id: "m4", transcript: { v: 1, messages: [{ role: "user", content: "第二句", timestamp: 2 }] } },
+    ]);
+    await run([{ type: "agent_end" }], repo as never);
+    const initial = (h.capturedInitialState?.initialState ?? {}) as {
+      messages: { role: string; content: string }[];
+    };
+    expect(initial.messages.map((m) => m.content)).toEqual(["第一句", "第二句"]);
+  });
+
+  it("回放历史非空时，落库 transcript 只含本轮增量（baseline 隔离历史）", async () => {
+    const { repo, create } = makeRepo([
+      { id: "m1", transcript: { v: 1, messages: [{ role: "user", content: "历史轮", timestamp: 1 }] } },
+      {
+        id: "m2",
+        transcript: {
+          v: 1,
+          messages: [{ role: "assistant", content: [{ type: "text", text: "历史回复" }], timestamp: 2 }],
+        },
+      },
+    ]);
+    h.stateMessages = [
+      { role: "user", content: "本轮输入", timestamp: 9 },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "本轮回复" }],
+        api: "openai-completions",
+        provider: "test",
+        model: "m",
+        stopReason: "stop",
+        timestamp: 10,
+      },
+    ];
+    await run(
+      [
+        { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "本轮回复" } },
+        { type: "agent_end" },
+      ],
+      repo as never,
+    );
+    const persisted = create.mock.calls[0][0] as {
+      transcript: { messages: { role: string; content: unknown }[] };
+    };
+    // 只含本轮 assistant（user 属于 user 行；历史 assistant 不重复落库）
+    expect(persisted.transcript.messages).toHaveLength(1);
+    expect(persisted.transcript.messages[0].role).toBe("assistant");
   });
 });

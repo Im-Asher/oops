@@ -3,8 +3,11 @@ import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
 import { getChatModel, getChatModels } from "@/server/infra/providers/llm";
 import { agentRegistry } from "./agents/registry";
 import { toolRegistry } from "./tools/registry";
-import { sanitizeTranscript } from "./transcript";
+import { buildReplayHistory, sanitizeTranscript } from "./transcript";
 import type { SseEvent } from "./types";
+
+/** 回放消息数硬上限（tasks.md 3.2：任何情况下不爆炸的最后防线） */
+const REPLAY_MAX_MESSAGES = 40;
 
 export interface RunAgentArgs {
   sessionId: string;
@@ -32,9 +35,14 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
   const tools = agentRegistry.getAgentTools(args.agentId);
   const messageRepo = args.repos?.message ?? createMessageRepo();
 
+  // 重建回放历史：拼接会话 transcript，排除本轮 user 行（其文本由 prompt() 注入），
+  // 消息数硬上限兜底（compact 之前的最后防线）
+  const rows = await messageRepo.list(args.sessionId);
+  const history = buildReplayHistory(rows, args.userMessageId, REPLAY_MAX_MESSAGES);
+
   const agent = new Agent({
     streamFn: (m, c, o) => getChatModels().streamSimple(m, c, o),
-    initialState: { model, systemPrompt: def.systemPrompt, tools },
+    initialState: { model, systemPrompt: def.systemPrompt, tools, messages: history },
     beforeToolCall: async (ctx) => {
       if (!toolRegistry.has(ctx.toolCall.name)) {
         return { block: true };
