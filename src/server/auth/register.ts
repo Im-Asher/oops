@@ -3,6 +3,7 @@ import { createUserRepo } from "@/server/db/user.repo";
 import { createInviteCodeRepo } from "@/server/db/invite-code.repo";
 import type { DbClient } from "@/server/db/invite-code.repo";
 import type { User } from "@/server/db/schema";
+import { generateUniqueOopsId } from "./oops-id";
 
 export type RegisterFailureReason = "invite_code_invalid" | "username_taken";
 
@@ -44,8 +45,13 @@ export async function registerUser(
       if (await createUserRepo(tx).findByUsername(input.username)) {
         throw new RegisterAbort("username_taken");
       }
+      // oops ID 生成与查重同事务：冲突近乎不可能，重试兜底（上限 5 次）
+      const oopsId = await generateUniqueOopsId(async (id) => {
+        return !(await createUserRepo(tx).findByOopsId(id));
+      });
       return createUserRepo(tx).create({
         username: input.username,
+        oopsId,
         passwordHash: input.passwordHash,
         inviteCodeId: consumed.id,
       });

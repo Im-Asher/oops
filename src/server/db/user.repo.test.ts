@@ -16,18 +16,57 @@ describe("user repo", () => {
     expect(mock.state.calls.at(-1)?.op).toBe("select.from.where.limit");
   });
 
-  it("create inserts all fields and returns the row", async () => {
+  it("findByOopsId filters by the exact oops id", async () => {
+    const mock = makeMockDb({ selectResult: [] });
+    await createUserRepo(mock.db).findByOopsId("x7k9m2p4");
+    expect(mock.state.calls.at(-1)?.op).toBe("select.from.where.limit");
+  });
+
+  it("create inserts all fields including oopsId and returns the row", async () => {
     const mock = makeMockDb();
     const row = await createUserRepo(mock.db).create({
       username: "alice",
+      oopsId: "x7k9m2p4",
       passwordHash: "HASH",
+      displayName: "小明",
       inviteCodeId: "c1",
     });
     expect(row).toMatchObject({
       username: "alice",
+      oopsId: "x7k9m2p4",
       passwordHash: "HASH",
+      displayName: "小明",
       inviteCodeId: "c1",
     });
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
+  });
+
+  it("updateProfile applies only the provided fields", async () => {
+    const mock = makeMockDb();
+    await createUserRepo(mock.db).updateProfile("u1", {
+      displayName: null,
+      bio: "做电商图的",
+    });
+    expect(mock.state.lastSet).toEqual({
+      displayName: null,
+      bio: "做电商图的",
+    });
+    expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
+  });
+
+  it("updateProfile clears fields with explicit null", async () => {
+    const mock = makeMockDb();
+    await createUserRepo(mock.db).updateProfile("u1", { bio: null });
+    expect(mock.state.lastSet).toEqual({ bio: null });
+  });
+
+  it("updatePassword writes the hash and bumps token_version in one statement", async () => {
+    const mock = makeMockDb();
+    await createUserRepo(mock.db).updatePassword("u1", "NEW_HASH");
+    const set = mock.state.lastSet as Record<string, unknown>;
+    expect(set.passwordHash).toBe("NEW_HASH");
+    // tokenVersion 以 sql 片段下发，由数据库端原位 +1
+    expect(typeof set.tokenVersion).toBe("object");
+    expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
   });
 });

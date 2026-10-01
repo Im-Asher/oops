@@ -90,6 +90,19 @@ describe("registerUser", () => {
     expect(chain.insert).not.toHaveBeenCalled();
   });
 
+  it("generates an oops id in-transaction and retries once on oops-id conflict", async () => {
+    const { db, captured } = makeTxStub({
+      returningResults: [[code], [{ id: "u1", username: "alice" }]],
+      // findByUsername 空 → oopsId 第一次冲突 → 第二次可用
+      limitResults: [[], [{ id: "x0" }], []],
+    });
+    const result = await registerUser(input, db);
+    expect(result).toEqual({ ok: true, user: { id: "u1", username: "alice" } });
+    expect(captured.valuesArgs[0]?.oopsId).toMatch(
+      /^[23456789abcdefghjkmnpqrstuvwxyz]{8}$/,
+    );
+  });
+
   it("maps a unique violation from concurrent same-name registration to username_taken", async () => {
     const { db, chain } = makeTxStub({
       returningResults: [[code]],

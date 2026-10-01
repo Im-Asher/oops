@@ -8,6 +8,8 @@ export interface MockDbState {
   selectResult: unknown[];
   pendingValues: unknown;
   pendingSet: unknown;
+  /** 最近一次 .set() 入参（returning 后不清空，供断言用） */
+  lastSet: unknown;
   calls: { op: string; args: unknown[] }[];
 }
 
@@ -20,6 +22,7 @@ export function makeMockDb(
     selectResult: initial?.selectResult ?? [],
     pendingValues: initial?.pendingValues,
     pendingSet: initial?.pendingSet,
+    lastSet: undefined,
     calls: [],
   };
 
@@ -52,7 +55,10 @@ export function makeMockDb(
       apply(_t, _this, args: unknown[]) {
         if (op.endsWith(".values") || op.endsWith(".set")) {
           state.pendingValues = op.endsWith(".values") ? args[0] : state.pendingValues;
-          state.pendingSet = op.endsWith(".set") ? args[0] : state.pendingSet;
+          if (op.endsWith(".set")) {
+            state.pendingSet = args[0];
+            state.lastSet = args[0];
+          }
         }
         return build(op);
       },
