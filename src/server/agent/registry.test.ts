@@ -23,6 +23,7 @@ describe("AgentRegistry", () => {
         id: "registry-test",
         name: "测试",
         description: "测试 Agent",
+        icon: "🧪",
         tools: ["generate_image"],
         systemPrompt: "x",
       }),
@@ -39,6 +40,7 @@ describe("AgentRegistry", () => {
         id: "auth-test",
         name: "测试",
         description: "测试 Agent",
+        icon: "🧪",
         tools: ["gen_tool"],
         systemPrompt: "x",
       }),
@@ -46,5 +48,21 @@ describe("AgentRegistry", () => {
     const tools = agentRegistry.getAgentTools("auth-test");
     expect(tools.map((t) => t.name)).toEqual(["gen_tool"]);
     expect(tools.some((t) => t.name === "extra_tool")).toBe(false);
+  });
+
+  it("元数据导出：metadata() 含 icon 且不含 systemPrompt", () => {
+    agentRegistry.register(
+      defineAgent({
+        id: "meta-test",
+        name: "测试",
+        description: "测试 Agent",
+        icon: "🧪",
+        tools: [],
+        systemPrompt: "secret-prompt",
+      }),
+    );
+    const meta = agentRegistry.metadata().find((a) => a.id === "meta-test");
+    expect(meta).toMatchObject({ id: "meta-test", icon: "🧪", tools: [] });
+    expect(meta).not.toHaveProperty("systemPrompt");
   });
 });

@@ -55,7 +55,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 **两张注册表解耦：ToolRegistry + AgentRegistry。**
 
 - **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落 MinIO→assets 的原子语义）；`render_html`/`save_asset` 属刻意延后项。
-- **AgentRegistry**：启动时扫描 `src/server/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/tools，不含 systemPrompt）给前端 `GET /api/agents`。
+- **AgentRegistry**：启动时扫描 `src/server/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/icon/tools，不含 systemPrompt）给前端 `GET /api/agents`。
 
 新增 Agent = 新增一个文件：
 
@@ -70,7 +70,7 @@ export const atmosphereDesigner = defineAgent({
 });
 ```
 
-> 注：v1 的 Agent 定义为 `{ id, name, description, tools, systemPrompt }`；`icon` / `greeting` / `defaults` 属规划中的元数据扩展（前端选择器当前仅消费 id/name/description/tools），以代码为准。
+> 注：Agent 定义为 `{ id, name, description, icon, tools, systemPrompt }`（icon 为前端头像徽标 emoji）；`greeting` / `defaults` 已从契约中移除（从未有消费方），以代码为准。
 
 - system prompt 外置到 `src/server/agent/definitions/prompts/*.md`，独立调优（compact 摘要骨架 `session-summary.md` 同目录）。
 - 切换 Agent = 换 systemPrompt + tools 子集重新进入 `agentLoop`，无子 Agent 黑盒编排（符合 Pi 反黑盒理念）。

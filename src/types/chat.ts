@@ -17,6 +17,8 @@ export interface AgentInfo {
   id: string;
   name: string;
   description: string;
+  /** 头像徽标 emoji。 */
+  icon: string;
   tools: string[];
 }
 

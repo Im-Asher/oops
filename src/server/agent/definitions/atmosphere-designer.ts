@@ -10,6 +10,7 @@ export const atmosphereDesigner = defineAgent({
   id: "atmosphere-designer",
   name: "氛围图设计师",
   description: "专注氛围/场景图与产品图的文生图助手，调用 generate_image 把描述变成图片。",
+  icon: "🌄",
   tools: ["generate_image"],
   systemPrompt,
 });
