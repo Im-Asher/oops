@@ -1,6 +1,6 @@
 # IMPROVEMENT.md — 文档同步规则与待改进项
 
-> 本文件是 `AGENTS.md` / `docs/ARCHITECTURE.md` 等文档的**防腐烂机制**：
+> 本文件是 `AGENTS.md` / `docs/ARCHITECTURE.md` / `docs/PRODUCT_DESIGN.md` 等文档的**防腐烂机制**：
 > 只定义「何时更新 / 如何判定 / 谁负责 / 如何验证」的规则，以及**尚未实施的待改进项**。
 > 变更历史不在此登记——它属于 git 提交记录（见下方「过期处理」）。
 
@@ -12,6 +12,7 @@
 - 构建 / 测试命令、依赖版本（minor/major 且影响行为）、环境变量变化
 - 安全要求变化：认证、上传校验、渲染沙箱白名单、密钥访问路径
 - 端到端流程或意图分流逻辑变化
+- 产品/体验原则变化：新增或修订产品理念、原则边界裁决、体验冲突裁决（**同一次提交同步 `docs/PRODUCT_DESIGN.md`** 对应章节与 5.2 裁决表；其自身更新规则见该文档 §7）
 
 ### 2. 豁免清单（负面：以下情况无需更新文档）
 - 纯重命名且对外契约不变、内部函数/模块重构不改导出与目录
@@ -39,9 +40,9 @@
 更新文档后，用以下方式确认准确、完整、一致：
 
 1. **事实核对（对代码）**：文档声称的目录/文件/表结构用实际代码核对；确认每个
-   `src/server/agent/agents/*.ts` 都有对应 `prompts/*.md`；确认 `ARCHITECTURE.md` 目录树与真实树一致。
+   `src/server/agent/definitions/*.ts` 都有对应 `prompts/*.md`；确认 `ARCHITECTURE.md` 目录树与真实树一致。
 2. **可执行护栏**：运行 `pnpm lint && pnpm typecheck && pnpm test`，确认文档所述命令真实存在且通过。
-3. **交叉一致性**：`AGENTS.md` 与 `ARCHITECTURE.md` 表述不冲突（技术栈等易重复处以 `ARCHITECTURE.md` 为准，`AGENTS.md` 只摘摘要并链接）。
+3. **交叉一致性**：`AGENTS.md` 与 `ARCHITECTURE.md` 表述不冲突（技术栈等易重复处以 `ARCHITECTURE.md` 为准，`AGENTS.md` 只摘摘要并链接）。`PRODUCT_DESIGN.md` 只写理念与原则、不重复实现细节；理念表述与实现/架构文档冲突时，按其 §7.3 处理（改代码纠偏，或修订文档并留理由）。
 4. **CI 自动校验（建议新增）**：加轻量 `docs:check` 脚本作为 PR 门禁，校验：
    - `ARCHITECTURE.md` 目录树列出的文件是否真实存在
    - 每个 Agent 定义是否都有对应 prompt md

@@ -41,6 +41,11 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
   implementation. When a change alters architecture decisions, agents/tools,
   commands, conventions, or security requirements, update the relevant doc
   **in the same change** — doc updates are part of the definition of done.
+- `docs/PRODUCT_DESIGN.md` is the product design constitution (principles &
+  philosophy only — no implementation details, no status tracking). When a
+  change makes a UX/product-principle decision, resolves a principle conflict,
+  or would behave against a stated principle, update its affected sections
+  **in the same change** (its own update rules live in §7 of that doc).
 - Sync rules and deferred doc TODOs live in `IMPROVEMENT.md`; it is **not** a
   change log — doc-update history is tracked in git commits, never duplicated
   in a manual table. If docs and code conflict, code wins — fix the doc
