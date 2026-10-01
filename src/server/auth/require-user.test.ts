@@ -21,8 +21,12 @@ beforeEach(() => {
 });
 
 describe("requireUser", () => {
-  it("returns the userId for a valid cookie and active user", async () => {
-    findByIdMock.mockResolvedValue({ id: "u1", status: "active" });
+  it("returns the userId for a legacy cookie (no tv) against token_version 0", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "active",
+      tokenVersion: 0,
+    });
     const value = createSessionCookieValue(
       { userId: "u1", exp: 1_800_000_000 },
       SECRET,
@@ -30,8 +34,51 @@ describe("requireUser", () => {
     await expect(requireUser(requestWithCookie(value))).resolves.toBe("u1");
   });
 
+  it("returns the userId when the token version matches", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "active",
+      tokenVersion: 2,
+    });
+    const value = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000, tv: 2 },
+      SECRET,
+    );
+    await expect(requireUser(requestWithCookie(value))).resolves.toBe("u1");
+  });
+
+  it("rejects a cookie whose token version lags behind the user (kicked session)", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "active",
+      tokenVersion: 1,
+    });
+    const value = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000, tv: 0 },
+      SECRET,
+    );
+    await expect(requireUser(requestWithCookie(value))).resolves.toBeNull();
+  });
+
+  it("rejects a legacy cookie for a user whose version has advanced", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "active",
+      tokenVersion: 3,
+    });
+    const value = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000 },
+      SECRET,
+    );
+    await expect(requireUser(requestWithCookie(value))).resolves.toBeNull();
+  });
+
   it("returns null when the user is disabled", async () => {
-    findByIdMock.mockResolvedValue({ id: "u1", status: "disabled" });
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "disabled",
+      tokenVersion: 0,
+    });
     const value = createSessionCookieValue(
       { userId: "u1", exp: 1_800_000_000 },
       SECRET,
