@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { resolveDisplayName } from "@/lib/nickname";
 import { cn } from "cn";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -43,7 +44,7 @@ function FeedbackLine({ feedback }: { feedback: Feedback | null }) {
   );
 }
 
-/** 个人信息页：基本信息卡（资料维护）+ 安全信息卡（改密）。proxy 保护非公开路径，此处仅做 401 兜底跳转。 */
+/** 个人信息页：身份头卡 + 基本信息卡（资料维护）+ 安全信息卡（改密）。proxy 保护非公开路径，此处仅做 401 兜底跳转。 */
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -173,35 +174,35 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
         <p className="text-sm text-muted-foreground">加载中…</p>
       </div>
     );
   }
 
+  const nickname = resolveDisplayName(profile);
+  const initial = nickname[0] ?? "";
+
   return (
-    <div className="mx-auto w-full max-w-md space-y-6 px-4 py-10">
-      <h1 className="text-center text-xl font-semibold tracking-tight text-foreground">
-        个人信息
-      </h1>
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-10">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          个人信息
+        </h1>
 
-      <section
-        aria-label="基本信息"
-        className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
-      >
-        <h2 className="text-sm font-medium text-foreground">基本信息</h2>
-
-        <div className="space-y-1">
-          <span className="text-sm text-muted-foreground">用户名</span>
-          <p className="text-sm text-foreground">{profile.username}</p>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-sm text-muted-foreground">oops ID</span>
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-sm text-foreground">
-              oops_{profile.oopsId}
-            </p>
+        <section
+          aria-label="账号身份"
+          className="flex items-center gap-4 rounded-xl border border-border bg-card p-6 shadow-sm"
+        >
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
+            {initial}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-semibold text-foreground">{nickname}</p>
+            <p className="truncate text-sm text-muted-foreground">{profile.username}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <p className="font-mono text-sm text-foreground">oops_{profile.oopsId}</p>
             <Button
               aria-label="复制 oops ID"
               size="icon-sm"
@@ -211,122 +212,129 @@ export default function ProfilePage() {
               {copied ? <CheckIcon /> : <CopyIcon />}
             </Button>
           </div>
-        </div>
+        </section>
 
-        <form className="space-y-4" onSubmit={onSaveProfile}>
-          <div className="space-y-2">
-            <label htmlFor="displayName" className="text-sm font-medium text-foreground">
-              昵称
-            </label>
-            <Input
-              id="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              maxLength={20}
-              placeholder="选填，清空即移除"
-            />
-          </div>
+        <section
+          aria-label="基本信息"
+          className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
+        >
+          <h2 className="text-sm font-medium text-foreground">基本信息</h2>
 
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-foreground">性别</span>
-            <div aria-label="性别" className="flex gap-2" role="radiogroup">
-              {GENDER_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  aria-checked={gender === opt.value}
-                  className={cn(
-                    "flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors",
-                    gender === opt.value
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border text-muted-foreground hover:bg-muted",
-                  )}
-                  onClick={() => setGender(opt.value)}
-                  role="radio"
-                  type="button"
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <form className="space-y-4" onSubmit={onSaveProfile}>
+            <div className="space-y-2">
+              <label htmlFor="displayName" className="text-sm font-medium text-foreground">
+                昵称
+              </label>
+              <Input
+                id="displayName"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={20}
+                placeholder="选填，清空即移除"
+              />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="bio" className="text-sm font-medium text-foreground">
-              个性签名
-            </label>
-            <Input
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              maxLength={60}
-              placeholder="选填，清空即移除"
-            />
-          </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">性别</span>
+              <div aria-label="性别" className="flex gap-2" role="radiogroup">
+                {GENDER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    aria-checked={gender === opt.value}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                      gender === opt.value
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted",
+                    )}
+                    onClick={() => setGender(opt.value)}
+                    role="radio"
+                    type="button"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <FeedbackLine feedback={saveFeedback} />
-          <Button className="w-full" disabled={saving} type="submit">
-            {saving ? "保存中…" : "保存"}
-          </Button>
-        </form>
-      </section>
+            <div className="space-y-2">
+              <label htmlFor="bio" className="text-sm font-medium text-foreground">
+                个性签名
+              </label>
+              <Input
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={60}
+                placeholder="选填，清空即移除"
+              />
+            </div>
 
-      <section
-        aria-label="安全信息"
-        className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
-      >
-        <h2 className="text-sm font-medium text-foreground">安全信息</h2>
+            <FeedbackLine feedback={saveFeedback} />
+            <Button className="w-full" disabled={saving} type="submit">
+              {saving ? "保存中…" : "保存"}
+            </Button>
+          </form>
+        </section>
 
-        <form className="space-y-4" onSubmit={onChangePassword}>
-          <div className="space-y-2">
-            <label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
-              当前密码
-            </label>
-            <Input
-              id="currentPassword"
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              type="password"
-              value={currentPassword}
-              autoComplete="current-password"
-            />
-          </div>
+        <section
+          aria-label="安全信息"
+          className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
+        >
+          <h2 className="text-sm font-medium text-foreground">安全信息</h2>
 
-          <div className="space-y-2">
-            <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
-              新密码
-            </label>
-            <Input
-              id="newPassword"
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={8}
-              required
-              type="password"
-              value={newPassword}
-              autoComplete="new-password"
-            />
-            <p className="text-xs text-muted-foreground">至少 8 位</p>
-          </div>
+          <form className="space-y-4" onSubmit={onChangePassword}>
+            <div className="space-y-2">
+              <label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
+                当前密码
+              </label>
+              <Input
+                id="currentPassword"
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                type="password"
+                value={currentPassword}
+                autoComplete="current-password"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-              确认新密码
-            </label>
-            <Input
-              id="confirmPassword"
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              type="password"
-              value={confirmPassword}
-              autoComplete="new-password"
-            />
-          </div>
+            <div className="space-y-2">
+              <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
+                新密码
+              </label>
+              <Input
+                id="newPassword"
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+                required
+                type="password"
+                value={newPassword}
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-muted-foreground">至少 8 位</p>
+            </div>
 
-          <FeedbackLine feedback={passwordFeedback} />
-          <Button className="w-full" disabled={changing} type="submit">
-            {changing ? "修改中…" : "修改密码"}
-          </Button>
-        </form>
-      </section>
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+                确认新密码
+              </label>
+              <Input
+                id="confirmPassword"
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                type="password"
+                value={confirmPassword}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <FeedbackLine feedback={passwordFeedback} />
+            <Button className="w-full" disabled={changing} type="submit">
+              {changing ? "修改中…" : "修改密码"}
+            </Button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }
