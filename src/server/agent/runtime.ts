@@ -2,7 +2,7 @@ import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo, type SessionRepo } from "@/server/db/session.repo";
 import { getChatModel, getChatModels } from "@/server/infra/providers/llm";
-import { agentRegistry } from "./agents/registry";
+import { agentRegistry } from "./registry";
 import { compactSessionHistory, summaryPrefixMessage } from "./compact";
 import { toolRegistry } from "./tools/registry";
 import { buildReplayHistory, sanitizeTranscript } from "./transcript";

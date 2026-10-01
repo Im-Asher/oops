@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   messageCreates: [] as Record<string, unknown>[],
 }));
 
-vi.mock("@/server/agent/agents", () => ({ default: {} }));
+vi.mock("@/server/agent", () => ({ default: {} }));
 vi.mock("@/server/agent/runtime", () => ({
   runAgent: vi.fn(async (args: { onEvent: (e: unknown) => void }) => {
     h.runAgentCalls += 1;

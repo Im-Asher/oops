@@ -1,5 +1,5 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { toolRegistry } from "../tools/registry";
+import { toolRegistry } from "./tools/registry";
 
 export interface AgentDefinition {
   id: string;

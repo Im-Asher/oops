@@ -47,7 +47,7 @@ vi.mock("@/server/infra/providers/llm", () => ({
 }));
 
 import { runAgent } from "./runtime";
-import { agentRegistry, defineAgent } from "./agents/registry";
+import { agentRegistry, defineAgent } from "./registry";
 import type { MessageRepo } from "@/server/db/message.repo";
 
 interface ToolEndDetails {

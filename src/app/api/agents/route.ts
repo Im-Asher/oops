@@ -1,4 +1,4 @@
-import { agentRegistry } from "@/server/agent/agents";
+import { agentRegistry } from "@/server/agent";
 
 export const dynamic = "force-dynamic";
 

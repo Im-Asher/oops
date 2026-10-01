@@ -7,7 +7,7 @@ import { buildReplayHistory, isSerializedTranscript, type TranscriptRowLike } fr
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** 摘要骨架 prompt（外置文件，遵循 prompt 不内联约定） */
-export const SUMMARY_PROMPT = readFileSync(join(here, "agents", "prompts", "session-summary.md"), "utf8");
+export const SUMMARY_PROMPT = readFileSync(join(here, "definitions", "prompts", "session-summary.md"), "utf8");
 
 /** 字符近似 token 估算（中文 ~1.5 字/token），阈值误差由 last-40 兜底吸收。 */
 export function estimateTokens(text: string): number {

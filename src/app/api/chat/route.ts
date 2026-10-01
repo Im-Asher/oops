@@ -3,7 +3,7 @@ import type { UserMessage } from "@earendil-works/pi-ai";
 import { runAgent } from "@/server/agent/runtime";
 import { screenInput } from "@/server/agent/moderation";
 import { sanitizeTranscript } from "@/server/agent/transcript";
-import "@/server/agent/agents"; // 副作用：注册 Agent / 工具 / 任务处理器
+import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { createMessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo } from "@/server/db/session.repo";
 import type { SseEvent } from "@/server/agent/types";
