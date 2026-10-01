@@ -181,6 +181,46 @@ describe("runAgent (runtime bridge)", () => {
     expect(create).toHaveBeenCalled();
   });
 
+  it("含思考回合：thinking 三段事件按序桥接（id=contentIndex），落库 transcript 仍无 thinking", async () => {
+    const { repo, create } = makeRepo();
+    h.stateMessages = [
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "secret reasoning LEAKMARK" },
+          { type: "text", text: "回答" },
+        ],
+        api: "openai-completions",
+        provider: "test",
+        model: "m",
+        stopReason: "stop",
+        timestamp: 1,
+      },
+    ];
+    const events = await run(
+      [
+        { type: "message_update", assistantMessageEvent: { type: "thinking_start", contentIndex: 0 } },
+        { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "思考中" } },
+        { type: "message_update", assistantMessageEvent: { type: "thinking_end", contentIndex: 0, content: "思考中" } },
+        { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "回答" } },
+        { type: "agent_end" },
+      ],
+      repo as never,
+    );
+    expect(events.map((e) => e.type)).toEqual([
+      "thinking_start",
+      "thinking_delta",
+      "thinking_end",
+      "message_delta",
+      "finish",
+    ]);
+    expect((events[0] as { id: string }).id).toBe("0");
+    expect((events[1] as { text: string }).text).toBe("思考中");
+    // 桥接不改变持久化清洗：thinking 不出现在落库 transcript
+    const persisted = create.mock.calls[0][0] as { transcript?: unknown };
+    expect(JSON.stringify(persisted.transcript)).not.toContain("LEAKMARK");
+  });
+
   it("assistant 行 transcript 含本轮 assistant 与 toolResult（无 thinking、无图片 base64、排除 system/user）", async () => {
     const { repo, create } = makeRepo();
     h.stateMessages = [

@@ -116,6 +116,14 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
         if (ame.type === "text_delta") {
           assistantText += ame.delta;
           args.onEvent({ type: "message_delta", text: ame.delta });
+        } else if (ame.type === "thinking_start") {
+          // 思考内容仅流式转发（前端可折叠展示），不累积、不落库——
+          // 持久化清洗由 sanitizeTranscript 在回合结束统一剥离
+          args.onEvent({ type: "thinking_start", id: String(ame.contentIndex) });
+        } else if (ame.type === "thinking_delta") {
+          args.onEvent({ type: "thinking_delta", id: String(ame.contentIndex), text: ame.delta });
+        } else if (ame.type === "thinking_end") {
+          args.onEvent({ type: "thinking_end", id: String(ame.contentIndex) });
         }
         break;
       }

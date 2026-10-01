@@ -3,6 +3,10 @@ import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 /** SSE 事件：由 runtime 将 agentLoop 事件桥接为前端可消费的格式。 */
 export type SseEvent =
   | { type: "message_delta"; text: string }
+  /** 思考内容三段事件（id 为思考块索引，仅流式展示，不落库） */
+  | { type: "thinking_start"; id: string }
+  | { type: "thinking_delta"; id: string; text: string }
+  | { type: "thinking_end"; id: string }
   | { type: "tool_start"; id: string; name: string; args: unknown }
   | { type: "tool_end"; id: string; name: string; details: Record<string, unknown> | null }
   | { type: "finish"; stopReason: string }
