@@ -9,8 +9,19 @@ const bodySchema = z.object({
   username: z
     .string()
     .trim()
-    .min(2, "用户名至少 2 个字符")
-    .max(32, "用户名至多 32 个字符"),
+    .min(3, "用户名需 3–20 个字符")
+    .max(20, "用户名需 3–20 个字符")
+    .regex(
+      /^[A-Za-z][A-Za-z0-9_]*$/,
+      "用户名需以字母开头，仅含字母、数字或下划线",
+    ),
+  // 可选昵称：trim 后为空串视为未填写
+  displayName: z
+    .string()
+    .trim()
+    .max(20, "昵称至多 20 个字符")
+    .transform((v) => (v.length === 0 ? undefined : v))
+    .optional(),
   password: z.string().min(8, "密码至少 8 位"),
   inviteCode: z.string().trim().min(1, "请填写邀请码"),
 });
@@ -47,6 +58,7 @@ export async function POST(req: Request): Promise<Response> {
   const passwordHash = await hashPassword(parsed.data.password);
   const result = await registerUser({
     username: parsed.data.username,
+    displayName: parsed.data.displayName,
     passwordHash,
     inviteCode: parsed.data.inviteCode,
   });

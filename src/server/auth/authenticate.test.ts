@@ -10,14 +10,18 @@ const findByUsernameMock = vi.fn<(username: string) => Promise<unknown>>();
 import { authenticate } from "./authenticate";
 
 describe("authenticate", () => {
-  it("returns the userId for correct credentials", async () => {
+  it("returns the userId and token version for correct credentials", async () => {
     const hash = await hashPassword("correct-password");
     findByUsernameMock.mockResolvedValue({
       id: "u1",
       username: "alice",
       passwordHash: hash,
+      tokenVersion: 0,
     });
-    await expect(authenticate("alice", "correct-password")).resolves.toBe("u1");
+    await expect(authenticate("alice", "correct-password")).resolves.toEqual({
+      userId: "u1",
+      tokenVersion: 0,
+    });
   });
 
   it("returns null for a wrong password", async () => {

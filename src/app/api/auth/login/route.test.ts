@@ -26,11 +26,17 @@ function post(body: unknown) {
 }
 
 describe("POST /api/auth/login", () => {
-  it("登录成功：200 + 签发会话 cookie", async () => {
-    h.authenticate.mockResolvedValueOnce("u1");
+  it("登录成功：200 + 签发携带当前会话版本的 cookie", async () => {
+    h.authenticate.mockResolvedValueOnce({ userId: "u1", tokenVersion: 2 });
     const res = await post({ username: "alice", password: "whatever" });
     expect(res.status).toBe(200);
-    expect(res.headers.get("set-cookie")).toContain("oops_session=");
+    const cookie = res.headers.get("set-cookie") ?? "";
+    expect(cookie).toContain("oops_session=");
+    const token = cookie.split(";")[0].split("=").slice(1).join("=");
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[0], "base64url").toString(),
+    ) as { userId: string; tv: number };
+    expect(payload).toMatchObject({ userId: "u1", tv: 2 });
   });
 
   it("凭证错误：401 且文案不区分原因", async () => {

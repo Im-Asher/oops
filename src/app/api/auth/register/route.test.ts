@@ -34,17 +34,54 @@ const okResult = {
 } as const;
 
 describe("POST /api/auth/register", () => {
-  it("注册成功：201 + 签发会话 cookie，服务层收到哈希后的密码", async () => {
+  it("注册成功：201 + 签发会话 cookie，服务层收到哈希后的密码与昵称", async () => {
     h.registerUser.mockResolvedValueOnce(okResult);
-    const res = await post({ username: "alice", password: "12345678", inviteCode: "CODE-1" });
+    const res = await post({
+      username: "alice",
+      displayName: " 小明 ",
+      password: "12345678",
+      inviteCode: "CODE-1",
+    });
     expect(res.status).toBe(201);
     const cookie = res.headers.get("set-cookie") ?? "";
     expect(cookie).toContain("oops_session=");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(h.registerUser).toHaveBeenCalledWith(
-      expect.objectContaining({ username: "alice", passwordHash: "HASH", inviteCode: "CODE-1" }),
+      expect.objectContaining({
+        username: "alice",
+        displayName: "小明",
+        passwordHash: "HASH",
+        inviteCode: "CODE-1",
+      }),
     );
+  });
+
+  it.each([
+    ["ab", "用户名需 3–20 个字符"],
+    ["a".repeat(21), "用户名需 3–20 个字符"],
+    ["1alice", "用户名需以字母开头，仅含字母、数字或下划线"],
+    ["_alice", "用户名需以字母开头，仅含字母、数字或下划线"],
+    ["alice smile", "用户名需以字母开头，仅含字母、数字或下划线"],
+    ["小明01", "用户名需以字母开头，仅含字母、数字或下划线"],
+  ])("用户名不合规（%j）：400 且不触达服务层", async (username, message) => {
+    const res = await post({ username, password: "12345678", inviteCode: "CODE-1" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { message: string } };
+    expect(body.error.message).toBe(message);
+    expect(h.registerUser).not.toHaveBeenCalled();
+  });
+
+  it("昵称超长：400", async () => {
+    const res = await post({
+      username: "alice",
+      displayName: "长".repeat(21),
+      password: "12345678",
+      inviteCode: "CODE-1",
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { message: string } };
+    expect(body.error.message).toBe("昵称至多 20 个字符");
   });
 
   it("邀请码无效或已用尽：400 人话文案", async () => {

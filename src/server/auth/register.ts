@@ -33,7 +33,12 @@ function isUniqueViolation(e: unknown): boolean {
  * lower(username) 唯一索引为并发同名注册的兜底，冲突同样归为 username_taken。
  */
 export async function registerUser(
-  input: { username: string; passwordHash: string; inviteCode: string },
+  input: {
+    username: string;
+    passwordHash: string;
+    inviteCode: string;
+    displayName?: string;
+  },
   db: DbClient = defaultDb,
 ): Promise<RegisterResult> {
   try {
@@ -51,6 +56,7 @@ export async function registerUser(
       });
       return createUserRepo(tx).create({
         username: input.username,
+        displayName: input.displayName,
         oopsId,
         passwordHash: input.passwordHash,
         inviteCodeId: consumed.id,

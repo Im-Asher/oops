@@ -33,15 +33,23 @@ export async function POST(req: Request): Promise<Response> {
       { status: 400 },
     );
   }
-  const userId = await authenticate(parsed.data.username, parsed.data.password);
-  if (!userId) {
+  const auth = await authenticate(parsed.data.username, parsed.data.password);
+  if (!auth) {
     return Response.json(
       { error: { code: "INVALID_CREDENTIALS", message: "用户名或密码不正确" } },
       { status: 401 },
     );
   }
   return Response.json(
-    { user: { id: userId } },
-    { headers: { "set-cookie": sessionCookieHeader(userId, getConfig().AUTH_SECRET) } },
+    { user: { id: auth.userId } },
+    {
+      headers: {
+        "set-cookie": sessionCookieHeader(
+          auth.userId,
+          getConfig().AUTH_SECRET,
+          auth.tokenVersion,
+        ),
+      },
+    },
   );
 }
