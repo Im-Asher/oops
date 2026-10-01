@@ -156,12 +156,14 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
   `.env*` (gitignored). Access them exclusively through
   `src/lib/config.ts`; never log secrets or echo them into prompts/errors.
 - **Auth:** cookie session with HttpOnly + Secure + SameSite=Lax. Every Route
-  Handler must verify the session before touching DB or spawning tasks.
-  MVP passcode/invite-code auth is intentionally minimal — do not weaken it
-  further (no query-string tokens).
-  **状态（2026-09-28，foundation 阶段）：认证有意延后**——当前全部请求以固定
-  `OWNER_ID`（`src/lib/config.ts`）作为唯一用户，无任何会话校验；cookie-session
-  认证待后续 change 补充，届时同步本节并恢复上面的校验要求。
+  Handler must verify the session before touching DB or spawning tasks — call
+  `requireUser` (`src/server/auth/require-user.ts`) and return 401 on null.
+  `proxy.ts` only redirects pages for UX (cookie presence check, never a
+  security boundary — Edge has no DB access); the full verification (HMAC
+  signature, expiry, `users.status=active`) lives in `requireUser`.
+  Registration requires a valid invite code (conditional-UPDATE decrement
+  prevents concurrent over-issue). Passwords are salted scrypt hashes (never
+  plaintext). Keep it minimal — no query-string tokens.
 - **Uploads:** validate MIME type and size on upload (images only, hard cap);
   store with generated filenames (never user-supplied names); serve user
   files through the `files` route with correct `Content-Type` and

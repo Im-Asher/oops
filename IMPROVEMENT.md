@@ -59,8 +59,8 @@
 - [ ] **生图 Provider 抽象稳定化**：已实现 DashScope 万相 `wan2.7-image` 经 pi-ai `createImagesProvider` 自定义接入（`src/server/infra/providers/dashscope-images.ts`，Token Plan China 同步端点，返回 base64）；provider 抽象即 pi-ai 的 `createImagesProvider` / `createImagesModels` 接口。待补充：多 provider 选择、接口文档与联调固化。
 - [ ] **渲染沙箱网络白名单**：Playwright 出网限制目前是设计要求（AGENTS.md Security），实现时需细化白名单配置项并补充示例。
 - [ ] **入口敏感词词表**：`src/server/agent/moderation.ts` 机制已接好（聊天路由进入 LLM 前拦截），但 `DEFAULT_BLOCKLIST` 当前为空，词表待策略补充。
-- [ ] **数据模型演进**：`userId` 已预留但未启用；启动多租户时同步更新 ARCHITECTURE.md §7 与认证设计。
-- [ ] **认证延后（foundation）**：当前以固定 `OWNER_ID`（`src/lib/config.ts`）作为唯一用户，Route Handler 不做会话校验；待补充口令/邀请码 + cookie-session，届时恢复 AGENTS.md / ARCHITECTURE.md §2 的会话校验要求与实现。
+- [x] **数据模型演进**：`userId` 已随 `user-auth` change 实装为必传列（指向 `users.id`），ARCHITECTURE.md §7 已同步。
+- [x] **认证延后（foundation）**：已由 `user-auth` change 落地（邀请码注册 + scrypt 密码 + HMAC cookie session + `requireUser` 路由边界）；AGENTS.md / ARCHITECTURE.md 会话校验要求与实现已恢复同步。
 - [ ] **修复基线语义冲突**：`AGENTS.md` 称任务「persisted and retryable」，而 `ARCHITECTURE.md` §4 称「重启后 running 标记 failed」。统一表述：任务记录持久化（可手动重试/排查），但进程重启不自动恢复，running 任务标记 failed 后由用户重发。
 - [ ] **刷新后图片不显示（2026-09-30 冒烟发现）**：`runtime.ts` 落库 `tool_calls` 写入的是工具 result `details`（url/size/model/prompt，**无 `type` 字段**），而 `transcript.ts` 的 `toUIMessage` 要求 `type === "generate_image"` 才重建图片 part → 刷新后聊天面板与画布均无图（实时 SSE 流不受影响，图片仅当前回合可见）。修复方向：落库时补 `type: "generate_image"`，并让 `toUIMessage` 对存量行按「有 url 无 type」宽松兼容。
 - [ ] **assets.session_id 未关联（2026-09-30 冒烟发现）**：`generate_image` 落 assets 时 session_id 恒为空（历史数据亦然），按会话查询资产不可用。当前无消费方（画布走 SSE 直显），但多租户/作品库演进前需补齐关联。

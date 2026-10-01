@@ -25,7 +25,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | 决策点 | 结论 |
 | --- | --- |
 | 生图路径 | **混合模式**：海报/详情长图 = agent 生成 HTML → 服务端截图；氛围/场景图 = 纯文生图 API |
-| 产品形态 | MVP 单租户（口令/邀请码登录），schema 预留 userId 演进多租户 |
+| 产品形态 | MVP 多用户单部署（邀请码注册 + 用户名/密码登录），全表实装 `user_id` 隔离数据 |
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
 | 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
@@ -46,7 +46,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发（`render_html` 工具延后） |
 | 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
-| 认证 | 口令/邀请码 + cookie session（**foundation 阶段延后**，当前以固定 OWNER_ID 作为唯一用户） | 自实现（HttpOnly/Secure/SameSite），不引入 next-auth |
+| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符 |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
 
@@ -105,10 +105,12 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ## 5. 端到端流程（用户发送一条消息）
 
 ```
+⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/chat` 未登录 → 302 `/login`）；
+   业务 API 由 `requireUser` 完整验签 + 查 `users` active（唯一安全边界），未认证统一 401
 ① 前端：PromptInput 提交消息+附件 → POST /api/chat { sessionId, agentId, ... } → SSE 连接
-② Route Handler：鉴权 → 用户消息落库 → AgentRegistry 取配置 → 加载历史 → agentLoop
+② Route Handler：requireUser 取 userId → 用户消息落库 → AgentRegistry 取配置 → 加载历史 → agentLoop
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
-④ 工具执行：generate_image（出图 → 下载转 base64 → 落 MinIO → assets 落库）返回自有 `/files` URL
+④ 工具执行：generate_image（出图 → 下载转 base64 → 落 MinIO → assets 落库，userId 源自工具上下文）返回自有 `/files` URL
 ⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
 ⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 作品库可见
 ```
@@ -160,11 +162,20 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ## 7. 数据模型（Drizzle + PostgreSQL）
 
-> 以下为 **foundation 阶段**已落库的 MVP 表（已 `pnpm db:migrate` 应用）。所有表带
-> `userId` 列（多租户演进预留，当前恒为 `OWNER_ID`）；时间列 `timestamp with time zone`；
+> 以下为已落库的 MVP 表（已 `pnpm db:migrate` 应用）。业务四表带 `userId` 列
+> （指向 `users.id`，仓储层必传，按用户隔离数据）；时间列 `timestamp with time zone`；
 > `meta`/`payload`/`result`/`tool_calls` 用 `jsonb`；`role`/`kind`/`type`/`status` 用 `pgEnum`。
 
 ```
+users          用户      id(uuid), username(text, lower(username) 唯一索引),
+                        password_hash(text, scrypt, 不存明文), display_name(text?),
+                        status(user_status enum active|disabled), invite_code_id(uuid?→invite_codes),
+                        created_at
+invite_codes   邀请码    code(text 主键), max_uses(int, 默认 1), used_count(int, 默认 0),
+                        expires_at(timestamptz?), note(text?), created_at
+chat_sessions  会话      id(uuid), user_id(text→users.id), agent_id(uuid?), title(text?),
+                        summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
+                        created_at, updated_at
 chat_sessions  会话      id(uuid), user_id(text), agent_id(uuid?), title(text?),
                         summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
                         created_at, updated_at
@@ -182,6 +193,7 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 枚举取值：
 
 - `message_role`：`user` / `assistant` / `system`
+- `user_status`：`active` / `disabled`
 - `asset_kind`：`image` / `json` / `other` / `edited`
 - `task_type`：`generate_image` / `render_html` / `export`
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
@@ -194,6 +206,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
 > `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
 > `summarized_up_to`（compact 水位线，迁移 `0003`），存量数据零回填（见 5.1）。
+> `user-auth` 新增 `users` / `invite_codes` 表与 `user_status` 枚举（迁移 `0004`）；
+> 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
 Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列用 `timestamp with time zone`。
@@ -205,20 +219,28 @@ Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列�
 ```
 oops/
 ├── src/
+│   ├── proxy.ts                    # Edge 层引导（cookie 存在性 → 302 /login；非安全边界）
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
-│   │   ├── page.tsx                # 默认首页
-│   │   ├── files/[...path]/route.ts # 资产代理读取（安全响应头）
-│   │   ├── upload/route.ts
+│   │   ├── (auth)/                 # 登录/注册页（公开，居中卡片）
+│   │   │   ├── layout.tsx
+│   │   │   ├── login/page.tsx
+│   │   │   └── register/page.tsx
+│   │   ├── files/[...path]/route.ts # 资产代理读取（登录后，安全响应头）
+│   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限）
 │   │   ├── chat/page.tsx           # 画布工作台页（全屏画布 + 悬浮聊天面板，自定义 SSE）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
-│   │       ├── sessions/route.ts   # 会话 CRUD
+│   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
+│   │       ├── sessions/route.ts   # 会话 CRUD（按认证用户隔离）
 │   │       ├── sessions/[id]/route.ts # GET 会话历史（UIMessage 重建）
-│   │       └── chat/route.ts       # POST SSE 聊天（敏感词初筛 + 落库 + 流式）         # 图片上传（MIME 白名单 + 大小上限）
+│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
+│   │   ├── auth/                   # 认证域（password / session-cookie / require-user / register / authenticate / rate-limit）
 │   │   ├── db/                     # Drizzle client + schema + 仓储
-│   │   │   ├── schema.ts           # 四表 + 枚举定义
+│   │   │   ├── schema.ts           # 六表 + 枚举定义
 │   │   │   ├── index.ts            # pg Pool 单例（惰性）
+│   │   │   ├── user.repo.ts        # 用户 仓储
+│   │   │   ├── invite-code.repo.ts # 邀请码 仓储（条件 UPDATE 防超发）
 │   │   │   ├── session.repo.ts     # 会话 仓储（接口 + 实现）
 │   │   │   ├── message.repo.ts     # 消息 仓储
 │   │   │   ├── asset.repo.ts       # 资产 仓储
@@ -228,7 +250,7 @@ oops/
 │   │       ├── storage/            # 存储抽象（MinIO / S3 兼容）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
 │   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
-│   │           ├── upload.ts
+│   │           ├── upload.ts       # 上传/画布导出处理（userId 必传）
 │   │   │   └── providers/          # 外部 Provider 接入
 │   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
 │   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider
@@ -237,10 +259,10 @@ oops/
 │   │   └── agent/                  # 声明式 Agent 运行时
 │   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts / compact.ts
 │   │       ├── definitions/        # 各 Agent 定义 + prompts/<id>.md（含 compact 摘要骨架）
-│   │       └── tools/              # ToolRegistry + 工具实现（generate-image 等）       # 上传校验 + 处理
+│   │       └── tools/              # ToolRegistry（ToolExecutionContext 注入 userId）+ 工具实现
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
-│   ├── lib/                        # 客户端安全共享：config / utils（+ 单测）
-│   └── (types/ 规划)               # 共享类型，后续 change 引入
+│   ├── lib/                        # 客户端安全共享：config / utils / canvas（+ 单测）
+│   └── types/                      # 共享 TypeScript 类型
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
 ├── drizzle.config.ts               # drizzle-kit 配置（加载 .env.local）
 ├── drizzle/                        # 生成的迁移 SQL（已提交）
@@ -258,7 +280,7 @@ oops/
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
-- **多租户 SaaS**：userId 已预留，补注册/登录、配额/积分、团队隔离。
+- **多租户 SaaS**：注册/登录与用户级数据隔离已落地，后续补配额/积分、团队与组织隔离。
 - **多实例部署**：存储已为 MinIO（S3 兼容）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
 - **Agent 市场**：AgentRegistry 已是配置驱动，可平移到 DB 存储开放自定义。
 - **局部重绘/抠图**：作为新工具加入 ToolRegistry，Agent 按需引用。
