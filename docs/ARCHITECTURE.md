@@ -46,7 +46,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发（`render_html` 工具延后） |
 | 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
-| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符 |
+| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线） |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
 
@@ -106,7 +106,7 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 
 ```
 ⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/chat` 未登录 → 302 `/login`）；
-   业务 API 由 `requireUser` 完整验签 + 查 `users` active（唯一安全边界），未认证统一 401
+   业务 API 由 `requireUser` 完整验签 + 查 `users` active + 会话版本一致（唯一安全边界），未认证统一 401
 ① 前端：PromptInput 提交消息+附件 → POST /api/chat { sessionId, agentId, ... } → SSE 连接
 ② Route Handler：requireUser 取 userId → 用户消息落库 → AgentRegistry 取配置 → 加载历史 → agentLoop
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
@@ -114,6 +114,9 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
 ⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 作品库可见
 ```
+
+账号入口：悬浮聊天窗顶栏头像菜单（只读账号摘要 / 个人信息 / 退出登录）→ `/profile`
+维护昵称/性别/签名与改密（改密成功后当前端保持登录、其他端全部下线）。
 
 要点：
 
@@ -168,7 +171,10 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ```
 users          用户      id(uuid), username(text, lower(username) 唯一索引),
+                        oops_id(text, 8 位去易混短 ID, 唯一索引, 注册时生成不可改),
                         password_hash(text, scrypt, 不存明文), display_name(text?),
+                        gender(user_gender enum, 默认 secret), bio(text?),
+                        token_version(int, 改密踢下线水位),
                         status(user_status enum active|disabled), invite_code_id(uuid?→invite_codes),
                         created_at
 invite_codes   邀请码    code(text 主键), max_uses(int, 默认 1), used_count(int, 默认 0),
@@ -194,6 +200,7 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 
 - `message_role`：`user` / `assistant` / `system`
 - `user_status`：`active` / `disabled`
+- `user_gender`：`male` / `female` / `secret`
 - `asset_kind`：`image` / `json` / `other` / `edited`
 - `task_type`：`generate_image` / `render_html` / `export`
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
@@ -207,6 +214,7 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
 > `summarized_up_to`（compact 水位线，迁移 `0003`），存量数据零回填（见 5.1）。
 > `user-auth` 新增 `users` / `invite_codes` 表与 `user_status` 枚举（迁移 `0004`）；
+> `add-user-profile-and-logout` 为 `users` 增 `oops_id` / `gender` / `bio` / `token_version` 与 `user_gender` 枚举（迁移 `0005`，存量行 `oops_id` 已回填）；
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
@@ -228,9 +236,11 @@ oops/
 │   │   ├── files/[...path]/route.ts # 资产代理读取（登录后，安全响应头）
 │   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限）
 │   │   ├── chat/page.tsx           # 画布工作台页（全屏画布 + 悬浮聊天面板，自定义 SSE）
+│   │   ├── profile/page.tsx        # 个人信息页（基本资料卡 + 改密卡，proxy 保护）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
 │   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
+│   │       ├── profile/            # GET/PATCH 资料 + POST 改密（requireUser + 改密按 IP 限频）
 │   │       ├── sessions/route.ts   # 会话 CRUD（按认证用户隔离）
 │   │       ├── sessions/[id]/route.ts # GET 会话历史（UIMessage 重建）
 │   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 落库 + 流式）

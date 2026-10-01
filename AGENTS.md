@@ -160,10 +160,16 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
   `requireUser` (`src/server/auth/require-user.ts`) and return 401 on null.
   `proxy.ts` only redirects pages for UX (cookie presence check, never a
   security boundary — Edge has no DB access); the full verification (HMAC
-  signature, expiry, `users.status=active`) lives in `requireUser`.
-  Registration requires a valid invite code (conditional-UPDATE decrement
-  prevents concurrent over-issue). Passwords are salted scrypt hashes (never
-  plaintext). Keep it minimal — no query-string tokens.
+  signature, expiry, `users.status=active`, session-version match) lives in
+  `requireUser`. The session payload carries a token version (`tv`): on
+  password change the same UPDATE writes the new scrypt hash and bumps
+  `users.token_version`, and the response issues a fresh cookie — the current
+  client stays logged in while all other sessions 401. Profile read/update and
+  password change (`/api/profile*`) are `requireUser`-protected the same way;
+  the password endpoint reuses per-IP rate limiting to blunt current-password
+  brute force. Registration requires a valid invite code (conditional-UPDATE
+  decrement prevents concurrent over-issue). Passwords are salted scrypt hashes
+  (never plaintext). Keep it minimal — no query-string tokens.
 - **Uploads:** validate MIME type and size on upload (images only, hard cap);
   store with generated filenames (never user-supplied names); serve user
   files through the `files` route with correct `Content-Type` and
