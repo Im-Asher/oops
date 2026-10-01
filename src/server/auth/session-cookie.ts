@@ -62,3 +62,14 @@ export function readSessionCookie(cookieHeader: string): string | undefined {
 export function sessionCookieAttributes(maxAge: number): string {
   return `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
+
+/** 登录/注册成功时追加到响应的完整 Set-Cookie 头。 */
+export function sessionCookieHeader(userId: string, secret: string): string {
+  const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
+  return `${SESSION_COOKIE_NAME}=${createSessionCookieValue({ userId, exp }, secret)}; ${sessionCookieAttributes(SESSION_MAX_AGE_SECONDS)}`;
+}
+
+/** 登出时的 Set-Cookie 头（立即过期）。 */
+export function clearSessionCookieHeader(): string {
+  return `${SESSION_COOKIE_NAME}=; ${sessionCookieAttributes(0)}`;
+}
