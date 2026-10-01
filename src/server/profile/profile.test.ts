@@ -32,6 +32,8 @@ const user = {
   bio: "做电商图的",
   tokenVersion: 0,
   status: "active",
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  inviteCodeId: null,
 } as const;
 
 beforeEach(() => {

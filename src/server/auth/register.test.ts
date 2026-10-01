@@ -6,7 +6,10 @@ import type { DbClient } from "@/server/db/invite-code.repo";
 function makeTxStub(
   opts: { returningResults?: unknown[][]; limitResults?: unknown[][] } = {},
 ) {
-  const captured: { whereArgs: unknown[][]; valuesArgs: unknown[] } = {
+  const captured: {
+    whereArgs: unknown[][];
+    valuesArgs: Array<Record<string, unknown>>;
+  } = {
     whereArgs: [],
     valuesArgs: [],
   };
@@ -24,7 +27,9 @@ function makeTxStub(
   ] as const) {
     chain[name] = vi.fn((...args: unknown[]) => {
       if (name === "where") captured.whereArgs.push(args);
-      if (name === "values") captured.valuesArgs.push(args[0]);
+      if (name === "values") {
+        captured.valuesArgs.push(args[0] as Record<string, unknown>);
+      }
       return chain;
     });
   }
