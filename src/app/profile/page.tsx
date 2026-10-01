@@ -234,8 +234,9 @@ export default function ProfilePage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   maxLength={20}
-                  placeholder="选填，清空即移除"
+                  placeholder={nickname}
                 />
+                <p className="text-xs text-muted-foreground">清空保存即恢复默认昵称</p>
               </div>
 
               <div className="space-y-2">
