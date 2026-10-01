@@ -45,6 +45,23 @@ function UserAvatar() {
   );
 }
 
+/**
+ * 相邻 text parts 合并：流式增量各自成 part，而 MessageContent 为 flex-col，
+ * 不合并会导致每个增量各占一行、文字碎片化。
+ */
+function mergeTextParts(parts: UIMessage["parts"]): UIMessage["parts"] {
+  const merged: UIMessage["parts"] = [];
+  for (const p of parts) {
+    const last = merged[merged.length - 1];
+    if (p.type === "text" && last?.type === "text") {
+      merged[merged.length - 1] = { type: "text", text: last.text + p.text };
+    } else {
+      merged.push(p);
+    }
+  }
+  return merged;
+}
+
 /** 等待首个可见内容（文字/思考/状态行）时的占位动画，不依赖服务端事件。 */
 function ThinkingPlaceholder() {
   return (
@@ -82,10 +99,11 @@ export function MessageList({
   }, [messages]);
 
   // 图片按出现顺序编号，让每张缩略图有可区分的无障碍名称。
+  // 键基于合并后的 parts 索引，与渲染循环一致。
   const imagePositions = new Map<string, number>();
   let seq = 0;
   for (const m of messages) {
-    m.parts.forEach((p, pi) => {
+    mergeTextParts(m.parts).forEach((p, pi) => {
       if (p.type === "image") imagePositions.set(`${m.id}:${pi}`, ++seq);
     });
   }
@@ -107,7 +125,7 @@ export function MessageList({
             <Message from={m.role} className="max-w-[85%] min-w-0">
               <MessageContent>
                 {emptyStreaming && <ThinkingPlaceholder />}
-                {m.parts.map((p, i) => {
+                {mergeTextParts(m.parts).map((p, i) => {
                   switch (p.type) {
                     case "text":
                       return (
