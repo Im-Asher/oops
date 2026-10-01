@@ -25,6 +25,10 @@ const envSchema = z.object({
   MINIO_BUCKET: z.string().min(1, "MINIO_BUCKET 缺失"),
   QWEN_TOKEN_PLAN_CN_API_KEY: z.string().min(1).optional(),
   OWNER_ID: z.string().min(1).default("owner"),
+  // 会话 cookie 签名密钥；长度下限保证离线暴力破解不可行
+  AUTH_SECRET: z
+    .string()
+    .min(32, "AUTH_SECRET 需至少 32 字符（生成：openssl rand -base64 32）"),
   IMAGE_MODELS: z
     .string()
     .default("wan2.7-image")

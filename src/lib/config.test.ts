@@ -7,6 +7,7 @@ const validEnv = {
   MINIO_ACCESS_KEY: "minioadmin",
   MINIO_SECRET_KEY: "minioadmin",
   MINIO_BUCKET: "oops-assets",
+  AUTH_SECRET: "unit-test-secret-0123456789abcdef-unit-test",
 };
 
 describe("parseEnv", () => {
@@ -46,6 +47,17 @@ describe("parseEnv", () => {
   it("throws when a MINIO credential is missing", () => {
     const { MINIO_SECRET_KEY: _omit, ...env } = validEnv;
     expect(() => parseEnv(env)).toThrowError(/MINIO_SECRET_KEY/);
+  });
+
+  it("throws when AUTH_SECRET is missing", () => {
+    const { AUTH_SECRET: _omit, ...env } = validEnv;
+    expect(() => parseEnv(env)).toThrowError(/AUTH_SECRET/);
+  });
+
+  it("throws when AUTH_SECRET is shorter than 32 chars", () => {
+    expect(() =>
+      parseEnv({ ...validEnv, AUTH_SECRET: "too-short" }),
+    ).toThrowError(/AUTH_SECRET/);
   });
 });
 
