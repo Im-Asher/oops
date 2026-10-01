@@ -241,16 +241,20 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <span className="text-sm font-medium text-foreground">性别</span>
-                <div aria-label="性别" className="flex gap-2" role="radiogroup">
+                <div
+                  aria-label="性别"
+                  className="flex rounded-lg border border-border p-1"
+                  role="radiogroup"
+                >
                   {GENDER_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       aria-checked={gender === opt.value}
                       className={cn(
-                        "flex-1 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                        "flex-1 rounded-md px-3 py-1.5 text-sm transition-colors",
                         gender === opt.value
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted",
+                          ? "bg-primary/10 font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted",
                       )}
                       onClick={() => setGender(opt.value)}
                       role="radio"
