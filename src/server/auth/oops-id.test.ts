@@ -32,7 +32,7 @@ describe("generateUniqueOopsId", () => {
 
   it("retries when the id is taken and succeeds within the limit", async () => {
     let calls = 0;
-    const isAvailable = vi.fn(async () => ++calls < 3);
+    const isAvailable = vi.fn(async () => ++calls >= 3);
     await expect(generateUniqueOopsId(isAvailable)).resolves.toMatch(
       OOPS_ID_PATTERN,
     );
