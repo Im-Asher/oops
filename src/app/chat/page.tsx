@@ -14,6 +14,11 @@ import {
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useState } from "react";
 
+/** 工具状态行的展示文案（按工具名；未收录的用通用文案）。 */
+const TOOL_STATUS_LABELS: Record<string, string> = {
+  generate_image: "正在生成图片…",
+};
+
 export default function ChatPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -156,22 +161,15 @@ export default function ChatPage() {
     const assistantMsg: UIMessage = { id: `a${Date.now()}`, role: "assistant", parts: [] };
     setMessages((m) => [...m, userMsg, assistantMsg]);
 
+    const updateAssistant = (fn: (parts: UIMessage["parts"]) => UIMessage["parts"]) =>
+      setMessages((m) =>
+        m.map((msg) =>
+          msg.id === assistantMsg.id ? { ...msg, parts: fn(msg.parts) } : msg,
+        ),
+      );
+
     const appendText = (delta: string) =>
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === assistantMsg.id
-            ? { ...msg, parts: [...msg.parts, { type: "text", text: delta }] }
-            : msg,
-        ),
-      );
-    const appendImage = (url: string, assetId: string) =>
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === assistantMsg.id
-            ? { ...msg, parts: [...msg.parts, { type: "image", url, assetId }] }
-            : msg,
-        ),
-      );
+      updateAssistant((parts) => [...parts, { type: "text", text: delta }]);
 
     const res = await fetch("/api/chat", {
       method: "POST",
@@ -189,11 +187,72 @@ export default function ChatPage() {
     let buffer = "";
 
     const handleEvent = (event: ChatEvent) => {
-      if (event.type === "message_delta") appendText(event.text);
-      else if (event.type === "tool_end" && event.details?.url) {
-        appendImage(String(event.details.url), String(event.details.assetId ?? ""));
-      } else if (event.type === "error") {
-        appendText(`\n[错误] ${event.message}`);
+      switch (event.type) {
+        case "message_delta":
+          appendText(event.text);
+          break;
+        case "thinking_start":
+          // 整个回合的思考聚合为单个 thinking part（spec：当轮专用，不落库）
+          updateAssistant((parts) =>
+            parts.some((p) => p.type === "thinking")
+              ? parts
+              : [...parts, { type: "thinking", text: "", streaming: true }],
+          );
+          break;
+        case "thinking_delta":
+          updateAssistant((parts) => {
+            if (!parts.some((p) => p.type === "thinking")) {
+              return [...parts, { type: "thinking", text: event.text, streaming: true }];
+            }
+            return parts.map((p) =>
+              p.type === "thinking" ? { ...p, text: p.text + event.text } : p,
+            );
+          });
+          break;
+        case "thinking_end":
+          updateAssistant((parts) =>
+            parts.map((p) =>
+              p.type === "thinking" ? { ...p, streaming: false } : p,
+            ),
+          );
+          break;
+        case "tool_start":
+          updateAssistant((parts) => [
+            ...parts,
+            {
+              type: "tool_status",
+              id: event.id,
+              label: TOOL_STATUS_LABELS[event.name] ?? `正在执行 ${event.name}…`,
+            },
+          ]);
+          break;
+        case "tool_end": {
+          updateAssistant((parts) => {
+            const statusIdx = parts.findIndex(
+              (p) => p.type === "tool_status" && p.id === event.id,
+            );
+            if (statusIdx === -1) return parts;
+            const next = [...parts];
+            if (event.details?.url) {
+              // 成功：状态行原位替换为图片
+              next[statusIdx] = {
+                type: "image",
+                url: String(event.details.url),
+                assetId: String(event.details.assetId ?? ""),
+              };
+            } else {
+              // 失败/非生图：移除状态行，原因由 Agent 文本解释
+              next.splice(statusIdx, 1);
+            }
+            return next;
+          });
+          break;
+        }
+        case "error":
+          appendText(`\n[错误] ${event.message}`);
+          break;
+        default:
+          break;
       }
     };
 
