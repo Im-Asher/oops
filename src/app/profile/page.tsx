@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { resolveDisplayName } from "@/lib/nickname";
 import { cn } from "cn";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -41,6 +41,48 @@ function FeedbackLine({ feedback }: { feedback: Feedback | null }) {
     >
       {feedback.message}
     </p>
+  );
+}
+
+/** 带显示/隐藏切换的密码输入框：切换仅改 type，受控值由父组件持有。 */
+function PasswordField({
+  autoComplete,
+  id,
+  minLength,
+  onChange,
+  required,
+  value,
+}: {
+  autoComplete: string;
+  id: string;
+  minLength?: number;
+  onChange: (value: string) => void;
+  required?: boolean;
+  value: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        autoComplete={autoComplete}
+        className="pr-9"
+        id={id}
+        minLength={minLength}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        type={visible ? "text" : "password"}
+        value={value}
+      />
+      <button
+        aria-label={visible ? "隐藏密码" : "显示密码"}
+        aria-pressed={visible}
+        className="absolute inset-y-0 right-0 my-auto mr-1 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        onClick={() => setVisible((v) => !v)}
+        type="button"
+      >
+        {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+      </button>
+    </div>
   );
 }
 
@@ -302,13 +344,12 @@ export default function ProfilePage() {
                 <label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
                   当前密码
                 </label>
-                <Input
-                  id="currentPassword"
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  type="password"
-                  value={currentPassword}
+                <PasswordField
                   autoComplete="current-password"
+                  id="currentPassword"
+                  onChange={setCurrentPassword}
+                  required
+                  value={currentPassword}
                 />
               </div>
 
@@ -316,14 +357,13 @@ export default function ProfilePage() {
                 <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
                   新密码
                 </label>
-                <Input
-                  id="newPassword"
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  minLength={8}
-                  required
-                  type="password"
-                  value={newPassword}
+                <PasswordField
                   autoComplete="new-password"
+                  id="newPassword"
+                  minLength={8}
+                  onChange={setNewPassword}
+                  required
+                  value={newPassword}
                 />
                 <p className="text-xs text-muted-foreground">至少 8 位</p>
               </div>
@@ -332,13 +372,12 @@ export default function ProfilePage() {
                 <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                   确认新密码
                 </label>
-                <Input
-                  id="confirmPassword"
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  type="password"
-                  value={confirmPassword}
+                <PasswordField
                   autoComplete="new-password"
+                  id="confirmPassword"
+                  onChange={setConfirmPassword}
+                  required
+                  value={confirmPassword}
                 />
               </div>
 
