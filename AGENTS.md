@@ -16,7 +16,7 @@ Key characteristics:
   text & layout control); atmosphere/scene images use pure text-to-image APIs
   (Seedream / Wanxiang).
 - **Declarative agents** — every agent is a single config file under
-  `src/server/agent/agents/` (system prompt + tool list + defaults). Adding an
+  `src/server/agent/definitions/` (system prompt + tool list). Adding an
   agent requires **no** frontend or runtime code changes.
 - **All-in-one Next.js app** — no separate backend service. Route Handlers
   stream agent events via SSE. Server-only code lives in `src/server/` and is
@@ -68,7 +68,7 @@ src/
 ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
 │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
 │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
-│   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/agents/tools）
+│   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
 ├── components/     # React components (client)
 ├── lib/            # Shared utilities (client-safe, 含 config)
 └── types/          # Shared TypeScript types
@@ -110,8 +110,8 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 - **Naming:** files `kebab-case.ts(x)`; components/Types `PascalCase`;
   functions/variables `camelCase`; constants `SCREAMING_SNAKE_CASE`.
 - **Agent definition (declarative):** one file per agent in
-  `src/server/agent/agents/<agent-id>.ts` calling `defineAgent({...})`.
-  System prompts live in `src/server/agent/agents/prompts/<agent-id>.md` —
+  `src/server/agent/definitions/<agent-id>.ts` calling `defineAgent({...})`.
+  System prompts live in `src/server/agent/definitions/prompts/<agent-id>.md` —
   never inline long prompts in code (the compact summary skeleton
   `session-summary.md` lives in the same directory). Tools are referenced
   **by name** from the ToolRegistry; do not implement ad-hoc tools inside
