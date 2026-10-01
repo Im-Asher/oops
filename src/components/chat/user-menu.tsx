@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { resolveDisplayName } from "@/lib/nickname";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,8 +22,8 @@ interface ProfileSummary {
 }
 
 /**
- * 顶栏用户入口：账号摘要（只读）/ 个人信息 / 退出登录。
- * 摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
+ * 顶栏用户入口：账号摘要（只读：昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
+ * 用户名仅在 /profile 页展示。摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
  */
 export function UserMenu() {
   const router = useRouter();
@@ -53,7 +54,8 @@ export function UserMenu() {
     }
   }
 
-  const initial = (profile?.displayName ?? profile?.username ?? "")[0] ?? "";
+  const nickname = profile ? resolveDisplayName(profile) : "";
+  const initial = nickname[0] ?? "";
 
   return (
     <DropdownMenu>
@@ -80,7 +82,7 @@ export function UserMenu() {
         {profile ? (
           <>
             <DropdownMenuLabel className="font-normal">
-              <span className="block truncate text-sm">{profile.username}</span>
+              <span className="block truncate text-sm">{nickname}</span>
               <span className="block truncate text-xs text-zinc-400">
                 oops_{profile.oopsId}
               </span>
