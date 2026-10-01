@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   integer,
   jsonb,
@@ -5,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { OWNER_ID } from "@/lib/config";
@@ -14,6 +16,9 @@ export const messageRole = pgEnum("message_role", [
   "assistant",
   "system",
 ]);
+
+// disabled 用户的所有会话请求立即被拒（require-user 校验 status），无需等 cookie 过期
+export const userStatus = pgEnum("user_status", ["active", "disabled"]);
 
 // edited：由画布编辑导出的派生图，与原始生成图（image）区分，meta 记录 sourceAssetId 血缘
 export const assetKind = pgEnum("asset_kind", ["image", "json", "other", "edited"]);
@@ -110,7 +115,44 @@ export const tasks = pgTable("tasks", {
     .defaultNow(),
 });
 
+export const inviteCodes = pgTable("invite_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  // 混合模型：1 = 一次性码，N = 团装码；使用纪律默认按一次性发放
+  maxUses: integer("max_uses").notNull().default(1),
+  usedCount: integer("used_count").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // 发放对象备注（无管理界面，码靠 SQL 手工插入）
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    username: text("username").notNull(),
+    // scrypt 加盐哈希，不存明文
+    passwordHash: text("password_hash").notNull(),
+    displayName: text("display_name"),
+    status: userStatus("status").notNull().default("active"),
+    // 注册所用邀请码（追溯发放来源）
+    inviteCodeId: uuid("invite_code_id").references(() => inviteCodes.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // 用户名不区分大小写唯一：存原样、比较走 lower()
+  (t) => [uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`)],
+);
+
 export type Session = typeof sessions.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type InviteCode = typeof inviteCodes.$inferSelect;
