@@ -8,6 +8,8 @@ export interface SessionPayload {
   userId: string;
   /** Unix 秒 */
   exp: number;
+  /** 会话版本（改密踢下线水位）；旧载荷缺省，解析时视为 0 以兼容存量 cookie */
+  tv?: number;
 }
 
 function sign(body: string, secret: string): string {
@@ -45,8 +47,11 @@ export function parseSessionCookieValue(
   if (typeof payload.userId !== "string" || typeof payload.exp !== "number") {
     return undefined;
   }
+  if (payload.tv !== undefined && typeof payload.tv !== "number") {
+    return undefined;
+  }
   if (payload.exp <= nowMs / 1000) return undefined;
-  return payload;
+  return { ...payload, tv: payload.tv ?? 0 };
 }
 
 /** 从 Cookie 头提取会话值；保持纯函数以便脱离 next/headers 单测。 */
@@ -63,10 +68,14 @@ export function sessionCookieAttributes(maxAge: number): string {
   return `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
-/** 登录/注册成功时追加到响应的完整 Set-Cookie 头。 */
-export function sessionCookieHeader(userId: string, secret: string): string {
+/** 登录/注册/改密成功时追加到响应的完整 Set-Cookie 头。 */
+export function sessionCookieHeader(
+  userId: string,
+  secret: string,
+  tokenVersion = 0,
+): string {
   const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
-  return `${SESSION_COOKIE_NAME}=${createSessionCookieValue({ userId, exp }, secret)}; ${sessionCookieAttributes(SESSION_MAX_AGE_SECONDS)}`;
+  return `${SESSION_COOKIE_NAME}=${createSessionCookieValue({ userId, exp, tv: tokenVersion }, secret)}; ${sessionCookieAttributes(SESSION_MAX_AGE_SECONDS)}`;
 }
 
 /** 登出时的 Set-Cookie 头（立即过期）。 */

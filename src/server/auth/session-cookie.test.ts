@@ -5,20 +5,61 @@ import {
   parseSessionCookieValue,
   readSessionCookie,
   sessionCookieAttributes,
+  sessionCookieHeader,
 } from "./session-cookie";
 
 const SECRET = "unit-test-secret-0123456789abcdef-unit-test";
 
+function payloadOf(header: string): Record<string, unknown> {
+  const token = header.split(";")[0].split("=").slice(1).join("=");
+  const [body] = token.split(".");
+  return JSON.parse(Buffer.from(body, "base64url").toString()) as Record<
+    string,
+    unknown
+  >;
+}
+
 describe("session cookie", () => {
-  it("roundtrips a valid payload", () => {
+  it("roundtrips a valid payload with a token version", () => {
     const value = createSessionCookieValue(
-      { userId: "u1", exp: 1_800_000_000 },
+      { userId: "u1", exp: 1_800_000_000, tv: 3 },
       SECRET,
     );
     expect(parseSessionCookieValue(value, SECRET)).toEqual({
       userId: "u1",
       exp: 1_800_000_000,
+      tv: 3,
     });
+  });
+
+  it("treats a legacy payload without tv as version 0", () => {
+    // 存量 cookie 载荷无 tv：视为版本 0，部署后不强制全员重登
+    const legacy = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000 },
+      SECRET,
+    );
+    expect(parseSessionCookieValue(legacy, SECRET)).toEqual({
+      userId: "u1",
+      exp: 1_800_000_000,
+      tv: 0,
+    });
+  });
+
+  it("rejects a non-numeric tv", () => {
+    const body = Buffer.from(
+      JSON.stringify({ userId: "u1", exp: 1_800_000_000, tv: "x" }),
+    ).toString("base64url");
+    const sig = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000, tv: 0 },
+      SECRET,
+    ).split(".")[1];
+    expect(parseSessionCookieValue(`${body}.${sig}`, SECRET)).toBeUndefined();
+  });
+
+  it("embeds the token version in the issued header", () => {
+    const header = sessionCookieHeader("u1", SECRET, 2);
+    expect(payloadOf(header)).toMatchObject({ userId: "u1", tv: 2 });
+    expect(header).toContain("HttpOnly");
   });
 
   it("rejects a tampered payload", () => {
