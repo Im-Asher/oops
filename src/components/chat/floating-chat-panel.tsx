@@ -65,6 +65,12 @@ export function FloatingChatPanel({
     toggleRef.current?.focus();
   }, [collapsed]);
 
+  // 会话消息的头像取该会话所属 Agent 的 icon（新会话未定 agentId 时回退当前选择）。
+  const currentSession = sessions.find((s) => s.id === currentId);
+  const sessionAgent =
+    agents.find((a) => a.id === currentSession?.agentId) ??
+    agents.find((a) => a.id === agentId);
+
   if (collapsed) {
     return (
       <Button
@@ -133,7 +139,10 @@ export function FloatingChatPanel({
           <SelectContent className="bg-zinc-900 text-zinc-50">
             {agents.map((a) => (
               <SelectItem key={a.id} value={a.id}>
-                {a.name}
+                <span className="flex items-center gap-2">
+                  <span aria-hidden>{a.icon}</span>
+                  {a.name}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -142,6 +151,7 @@ export function FloatingChatPanel({
 
       <MessageList
         activeUrl={activeUrl}
+        agentIcon={sessionAgent?.icon}
         messages={messages}
         onActivateImage={onActivateImage}
       />

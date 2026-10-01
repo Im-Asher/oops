@@ -1,21 +1,80 @@
 "use client";
 
+import {
+  Message,
+  MessageContent,
+} from "@/components/ai-elements/message";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 import { ImageThumbnail } from "@/components/chat/image-thumbnail";
 import type { CanvasImage } from "@/lib/canvas/canvas-reducer";
 import type { UIMessage } from "@/types/chat";
+import { BrainIcon, LoaderCircleIcon, UserIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 interface MessageListProps {
   messages: UIMessage[];
   activeUrl?: string | null;
+  /** 当前会话所属 Agent 的头像 emoji（assistant 消息徽标）。 */
+  agentIcon?: string;
   onActivateImage?: (image: CanvasImage) => void;
 }
 
+function AgentAvatar({ icon }: { icon?: string }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm leading-none"
+    >
+      {icon ?? <BrainIcon className="size-3.5 text-zinc-400" />}
+    </span>
+  );
+}
+
+function UserAvatar() {
+  return (
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-zinc-200"
+    >
+      <UserIcon className="size-3.5" />
+    </span>
+  );
+}
+
+/** 等待首个可见内容（文字/思考/状态行）时的占位动画，不依赖服务端事件。 */
+function ThinkingPlaceholder() {
+  return (
+    <span aria-label="思考中" className="inline-flex items-center gap-1 py-1.5">
+      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400" />
+    </span>
+  );
+}
+
+function ToolStatusLine({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+      <LoaderCircleIcon className="size-3 animate-spin" />
+      {label}
+    </span>
+  );
+}
+
 /**
- * 消息渲染：从简版聊天页原样迁出，仅适配悬浮面板的深色配色。
- * 流式追加、工具态、错误解释等行为保持不变。
+ * 消息渲染：AI Elements Message 容器 + 角色头像 + 进行中反馈。
+ * 图片上屏联动与激活高亮行为保持不变。
  */
-export function MessageList({ messages, activeUrl, onActivateImage }: MessageListProps) {
+export function MessageList({
+  messages,
+  activeUrl,
+  agentIcon,
+  onActivateImage,
+}: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,33 +92,64 @@ export function MessageList({ messages, activeUrl, onActivateImage }: MessageLis
 
   return (
     <div ref={scrollRef} className="flex-1 space-y-4 overflow-auto p-3" role="log">
-      {messages.map((m) => (
-        <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
+      {messages.map((m, idx) => {
+        const isUser = m.role === "user";
+        const isLast = idx === messages.length - 1;
+        const emptyStreaming = !isUser && isLast && m.parts.length === 0;
+        return (
           <div
-            className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${
-              m.role === "user" ? "bg-zinc-100 text-zinc-900" : "bg-zinc-800 text-zinc-50"
+            key={m.id}
+            className={`flex w-full items-start gap-2 ${
+              isUser ? "justify-end" : "justify-start"
             }`}
           >
-            {m.parts.map((p, i) =>
-              p.type === "text" ? (
-                <span key={i}>{p.text}</span>
-              ) : p.type === "image" ? (
-                <ImageThumbnail
-                  active={activeUrl === p.url}
-                  key={i}
-                  onActivate={() => onActivateImage?.({ assetId: p.assetId, url: p.url })}
-                  position={imagePositions.get(`${m.id}:${i}`) ?? 0}
-                  url={p.url}
-                />
-              ) : (
-                <a key={i} href={p.url} className="underline">
-                  文件
-                </a>
-              ),
-            )}
+            {!isUser && <AgentAvatar icon={agentIcon} />}
+            <Message from={m.role} className="max-w-[85%] min-w-0">
+              <MessageContent>
+                {emptyStreaming && <ThinkingPlaceholder />}
+                {m.parts.map((p, i) => {
+                  switch (p.type) {
+                    case "text":
+                      return (
+                        <span className="whitespace-pre-wrap" key={i}>
+                          {p.text}
+                        </span>
+                      );
+                    case "image":
+                      return (
+                        <ImageThumbnail
+                          active={activeUrl === p.url}
+                          key={i}
+                          onActivate={() =>
+                            onActivateImage?.({ assetId: p.assetId, url: p.url })
+                          }
+                          position={imagePositions.get(`${m.id}:${i}`) ?? 0}
+                          url={p.url}
+                        />
+                      );
+                    case "file":
+                      return (
+                        <a className="underline" href={p.url} key={i}>
+                          文件
+                        </a>
+                      );
+                    case "thinking":
+                      return (
+                        <Reasoning isStreaming={p.streaming} key={i}>
+                          <ReasoningTrigger />
+                          <ReasoningContent>{p.text}</ReasoningContent>
+                        </Reasoning>
+                      );
+                    case "tool_status":
+                      return <ToolStatusLine key={i} label={p.label} />;
+                  }
+                })}
+              </MessageContent>
+            </Message>
+            {isUser && <UserAvatar />}
           </div>
-        </div>
-      ))}
+        );
+      })}
       {messages.length === 0 && (
         <p className="text-sm text-zinc-400">
           新建会话，向“氛围图设计师”描述你想要的商品/场景图。

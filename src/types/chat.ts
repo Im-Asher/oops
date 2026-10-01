@@ -10,6 +10,10 @@ export interface UIMessage {
     | { type: "text"; text: string }
     | { type: "image"; url: string; assetId: string }
     | { type: "file"; url: string }
+    /** 当轮流式专用：思考内容聚合（streaming 标记驱动折叠态），不落库 */
+    | { type: "thinking"; text: string; streaming: boolean }
+    /** 当轮流式专用：工具执行状态行，完成时被结果或移除取代，不落库 */
+    | { type: "tool_status"; id: string; label: string }
   >;
 }
 
@@ -30,6 +34,9 @@ export interface SessionInfo {
 
 export type ChatEvent =
   | { type: "message_delta"; text: string }
+  | { type: "thinking_start"; id: string }
+  | { type: "thinking_delta"; id: string; text: string }
+  | { type: "thinking_end"; id: string }
   | { type: "tool_start"; id: string; name: string; args: unknown }
   | { type: "tool_end"; id: string; name: string; details: Record<string, unknown> | null }
   | { type: "finish"; stopReason: string }
