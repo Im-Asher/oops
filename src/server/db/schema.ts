@@ -20,6 +20,9 @@ export const messageRole = pgEnum("message_role", [
 // disabled 用户的所有会话请求立即被拒（require-user 校验 status），无需等 cookie 过期
 export const userStatus = pgEnum("user_status", ["active", "disabled"]);
 
+// 保密为默认值，避免 NULL 语义歧义
+export const userGender = pgEnum("user_gender", ["male", "female", "secret"]);
+
 // edited：由画布编辑导出的派生图，与原始生成图（image）区分，meta 记录 sourceAssetId 血缘
 export const assetKind = pgEnum("asset_kind", ["image", "json", "other", "edited"]);
 
@@ -134,9 +137,15 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     username: text("username").notNull(),
+    // 8 位短 ID（去易混字符），注册时生成、永不修改；UI 展示加 oops_ 前缀
+    oopsId: text("oops_id").notNull(),
     // scrypt 加盐哈希，不存明文
     passwordHash: text("password_hash").notNull(),
     displayName: text("display_name"),
+    gender: userGender("gender").notNull().default("secret"),
+    bio: text("bio"),
+    // 改密踢下线水位：改密 +1，载荷版本不符的旧 cookie 立即失效
+    tokenVersion: integer("token_version").notNull().default(0),
     status: userStatus("status").notNull().default("active"),
     // 注册所用邀请码（追溯发放来源）
     inviteCodeId: uuid("invite_code_id").references(() => inviteCodes.id, {
@@ -147,7 +156,10 @@ export const users = pgTable(
       .defaultNow(),
   },
   // 用户名不区分大小写唯一：存原样、比较走 lower()
-  (t) => [uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`)],
+  (t) => [
+    uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`),
+    uniqueIndex("users_oops_id_idx").on(t.oopsId),
+  ],
 );
 
 export type Session = typeof sessions.$inferSelect;
