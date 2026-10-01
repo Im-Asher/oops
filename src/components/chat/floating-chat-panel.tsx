@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageList } from "@/components/chat/message-list";
+import { UserMenu } from "@/components/chat/user-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -124,6 +125,7 @@ export function FloatingChatPanel({
         >
           <PanelLeftCloseIcon />
         </Button>
+        <UserMenu />
       </div>
 
       <div className="flex items-center gap-2 border-b border-zinc-800 px-2 py-1.5">
