@@ -32,7 +32,7 @@ export default function proxy(req: NextRequest): NextResponse {
     return isAuthed ? NextResponse.next() : json401();
   }
 
-  // 首页归宿：`/` 重定向（无独立首页，design D6）
+  // 首页归宿：`/` 重定向（门厅即登录页，仍无独立首页，design D6）
   if (pathname === "/") {
     return NextResponse.redirect(new URL(isAuthed ? "/chat" : "/login", req.url));
   }

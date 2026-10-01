@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { AuthBrandPanel } from "@/components/auth/brand-panel";
+
+export const metadata: Metadata = {
+  description: "登录或用邀请码注册，开始生成能直接上架的电商图片",
+};
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
