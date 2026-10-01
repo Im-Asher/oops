@@ -10,6 +10,9 @@ export interface ToolHandlerResult {
 
 export interface ToolExecutionContext {
   signal?: AbortSignal;
+  // 每次运行注入的调用者身份：工具据此把任务/资产归属到真实用户
+  userId: string;
+  sessionId?: string;
 }
 
 /** 工具声明：zod schema 为入参校验权威；jsonSchema 仅用于生成 LLM 可用的 typebox 参数。 */
@@ -22,7 +25,7 @@ export interface ToolDefinition<T = unknown> {
   execute: (args: T, ctx: ToolExecutionContext) => Promise<ToolHandlerResult>;
 }
 
-function buildAgentTool(def: ToolDefinition): AgentTool {
+function buildAgentTool(def: ToolDefinition, ctx: ToolExecutionContext): AgentTool {
   const parameters = Type.Unsafe(def.jsonSchema);
   return {
     name: def.name,
@@ -37,7 +40,11 @@ function buildAgentTool(def: ToolDefinition): AgentTool {
           details: { error: "invalid_args", toolCallId },
         };
       }
-      const result = await def.execute(parsed.data, { signal });
+      const result = await def.execute(parsed.data, {
+        signal,
+        userId: ctx.userId,
+        sessionId: ctx.sessionId,
+      });
       return { content: result.content, details: (result.details ?? {}) as unknown as JsonValue };
     },
   };
@@ -49,11 +56,9 @@ function buildAgentTool(def: ToolDefinition): AgentTool {
  */
 export class ToolRegistry {
   private defs = new Map<string, ToolDefinition>();
-  private built = new Map<string, AgentTool>();
 
   register<T>(def: ToolDefinition<T>): void {
     this.defs.set(def.name, def as ToolDefinition);
-    this.built.delete(def.name);
   }
 
   has(name: string): boolean {
@@ -64,22 +69,18 @@ export class ToolRegistry {
     return this.defs.get(name)?.schema;
   }
 
-  getAgentTool(name: string): AgentTool | undefined {
+  // 每次构建携带当次运行的 ctx（userId 不同）；构建成本极低，不做跨运行缓存
+  getAgentTool(name: string, ctx: ToolExecutionContext): AgentTool | undefined {
     const def = this.defs.get(name);
     if (!def) return undefined;
-    let tool = this.built.get(name);
-    if (!tool) {
-      tool = buildAgentTool(def);
-      this.built.set(name, tool);
-    }
-    return tool;
+    return buildAgentTool(def, ctx);
   }
 
   /** 仅返回已登记且在 allowedNames 中的工具，天然实现按名授权。 */
-  getAgentTools(allowedNames: string[]): Map<string, AgentTool> {
+  getAgentTools(allowedNames: string[], ctx: ToolExecutionContext): Map<string, AgentTool> {
     const map = new Map<string, AgentTool>();
     for (const name of allowedNames) {
-      const tool = this.getAgentTool(name);
+      const tool = this.getAgentTool(name, ctx);
       if (tool) map.set(name, tool);
     }
     return map;

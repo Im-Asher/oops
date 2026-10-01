@@ -6,11 +6,11 @@ describe("asset repo", () => {
   it("create stores storageKey/mime and defaults kind=image", async () => {
     const mock = makeMockDb();
     const repo = createAssetRepo(mock.db);
-    const row = await repo.create({ storageKey: "assets/x.png", mimeType: "image/png" });
+    const row = await repo.create({ storageKey: "assets/x.png", mimeType: "image/png", userId: "u1" });
     expect(row).toMatchObject({
       storageKey: "assets/x.png",
       kind: "image",
-      userId: "owner",
+      userId: "u1",
     });
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
   });

@@ -1,7 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { db as defaultDb } from ".";
 import { messages, type Message } from "./schema";
-import { OWNER_ID } from "@/lib/config";
 
 export interface MessageInput {
   sessionId: string;
@@ -10,7 +9,7 @@ export interface MessageInput {
   toolCalls?: unknown;
   // LLM 视图 transcript（pi-ai Message 序列，写入前须经清洗：无 thinking、无 base64）
   transcript?: unknown;
-  userId?: string;
+  userId: string;
 }
 
 export interface MessageRepo {
@@ -30,7 +29,7 @@ export function createMessageRepo(db: typeof defaultDb = defaultDb): MessageRepo
           content: input.content ?? "",
           toolCalls: input.toolCalls,
           transcript: input.transcript,
-          userId: input.userId ?? OWNER_ID,
+          userId: input.userId,
         })
         .returning();
       return row;

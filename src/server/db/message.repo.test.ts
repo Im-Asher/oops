@@ -8,11 +8,12 @@ describe("message repo", () => {
     const repo = createMessageRepo(mock.db);
     const row = await repo.create({
       sessionId: "s1",
+      userId: "u1",
       role: "user",
       content: "hi",
       toolCalls: [{ tool: "generate_image" }],
     });
-    expect(row).toMatchObject({ role: "user", content: "hi", userId: "owner" });
+    expect(row).toMatchObject({ role: "user", content: "hi", userId: "u1" });
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
   });
 
@@ -24,6 +25,7 @@ describe("message repo", () => {
     ];
     const row = await repo.create({
       sessionId: "s1",
+      userId: "u1",
       role: "user",
       content: "hi",
       transcript,
@@ -34,7 +36,7 @@ describe("message repo", () => {
   it("create allows missing transcript (nullable)", async () => {
     const mock = makeMockDb();
     const repo = createMessageRepo(mock.db);
-    const row = await repo.create({ sessionId: "s1", role: "assistant", content: "ok" });
+    const row = await repo.create({ sessionId: "s1", userId: "u1", role: "assistant", content: "ok" });
     expect(row).not.toHaveProperty("transcript", expect.anything());
   });
 

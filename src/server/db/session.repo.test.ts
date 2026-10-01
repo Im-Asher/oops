@@ -3,20 +3,28 @@ import { makeMockDb } from "./mock-db";
 import { createSessionRepo } from "./session.repo";
 
 describe("session repo", () => {
-  it("create inserts with OWNER_ID default and returns the row", async () => {
+  it("create persists explicit userId and returns the row", async () => {
     const mock = makeMockDb();
     const repo = createSessionRepo(mock.db);
-    const row = await repo.create({ title: "我的会话" });
-    expect(row).toMatchObject({ title: "我的会话", userId: "owner" });
+    const row = await repo.create({ title: "我的会话", userId: "u1" });
+    expect(row).toMatchObject({ title: "我的会话", userId: "u1" });
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
   });
 
   it("list applies userId filter and ordering", async () => {
     const mock = makeMockDb({ selectResult: [{ id: "s1" }] });
     const repo = createSessionRepo(mock.db);
-    const rows = await repo.list();
+    const rows = await repo.list("u1");
     expect(rows).toHaveLength(1);
     expect(mock.state.calls.at(-1)?.op).toContain("limit");
+  });
+
+  it("get scopes by id + userId", async () => {
+    const mock = makeMockDb({ selectResult: [{ id: "s1", userId: "u1" }] });
+    const repo = createSessionRepo(mock.db);
+    const row = await repo.get("s1", "u1");
+    expect(row?.id).toBe("s1");
+    expect(mock.state.calls.at(-1)?.op).toBe("select.from.where.limit");
   });
 
   it("rename returns updated title", async () => {

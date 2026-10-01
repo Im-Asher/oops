@@ -6,7 +6,6 @@ import {
   generateImage,
 } from "@/server/infra/providers/dashscope-images";
 import { createStorage, defaultS3Client, extFromMime, generateAssetKey } from "@/server/infra/storage/s3";
-import { OWNER_ID } from "@/lib/config";
 
 /** 单任务超时（毫秒）。 */
 export const TASK_TIMEOUT_MS = 90_000;
@@ -26,6 +25,8 @@ export class TaskError extends Error {
 export interface TaskHandlerContext {
   signal: AbortSignal;
   taskId: string;
+  // 任务归属用户：handler 用它落资产，防止跨用户可见
+  userId: string;
 }
 
 export type TaskHandler = (
@@ -71,6 +72,8 @@ function slimForDb(result: unknown): unknown {
 export interface SubmitOptions {
   signal?: AbortSignal;
   sessionId?: string;
+  // 必传：任务与资产归属的真实用户（来自 require-user），无固定默认
+  userId: string;
   repo?: TaskRepo;
 }
 
@@ -78,14 +81,14 @@ export interface SubmitOptions {
 export async function submitAndWait(
   type: string,
   payload: unknown,
-  opts: SubmitOptions = {},
+  opts: SubmitOptions,
 ): Promise<unknown> {
   const repo = opts.repo ?? createTaskRepo();
   const created = await repo.create({
     type: type as "generate_image",
     payload,
     sessionId: opts.sessionId,
-    userId: OWNER_ID,
+    userId: opts.userId,
   });
   const taskId = created.id;
   try {
@@ -99,7 +102,11 @@ export async function submitAndWait(
       if (!handler) {
         throw new TaskError(`未登记的任务类型：${type}`, "unknown");
       }
-      const result = await handler(payload, { signal: controller.signal, taskId });
+      const result = await handler(payload, {
+        signal: controller.signal,
+        taskId,
+        userId: opts.userId,
+      });
       await repo.update(taskId, { status: "succeeded", result: slimForDb(result) });
       return result;
     } finally {
@@ -151,6 +158,7 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
     prompt,
     model: DASHSCOPE_IMAGE_MODEL,
     meta: { provider: DASHSCOPE_IMAGE_PROVIDER, size, aspectRatio, taskId: ctx.taskId },
+    userId: ctx.userId,
   });
   return {
     assetId: asset.id,

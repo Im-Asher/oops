@@ -84,6 +84,7 @@ async function run(script: Record<string, unknown>[], repo: MessageRepo, agentId
   );
   await runAgent({
     sessionId: "s1",
+    userId: "u1",
     agentId,
     userText: "hi",
     userMessageId: "mu1",
@@ -114,7 +115,7 @@ describe("runAgent (runtime bridge)", () => {
     expect(events.map((e) => e.type)).toEqual(["message_delta", "finish"]);
     expect(events[0].text).toBe("你好");
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "assistant", content: "你好", toolCalls: undefined }),
+      expect.objectContaining({ role: "assistant", content: "你好", toolCalls: undefined, userId: "u1" }),
     );
   });
 

@@ -1,11 +1,17 @@
 import { handleDerivedUpload, handleUpload } from "@/server/infra/storage/upload";
 import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
+import { requireUser } from "@/server/auth/require-user";
 import { createAssetRepo } from "@/server/db/asset.repo";
 import { createMessageRepo } from "@/server/db/message.repo";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request): Promise<Response> {
+  const userId = await requireUser(req);
+  if (!userId) {
+    return Response.json({ error: { code: "UNAUTHENTICATED", message: "请先登录" } }, { status: 401 });
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -55,6 +61,7 @@ export async function POST(req: Request): Promise<Response> {
         edits,
         width: Number.isFinite(width) ? width : undefined,
         height: Number.isFinite(height) ? height : undefined,
+        userId,
       },
       {
         storage: createStorage(defaultS3Client),
@@ -65,7 +72,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   return handleUpload(
-    { bytes, type, name },
+    { bytes, type, name, userId },
     { storage: createStorage(defaultS3Client), assets: createAssetRepo() },
   );
 }

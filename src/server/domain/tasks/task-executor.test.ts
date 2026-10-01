@@ -10,7 +10,7 @@ function makeRepo(): TaskRepo {
   const map = new Map<string, Record<string, unknown>>();
   let n = 0;
   return {
-    async create(input: TaskInput = {}) {
+    async create(input: TaskInput) {
       n += 1;
       const id = `t${n}`;
       const row = {
@@ -18,7 +18,7 @@ function makeRepo(): TaskRepo {
         type: input.type ?? "generate_image",
         payload: input.payload ?? {},
         sessionId: input.sessionId,
-        userId: input.userId ?? "owner",
+        userId: input.userId,
         status: "pending",
         result: null,
         error: null,
@@ -46,9 +46,10 @@ describe("task-executor", () => {
   it("运行处理器并返回结果，任务标记为 succeeded", async () => {
     registerTaskHandler("test_echo", async (p) => ({ echoed: p }));
     const repo = makeRepo();
-    const res = await submitAndWait("test_echo", { a: 1 }, { repo });
+    const res = await submitAndWait("test_echo", { a: 1 }, { repo, userId: "u1" });
     expect(res).toEqual({ echoed: { a: 1 } });
     expect((await repo.list())[0].status).toBe("succeeded");
+    expect((await repo.list())[0].userId).toBe("u1");
   });
 
   it("处理器抛错时任务标记为 failed 并保留错误信息", async () => {
@@ -56,13 +57,13 @@ describe("task-executor", () => {
       throw new Error("boom");
     });
     const repo = makeRepo();
-    await expect(submitAndWait("test_fail", {}, { repo })).rejects.toThrow("boom");
+    await expect(submitAndWait("test_fail", {}, { repo, userId: "u1" })).rejects.toThrow("boom");
     expect((await repo.list())[0].status).toBe("failed");
   });
 
   it("重启清理：running 任务被标记为 failed", async () => {
     const repo = makeRepo();
-    const created = await repo.create({ type: "generate_image" });
+    const created = await repo.create({ type: "generate_image", userId: "u1" });
     await repo.update(created.id, { status: "running" });
     const count = await recoverInterruptedTasks(repo);
     expect(count).toBe(1);
@@ -81,7 +82,7 @@ describe("task-executor", () => {
     });
     const repo = makeRepo();
     await Promise.all(
-      Array.from({ length: 6 }, (_, i) => submitAndWait("test_conc", { i }, { repo })),
+      Array.from({ length: 6 }, (_, i) => submitAndWait("test_conc", { i }, { repo, userId: "u1" })),
     );
     expect(max).toBeLessThanOrEqual(2);
   });

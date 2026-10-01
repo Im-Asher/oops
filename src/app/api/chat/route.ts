@@ -4,6 +4,7 @@ import { runAgent } from "@/server/agent/runtime";
 import { screenInput } from "@/server/agent/moderation";
 import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
+import { requireUser } from "@/server/auth/require-user";
 import { createMessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo } from "@/server/db/session.repo";
 import type { SseEvent } from "@/server/agent/types";
@@ -16,8 +17,13 @@ const chatSchema = z.object({
   message: z.string().min(1),
 });
 
-/** 聊天入口：校验 → 落库用户消息 → 经 agentLoop 流式生成（SSE）。 */
+/** 聊天入口：认证 → 校验 → 落库用户消息 → 经 agentLoop 流式生成（SSE）。 */
 export async function POST(req: Request): Promise<Response> {
+  const userId = await requireUser(req);
+  if (!userId) {
+    return Response.json({ error: { code: "UNAUTHENTICATED", message: "请先登录" } }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -35,7 +41,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: { code: "BLOCKED", message: blocked } }, { status: 400 });
   }
 
-  const session = await createSessionRepo().get(sessionId);
+  const session = await createSessionRepo().get(sessionId, userId);
   if (!session) {
     return Response.json({ error: { code: "NOT_FOUND", message: "会话不存在" } }, { status: 404 });
   }
@@ -46,6 +52,7 @@ export async function POST(req: Request): Promise<Response> {
   const userMessage: UserMessage = { role: "user", content: message, timestamp: Date.now() };
   const userRow = await messageRepo.create({
     sessionId,
+    userId,
     role: "user",
     content: message,
     transcript: sanitizeTranscript([userMessage]),
@@ -62,6 +69,7 @@ export async function POST(req: Request): Promise<Response> {
       try {
         await runAgent({
           sessionId,
+          userId,
           agentId,
           userText: message,
           userMessageId: userRow.id,

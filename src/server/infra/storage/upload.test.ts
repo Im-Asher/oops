@@ -30,16 +30,18 @@ describe("handleUpload", () => {
   it("走普通上传：仅落库 asset（kind 由仓储默认），不写会话消息", async () => {
     const { deps, createAsset, createMessage } = mockDeps();
     const res = await handleUpload(
-      { bytes: new Uint8Array([1, 2, 3]), type: "image/png", name: "a.png" },
+      { bytes: new Uint8Array([1, 2, 3]), type: "image/png", name: "a.png", userId: "u1" },
       deps as never,
     );
     expect(res.status).toBe(201);
     const assetArg = createAsset.mock.calls[0]?.[0] as {
       mimeType: string;
       sessionId?: string;
+      userId?: string;
     };
     expect(assetArg.mimeType).toBe("image/png");
     expect(assetArg.sessionId).toBeUndefined();
+    expect(assetArg.userId).toBe("u1");
     expect(createMessage).not.toHaveBeenCalled();
   });
 });
@@ -56,6 +58,7 @@ describe("handleDerivedUpload", () => {
         edits: { crop: null, filters: { brightness: 105 } },
         width: 800,
         height: 600,
+        userId: "u1",
       },
       deps,
     );
@@ -65,11 +68,13 @@ describe("handleDerivedUpload", () => {
       kind: string;
       sessionId: string;
       width: number;
+      userId: string;
       meta: { sourceAssetId: string; edits: unknown };
     };
     expect(assetArg.kind).toBe("edited");
     expect(assetArg.sessionId).toBe("sess-1");
     expect(assetArg.width).toBe(800);
+    expect(assetArg.userId).toBe("u1");
     expect(assetArg.meta).toEqual({
       sourceAssetId: "src-1",
       edits: { crop: null, filters: { brightness: 105 } },
@@ -91,7 +96,7 @@ describe("handleDerivedUpload", () => {
   it("拒绝不支持的类型（与普通上传共用校验）", async () => {
     const { deps, createAsset } = mockDeps();
     const res = await handleDerivedUpload(
-      { bytes: new Uint8Array([1]), type: "text/plain", sessionId: "s", sourceAssetId: "x" },
+      { bytes: new Uint8Array([1]), type: "text/plain", sessionId: "s", sourceAssetId: "x", userId: "u1" },
       deps,
     );
     expect(res.status).toBe(415);

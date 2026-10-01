@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// 路由级测试：mock runtime / 仓储 / 初筛，验证 SSE 行为、敏感词拦截与会话校验，
+// 路由级测试：mock runtime / 仓储 / 认证 / 初筛，验证 SSE 行为、敏感词拦截与会话校验，
 // 不依赖真实 LLM 与数据库。
 const h = vi.hoisted(() => ({
   events: [] as string[],
@@ -8,9 +8,13 @@ const h = vi.hoisted(() => ({
   runAgentCalls: 0,
   runAgentArgs: [] as Record<string, unknown>[],
   messageCreates: [] as Record<string, unknown>[],
+  userId: null as string | null,
 }));
 
 vi.mock("@/server/agent", () => ({ default: {} }));
+vi.mock("@/server/auth/require-user", () => ({
+  requireUser: vi.fn(async () => h.userId),
+}));
 vi.mock("@/server/agent/runtime", () => ({
   runAgent: vi.fn(async (args: { onEvent: (e: unknown) => void }) => {
     h.runAgentCalls += 1;
@@ -48,6 +52,18 @@ function post(message: string) {
 }
 
 describe("POST /api/chat", () => {
+  beforeEach(() => {
+    h.userId = "u1";
+  });
+
+  it("未认证返回 401，不触发任何下游", async () => {
+    h.userId = null;
+    h.runAgentCalls = 0;
+    const res = await post("画一颗苹果");
+    expect(res.status).toBe(401);
+    expect(h.runAgentCalls).toBe(0);
+  });
+
   it("入口敏感词初筛：命中黑名单直接 400，不进入 LLM", async () => {
     h.sessionExists = true;
     h.runAgentCalls = 0;
@@ -86,11 +102,11 @@ describe("POST /api/chat", () => {
     await post("画一颗苹果");
     expect(h.messageCreates).toHaveLength(1);
     const created = h.messageCreates[0];
-    expect(created).toMatchObject({ sessionId: "s1", role: "user", content: "画一颗苹果" });
+    expect(created).toMatchObject({ sessionId: "s1", role: "user", content: "画一颗苹果", userId: "u1" });
     const transcript = created.transcript as { v: number; messages: { role: string }[] };
     expect(transcript.v).toBe(1);
     expect(transcript.messages).toHaveLength(1);
     expect(transcript.messages[0].role).toBe("user");
-    expect(h.runAgentArgs[0]).toMatchObject({ userMessageId: "m1", userText: "画一颗苹果" });
+    expect(h.runAgentArgs[0]).toMatchObject({ userMessageId: "m1", userText: "画一颗苹果", userId: "u1" });
   });
 });

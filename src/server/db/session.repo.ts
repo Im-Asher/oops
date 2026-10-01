@@ -1,12 +1,11 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db as defaultDb } from ".";
 import { sessions, type Session } from "./schema";
-import { OWNER_ID } from "@/lib/config";
 
 export interface SessionRepo {
-  create(input?: { title?: string; agentId?: string; userId?: string }): Promise<Session>;
-  list(userId?: string): Promise<Session[]>;
-  get(id: string, userId?: string): Promise<Session | undefined>;
+  create(input: { title?: string; agentId?: string; userId: string }): Promise<Session>;
+  list(userId: string): Promise<Session[]>;
+  get(id: string, userId: string): Promise<Session | undefined>;
   rename(id: string, title: string): Promise<Session | undefined>;
   // compact 产物落库；水位线单调性由调用方（compact 模块）基于消息列表位置保证
   updateSummary(
@@ -18,19 +17,19 @@ export interface SessionRepo {
 
 export function createSessionRepo(db: typeof defaultDb = defaultDb): SessionRepo {
   return {
-    async create(input = {}) {
+    async create(input) {
       const [row] = await db
         .insert(sessions)
         .values({
           title: input.title,
           agentId: input.agentId,
-          userId: input.userId ?? OWNER_ID,
+          userId: input.userId,
         })
         .returning();
       return row;
     },
 
-    async list(userId = OWNER_ID) {
+    async list(userId) {
       return db
         .select()
         .from(sessions)
@@ -39,7 +38,7 @@ export function createSessionRepo(db: typeof defaultDb = defaultDb): SessionRepo
         .limit(100);
     },
 
-    async get(id, userId = OWNER_ID) {
+    async get(id, userId) {
       const rows = await db
         .select()
         .from(sessions)

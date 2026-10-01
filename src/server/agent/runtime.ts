@@ -17,6 +17,8 @@ export interface RunAgentArgs {
   userText: string;
   // 本轮 user 消息的落库行 id：重建历史时排除该行，避免与 prompt() 重复注入
   userMessageId: string;
+  // 已认证用户（require-user 解析）：贯穿工具上下文与落库归属
+  userId: string;
   signal: AbortSignal;
   onEvent: (event: SseEvent) => void;
   repos?: { message: MessageRepo; session?: SessionRepo };
@@ -34,7 +36,10 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
   }
 
   const model = getChatModel();
-  const tools = agentRegistry.getAgentTools(args.agentId);
+  const tools = agentRegistry.getAgentTools(args.agentId, {
+    userId: args.userId,
+    sessionId: args.sessionId,
+  });
   const messageRepo = args.repos?.message ?? createMessageRepo();
   const sessionRepo = args.repos?.session ?? createSessionRepo();
 
@@ -42,7 +47,7 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
 
   // compact：被动触发（估算超阈值才压缩，同步执行；详见 design D3/D4）。
   // 失败降级：按现有摘要/水位线继续回放（原文未删、last-40 兜底仍在），不中断用户回合
-  const session = await sessionRepo.get(args.sessionId);
+  const session = await sessionRepo.get(args.sessionId, args.userId);
   let compactResult: Awaited<ReturnType<typeof compactSessionHistory>> = {
     compacted: false,
     summary: session?.summary ?? null,
@@ -173,6 +178,7 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
       content: assistantText,
       toolCalls: toolResults.length ? toolResults : undefined,
       transcript: turnMessages.length > 0 ? sanitizeTranscript(turnMessages) : undefined,
+      userId: args.userId,
     });
   }
 }

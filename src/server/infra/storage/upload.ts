@@ -36,6 +36,7 @@ export interface UploadInput {
   bytes: Uint8Array;
   type: string;
   name?: string;
+  userId: string;
 }
 
 export interface UploadDeps {
@@ -60,6 +61,7 @@ export async function handleUpload(
     storageKey: key,
     mimeType: input.type,
     meta: input.name ? { originalName: input.name } : undefined,
+    userId: input.userId,
   });
 
   return Response.json(
@@ -107,11 +109,13 @@ export async function handleDerivedUpload(
     width: input.width,
     height: input.height,
     meta: { sourceAssetId: input.sourceAssetId, edits: input.edits ?? null },
+    userId: input.userId,
   });
 
   const url = `/files/${key}`;
   await deps.messages.create({
     sessionId: input.sessionId,
+    userId: input.userId,
     role: "assistant",
     content: "已导出为新图片",
     toolCalls: [{ type: "edited_image", url, assetId: asset.id, sourceAssetId: input.sourceAssetId }],

@@ -45,7 +45,7 @@ describe("AgentRegistry", () => {
         systemPrompt: "x",
       }),
     );
-    const tools = agentRegistry.getAgentTools("auth-test");
+    const tools = agentRegistry.getAgentTools("auth-test", { userId: "u1" });
     expect(tools.map((t) => t.name)).toEqual(["gen_tool"]);
     expect(tools.some((t) => t.name === "extra_tool")).toBe(false);
   });

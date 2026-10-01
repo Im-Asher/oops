@@ -53,13 +53,17 @@ export const generateImageTool: ToolDefinition<GenerateImageArgs> = {
     "尺寸与宽高比从用户意图推断，未指定则默认 1024*1024 与 1:1。",
   schema: generateImageSchema,
   jsonSchema: generateImageJsonSchema,
-  async execute(args) {
+  async execute(args, ctx) {
     try {
-      const result = (await submitAndWait("generate_image", {
-        prompt: args.prompt,
-        size: args.size,
-        aspectRatio: args.aspectRatio,
-      })) as GenerateImageOutcome;
+      const result = (await submitAndWait(
+        "generate_image",
+        {
+          prompt: args.prompt,
+          size: args.size,
+          aspectRatio: args.aspectRatio,
+        },
+        { sessionId: ctx.sessionId, userId: ctx.userId },
+      )) as GenerateImageOutcome;
       const image: ImageContent = {
         type: "image",
         data: result.data,

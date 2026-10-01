@@ -1,17 +1,16 @@
 import { desc, eq } from "drizzle-orm";
 import { db as defaultDb } from ".";
 import { tasks, type Task } from "./schema";
-import { OWNER_ID } from "@/lib/config";
 
 export interface TaskInput {
   type?: "generate_image" | "render_html" | "export";
   payload?: unknown;
   sessionId?: string;
-  userId?: string;
+  userId: string;
 }
 
 export interface TaskRepo {
-  create(input?: TaskInput): Promise<Task>;
+  create(input: TaskInput): Promise<Task>;
   get(id: string): Promise<Task | undefined>;
   update(
     id: string,
@@ -26,14 +25,14 @@ export interface TaskRepo {
 
 export function createTaskRepo(db: typeof defaultDb = defaultDb): TaskRepo {
   return {
-    async create(input = {}) {
+    async create(input) {
       const [row] = await db
         .insert(tasks)
         .values({
           type: input.type ?? "generate_image",
           payload: (input.payload as Record<string, unknown>) ?? {},
           sessionId: input.sessionId,
-          userId: input.userId ?? OWNER_ID,
+          userId: input.userId,
         })
         .returning();
       return row;

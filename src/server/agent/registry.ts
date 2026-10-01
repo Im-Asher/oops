@@ -1,5 +1,5 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { toolRegistry } from "./tools/registry";
+import { toolRegistry, type ToolExecutionContext } from "./tools/registry";
 
 export interface AgentDefinition {
   id: string;
@@ -51,11 +51,11 @@ class AgentRegistry {
     }));
   }
 
-  /** 解析该 Agent 允许的工具为 AgentTool 数组（registry 已做越权过滤）。 */
-  getAgentTools(id: string): AgentTool[] {
+  /** 解析该 Agent 允许的工具为 AgentTool 数组（registry 已做越权过滤），ctx 注入调用者身份。 */
+  getAgentTools(id: string, ctx: ToolExecutionContext): AgentTool[] {
     const def = this.defs.get(id);
     if (!def) return [];
-    return [...toolRegistry.getAgentTools(def.tools).values()];
+    return [...toolRegistry.getAgentTools(def.tools, ctx).values()];
   }
 }
 

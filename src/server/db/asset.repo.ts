@@ -1,7 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db as defaultDb } from ".";
 import { assets, type Asset } from "./schema";
-import { OWNER_ID } from "@/lib/config";
 
 export interface AssetInput {
   storageKey: string;
@@ -14,7 +13,7 @@ export interface AssetInput {
   model?: string;
   sourceUrl?: string;
   meta?: unknown;
-  userId?: string;
+  userId: string;
 }
 
 export interface AssetRepo {
@@ -40,7 +39,7 @@ export function createAssetRepo(db: typeof defaultDb = defaultDb): AssetRepo {
           model: input.model,
           sourceUrl: input.sourceUrl,
           meta: (input.meta as Record<string, unknown>) ?? {},
-          userId: input.userId ?? OWNER_ID,
+          userId: input.userId,
         })
         .returning();
       return row;

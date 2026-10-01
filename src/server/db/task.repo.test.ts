@@ -6,11 +6,11 @@ describe("task repo", () => {
   it("create defaults type=generate_image and stores payload", async () => {
     const mock = makeMockDb();
     const repo = createTaskRepo(mock.db);
-    const row = await repo.create({ payload: { prompt: "苹果" } });
+    const row = await repo.create({ payload: { prompt: "苹果" }, userId: "u1" });
     expect(row).toMatchObject({
       type: "generate_image",
       payload: { prompt: "苹果" },
-      userId: "owner",
+      userId: "u1",
     });
     expect(mock.state.calls.at(-1)?.op).toBe("insert.values.returning");
   });
