@@ -5,14 +5,24 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "cn";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // 实时规则提示与注册 zod 同步（3–20、字母开头、仅字母/数字/下划线）
+  const trimmedUsername = username.trim();
+  const usernameRules = [
+    { ok: trimmedUsername.length >= 3 && trimmedUsername.length <= 20, text: "3–20 个字符" },
+    { ok: /^[A-Za-z]/.test(trimmedUsername), text: "以字母开头" },
+    { ok: /^[A-Za-z0-9_]*$/.test(trimmedUsername), text: "仅含字母、数字或下划线" },
+  ];
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,7 +32,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ inviteCode, username, password }),
+        body: JSON.stringify({ inviteCode, username, displayName, password }),
       });
       if (res.ok) {
         router.replace("/chat");
@@ -67,9 +77,39 @@ export default function RegisterPage() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
-          minLength={2}
-          maxLength={32}
+          maxLength={20}
+          minLength={3}
+          pattern="[A-Za-z][A-Za-z0-9_]*"
           required
+          title="3–20 个字符，以字母开头，仅含字母、数字或下划线"
+        />
+        {trimmedUsername.length > 0 && (
+          <ul className="space-y-0.5" aria-label="用户名规则">
+            {usernameRules.map((rule) => (
+              <li
+                key={rule.text}
+                className={cn(
+                  "text-xs",
+                  rule.ok ? "text-emerald-600" : "text-muted-foreground",
+                )}
+              >
+                {rule.ok ? "✓" : "·"} {rule.text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="space-y-2">
+        <label htmlFor="displayName" className="text-sm font-medium text-foreground">
+          昵称 <span className="font-normal text-muted-foreground">（可选）</span>
+        </label>
+        <Input
+          id="displayName"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          autoComplete="nickname"
+          maxLength={20}
+          placeholder="聊天中展示的名字"
         />
       </div>
       <div className="space-y-2">
