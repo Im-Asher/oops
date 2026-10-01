@@ -6,3 +6,4 @@ process.env.MINIO_ACCESS_KEY ??= "test";
 process.env.MINIO_SECRET_KEY ??= "test";
 process.env.MINIO_BUCKET ??= "oops-assets";
 process.env.OWNER_ID ??= "owner";
+process.env.AUTH_SECRET ??= "unit-test-secret-0123456789abcdef-unit-test";
