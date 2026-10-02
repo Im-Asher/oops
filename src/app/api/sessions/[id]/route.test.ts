@@ -9,6 +9,15 @@ const h = vi.hoisted(() => ({
   removedAssetSessionId: null as string | null,
   removedSessionId: null as string | null,
   failOnKey: null as string | null,
+  renamedTitle: null as string | null,
+  updatedAgentId: null as string | null,
+}));
+
+vi.mock("@/server/agent", () => ({
+  agentRegistry: {
+    get: (id: string) =>
+      id === "atmosphere-designer" || id === "product-photographer" ? { id } : undefined,
+  },
 }));
 
 vi.mock("@/server/auth/require-user", () => ({
@@ -21,6 +30,14 @@ vi.mock("@/server/db/session.repo", () => ({
         ? h.sessionRow
         : undefined,
     ),
+    rename: vi.fn(async (id: string, title: string) => {
+      h.renamedTitle = title;
+      return { ...h.sessionRow, id, title };
+    }),
+    updateAgent: vi.fn(async (id: string, agentId: string) => {
+      h.updatedAgentId = agentId;
+      return { ...h.sessionRow, id, agentId };
+    }),
     remove: vi.fn(async (id: string) => {
       h.removedSessionId = id;
     }),
@@ -47,10 +64,18 @@ vi.mock("@/server/infra/storage/s3", () => ({
   }),
 }));
 
-import { DELETE } from "./route";
+import { DELETE, PATCH } from "./route";
 
 function del(id: string): Request {
   return new Request(`http://localhost/api/sessions/${id}`, { method: "DELETE" });
+}
+
+function patch(id: string, body: unknown): Request {
+  return new Request(`http://localhost/api/sessions/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function ctx(id: string): { params: Promise<{ id: string }> } {
@@ -66,6 +91,8 @@ describe("DELETE /api/sessions/[id]", () => {
     h.removedAssetSessionId = null;
     h.removedSessionId = null;
     h.failOnKey = null;
+    h.renamedTitle = null;
+    h.updatedAgentId = null;
   });
 
   it("未认证返回 401", async () => {
@@ -102,5 +129,85 @@ describe("DELETE /api/sessions/[id]", () => {
     expect(h.removedKeys).toEqual(["assets/a.png"]);
     expect(h.removedAssetSessionId).toBeNull();
     expect(h.removedSessionId).toBeNull();
+  });
+});
+
+describe("PATCH /api/sessions/[id]", () => {
+  beforeEach(() => {
+    h.userId = "u1";
+    h.sessionRow = { id: "s1", userId: "u1" };
+    h.renamedTitle = null;
+    h.updatedAgentId = null;
+  });
+
+  it("未认证返回 401", async () => {
+    h.userId = null;
+    const res = await PATCH(patch("s1", { title: "新标题" }), ctx("s1"));
+    expect(res.status).toBe(401);
+    expect(h.renamedTitle).toBeNull();
+  });
+
+  it("请求体为空对象返回 400", async () => {
+    const res = await PATCH(patch("s1", {}), ctx("s1"));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID");
+  });
+
+  it("非法 JSON 返回 400", async () => {
+    const res = await PATCH(
+      new Request("http://localhost/api/sessions/s1", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "not-json",
+      }),
+      ctx("s1"),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("BAD_JSON");
+  });
+
+  it("未注册的 agentId 返回 400 且无副作用", async () => {
+    const res = await PATCH(patch("s1", { agentId: "unknown-agent" }), ctx("s1"));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID_AGENT");
+    expect(h.updatedAgentId).toBeNull();
+  });
+
+  it("会话不存在或不属于当前用户返回 404", async () => {
+    h.sessionRow = { id: "s1", userId: "other" };
+    const res = await PATCH(patch("s1", { title: "新标题" }), ctx("s1"));
+    expect(res.status).toBe(404);
+    expect(h.renamedTitle).toBeNull();
+  });
+
+  it("仅重命名：更新标题，不动 agentId", async () => {
+    const res = await PATCH(patch("s1", { title: "  面霜场景图  " }), ctx("s1"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { title: string; agentId: string };
+    expect(h.renamedTitle).toBe("面霜场景图");
+    expect(h.updatedAgentId).toBeNull();
+    expect(body.title).toBe("面霜场景图");
+  });
+
+  it("仅重绑：更新 agentId，不动标题", async () => {
+    const res = await PATCH(patch("s1", { agentId: "product-photographer" }), ctx("s1"));
+    expect(res.status).toBe(200);
+    expect(h.updatedAgentId).toBe("product-photographer");
+    expect(h.renamedTitle).toBeNull();
+    const body = (await res.json()) as { agentId: string };
+    expect(body.agentId).toBe("product-photographer");
+  });
+
+  it("同时重命名与重绑：两者都生效", async () => {
+    const res = await PATCH(
+      patch("s1", { title: "新标题", agentId: "product-photographer" }),
+      ctx("s1"),
+    );
+    expect(res.status).toBe(200);
+    expect(h.renamedTitle).toBe("新标题");
+    expect(h.updatedAgentId).toBe("product-photographer");
   });
 });

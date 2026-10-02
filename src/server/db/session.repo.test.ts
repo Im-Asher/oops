@@ -35,6 +35,15 @@ describe("session repo", () => {
     expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
   });
 
+  it("updateAgent rebinds the session agent", async () => {
+    const mock = makeMockDb();
+    const repo = createSessionRepo(mock.db);
+    const row = await repo.updateAgent("s1", "product-photographer");
+    expect(row).toMatchObject({ agentId: "product-photographer" });
+    expect(mock.state.lastSet).toMatchObject({ agentId: "product-photographer" });
+    expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
+  });
+
   it("updateSummary persists summary and watermark", async () => {
     const mock = makeMockDb();
     const repo = createSessionRepo(mock.db);
