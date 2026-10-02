@@ -52,6 +52,16 @@ describe("task-executor", () => {
     expect((await repo.list())[0].userId).toBe("u1");
   });
 
+  it("handler ctx 透传 sessionId（资产回填会话，GC 依赖）", async () => {
+    let seen: string | undefined;
+    registerTaskHandler("test_ctx_session", async (_p, ctx) => {
+      seen = ctx.sessionId;
+      return { ok: true };
+    });
+    await submitAndWait("test_ctx_session", {}, { repo: makeRepo(), sessionId: "s42", userId: "u1" });
+    expect(seen).toBe("s42");
+  });
+
   it("处理器抛错时任务标记为 failed 并保留错误信息", async () => {
     registerTaskHandler("test_fail", async () => {
       throw new Error("boom");

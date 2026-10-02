@@ -27,6 +27,8 @@ export interface TaskHandlerContext {
   taskId: string;
   // 任务归属用户：handler 用它落资产，防止跨用户可见
   userId: string;
+  // 产生任务的会话：handler 落资产时回填 assets.sessionId，否则会话删除 GC 扫不到
+  sessionId?: string;
 }
 
 export type TaskHandler = (
@@ -106,6 +108,7 @@ export async function submitAndWait(
         signal: controller.signal,
         taskId,
         userId: opts.userId,
+        sessionId: opts.sessionId,
       });
       await repo.update(taskId, { status: "succeeded", result: slimForDb(result) });
       return result;
@@ -155,6 +158,7 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
   const asset = await assetRepo.create({
     storageKey: key,
     mimeType: gen.mimeType,
+    sessionId: ctx.sessionId,
     prompt,
     model: DASHSCOPE_IMAGE_MODEL,
     meta: { provider: DASHSCOPE_IMAGE_PROVIDER, size, aspectRatio, taskId: ctx.taskId },
