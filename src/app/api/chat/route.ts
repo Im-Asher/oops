@@ -41,11 +41,21 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: { code: "BLOCKED", message: blocked } }, { status: 400 });
   }
 
-  const session = await createSessionRepo().get(sessionId, userId);
+  const sessionRepo = createSessionRepo();
+  const session = await sessionRepo.get(sessionId, userId);
   if (!session) {
     return Response.json({ error: { code: "NOT_FOUND", message: "会话不存在" } }, { status: 404 });
   }
   const agentId = session.agentId ?? parsed.data.agentId;
+
+  // 首条用户消息自动命名：仅当标题为空时截取前 20 字（手动命名与后续消息不覆盖；失败不阻断聊天）
+  if (session.title == null) {
+    try {
+      await sessionRepo.rename(sessionId, message.slice(0, 20));
+    } catch {
+      // 自动命名失败仅影响标题展示，不阻断本轮对话
+    }
+  }
 
   const messageRepo = createMessageRepo();
   // user 消息双视图落库：UI 摘要 + LLM 视图 transcript（显式传 id 供 runAgent 排除本轮，防重复注入）
