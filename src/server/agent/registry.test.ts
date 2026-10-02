@@ -65,4 +65,20 @@ describe("AgentRegistry", () => {
     expect(meta).toMatchObject({ id: "meta-test", icon: "🧪", tools: [] });
     expect(meta).not.toHaveProperty("systemPrompt");
   });
+
+  it("声明式定义加载：内置两个 Agent 注册且元数据可透出", async () => {
+    await import("./index"); // 副作用：加载全部定义
+    const meta = agentRegistry.metadata();
+    expect(meta.find((a) => a.id === "atmosphere-designer")).toMatchObject({
+      name: "氛围图设计师",
+      icon: "🌄",
+      tools: ["generate_image"],
+    });
+    expect(meta.find((a) => a.id === "product-photographer")).toMatchObject({
+      name: "产品摄影师",
+      icon: "📸",
+      tools: ["generate_image"],
+    });
+    expect(meta.find((a) => a.id === "product-photographer")).not.toHaveProperty("systemPrompt");
+  });
 });
