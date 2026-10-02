@@ -169,9 +169,7 @@ export function MessageList({
         );
       })}
       {messages.length === 0 && (
-        <p className="text-sm text-zinc-400">
-          新建会话，向“氛围图设计师”描述你想要的商品/场景图。
-        </p>
+        <p className="text-sm text-zinc-400">选择 Agent 并描述你想要的商品/场景图。</p>
       )}
     </div>
   );
