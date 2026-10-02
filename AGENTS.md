@@ -144,8 +144,12 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
   - **Route handlers:** validate request parsing and error shapes with mocked
     services.
   - **Manual smoke path** after changes to the chat flow: login → create
-    session → pick agent → send message → observe SSE stream → verify
-    generated asset appears on the canvas (thumbnail, clickable to promote).
+    session → pick agent → send message (first message auto-titles the
+    session) → observe SSE stream → verify generated asset appears on the
+    canvas (thumbnail, clickable to promote) → reload to confirm message
+    persistence → deleting a session must remove its MinIO objects and asset
+    rows (GC) → narrow-viewport check: sidebar drawer + fullscreen canvas
+    overlay.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
 - Playwright screenshot rendering is covered by a service-level test using a
   minimal HTML fixture; keep it hermetic (no network).

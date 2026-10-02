@@ -74,7 +74,7 @@ export const atmosphereDesigner = defineAgent({
 
 - system prompt 外置到 `src/server/agent/definitions/prompts/*.md`，独立调优（compact 摘要骨架 `session-summary.md` 同目录）。
 - 切换 Agent = 换 systemPrompt + tools 子集重新进入 `agentLoop`，无子 Agent 黑盒编排（符合 Pi 反黑盒理念）。
-- 前端 Agent 选择器消费元数据列表，新增 Agent 前端零改动。
+- 前端 Agent 选择器消费元数据列表，新增 Agent 前端零改动。已有会话切换 Agent = composer 内 PATCH 重绑（持久化到 `chat_sessions.agent_id`，下一轮生效）；MVP 内置两个 Agent：氛围图设计师、产品摄影师。
 
 ## 4. 图片生成：异步任务执行模型
 
@@ -235,15 +235,15 @@ oops/
 │   │   │   └── register/page.tsx
 │   │   ├── files/[...path]/route.ts # 资产代理读取（登录后，安全响应头）
 │   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限）
-│   │   ├── chat/page.tsx           # 画布工作台页（全屏画布 + 悬浮聊天面板，自定义 SSE）
+│   │   ├── chat/page.tsx           # 聊天工作台页（三栏：会话侧栏 / 聊天列 / 画布列；窄屏抽屉+全屏浮层）
 │   │   ├── profile/page.tsx        # 个人信息页（基本资料卡 + 改密卡，proxy 保护）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
 │   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
 │   │       ├── profile/            # GET/PATCH 资料 + POST 改密（requireUser + 改密按 IP 限频）
-│   │       ├── sessions/route.ts   # 会话 CRUD（按认证用户隔离）
-│   │       ├── sessions/[id]/route.ts # GET 会话历史（UIMessage 重建）
-│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 落库 + 流式）
+│   │       ├── sessions/route.ts   # 会话列表/新建（按认证用户隔离）
+│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删 MinIO 对象→assets→会话，messages 级联）
+│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # 认证域（password / session-cookie / require-user / register / authenticate / rate-limit）
 │   │   ├── db/                     # Drizzle client + schema + 仓储
