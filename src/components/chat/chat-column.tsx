@@ -22,6 +22,8 @@ interface ChatColumnProps {
   onAgentChange: (id: string) => void;
   /** 消息头像 emoji（会话当前绑定 Agent 的 icon）。 */
   agentIcon?: string;
+  /** 是否已有会话（空态时禁用 composer 并提示先建会话；新会话=显式动作）。 */
+  hasSession: boolean;
   /** 会话标题（未命名时展示占位）。 */
   sessionTitle: string;
   activeUrl?: string | null;
@@ -46,6 +48,7 @@ export function ChatColumn({
   agentId,
   onAgentChange,
   agentIcon,
+  hasSession,
   sessionTitle,
   activeUrl,
   onActivateImage,
@@ -96,7 +99,7 @@ export function ChatColumn({
             <Textarea
               aria-label="消息输入"
               className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-zinc-50 shadow-none placeholder:text-zinc-500 focus-visible:ring-0"
-              disabled={busy}
+              disabled={busy || !hasSession}
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -104,7 +107,7 @@ export function ChatColumn({
                   onSend();
                 }
               }}
-              placeholder="描述你的图片需求…"
+              placeholder={hasSession ? "描述你的图片需求…" : "点击「新会话」开始"}
               rows={1}
               value={input}
             />
@@ -131,7 +134,7 @@ export function ChatColumn({
               <Button
                 aria-label="发送"
                 className="size-8 rounded-full"
-                disabled={busy || !input.trim()}
+                disabled={busy || !hasSession || !input.trim()}
                 onClick={onSend}
                 size="icon-sm"
               >

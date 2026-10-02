@@ -433,6 +433,7 @@ export default function ChatPage() {
             agentId={agentId}
             agents={agents}
             busy={busy}
+            hasSession={!!currentId}
             input={input}
             messages={messages}
             onActivateImage={handleActivateImage}
