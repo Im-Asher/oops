@@ -20,6 +20,10 @@ export interface AssetRepo {
   create(input: AssetInput): Promise<Asset>;
   get(id: string): Promise<Asset | undefined>;
   list(sessionId?: string): Promise<Asset[]>;
+  /** 会话删除时的资产 GC：无上限列出该会话全部对象的 storageKey。 */
+  listKeysBySession(sessionId: string): Promise<string[]>;
+  /** 按会话删除资产行（对象字节由调用方经 storage 清理后调用）。 */
+  removeBySession(sessionId: string): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -61,6 +65,18 @@ export function createAssetRepo(db: typeof defaultDb = defaultDb): AssetRepo {
         .where(sessionId ? eq(assets.sessionId, sessionId) : undefined)
         .orderBy(desc(assets.createdAt))
         .limit(500);
+    },
+
+    async listKeysBySession(sessionId) {
+      const rows = await db
+        .select({ storageKey: assets.storageKey })
+        .from(assets)
+        .where(eq(assets.sessionId, sessionId));
+      return rows.map((row) => row.storageKey);
+    },
+
+    async removeBySession(sessionId) {
+      await db.delete(assets).where(eq(assets.sessionId, sessionId));
     },
 
     async remove(id) {

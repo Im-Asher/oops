@@ -38,4 +38,23 @@ describe("asset repo", () => {
     await repo.remove("a1");
     expect(mock.state.calls.at(-1)?.op).toContain("delete.where");
   });
+
+  it("listKeysBySession returns all keys without row limit", async () => {
+    const mock = makeMockDb({
+      selectResult: [{ storageKey: "assets/a.png" }, { storageKey: "assets/b.jpg" }],
+    });
+    const repo = createAssetRepo(mock.db);
+    const keys = await repo.listKeysBySession("s1");
+    expect(keys).toEqual(["assets/a.png", "assets/b.jpg"]);
+    const last = mock.state.calls.at(-1);
+    expect(last?.op).toBe("select.from.where");
+    expect(last?.op).not.toContain("limit");
+  });
+
+  it("removeBySession deletes rows by sessionId", async () => {
+    const mock = makeMockDb();
+    const repo = createAssetRepo(mock.db);
+    await repo.removeBySession("s1");
+    expect(mock.state.calls.at(-1)?.op).toBe("delete.where");
+  });
 });

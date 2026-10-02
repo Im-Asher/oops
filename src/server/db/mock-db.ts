@@ -35,6 +35,7 @@ export function makeMockDb(
       return [v];
     }
     if (op === "delete.where") return [];
+    if (op.endsWith(".where")) return state.selectResult;
     if (op.endsWith(".limit")) return state.selectResult;
     return [];
   };
@@ -44,8 +45,9 @@ export function makeMockDb(
       get(_t, prop: string | symbol) {
         const nextOp = op ? `${op}.${String(prop)}` : String(prop);
         if (prop === "then") {
+          // await 直达链尾：按去掉 .then 后缀的真实 op 结算（否则绕过 where/limit 分支）
           return (cb?: (v: unknown) => void) =>
-            Promise.resolve(resolve(nextOp, [])).then(cb);
+            Promise.resolve(resolve(op, [])).then(cb);
         }
         if (TERMINALS.has(String(prop))) {
           return (...args: unknown[]) => Promise.resolve(resolve(nextOp, args));

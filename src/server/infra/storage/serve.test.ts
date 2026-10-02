@@ -11,6 +11,7 @@ function fakeStorage(object?: unknown, throws?: { name: string }): Storage {
       if (throws) throw throws;
       return object as Awaited<ReturnType<Storage["getObject"]>>;
     },
+    async removeObject() {},
   };
 }
 

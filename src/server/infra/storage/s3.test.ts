@@ -41,4 +41,21 @@ describe("storage", () => {
     );
     expect(res.Body).toBeDefined();
   });
+
+  it("removeObject sends DeleteObjectCommand with bucket/key", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const storage = createStorage({ send });
+    await storage.removeObject("assets/x.png");
+    const cmd = send.mock.calls[0][0] as { input: { Bucket: string; Key: string } };
+    expect(cmd.input.Bucket).toBe("oops-assets");
+    expect(cmd.input.Key).toBe("assets/x.png");
+  });
+
+  it("removeObject is idempotent for missing objects (S3 语义)", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const storage = createStorage({ send });
+    await expect(storage.removeObject("assets/missing.png")).resolves.toBeUndefined();
+    await expect(storage.removeObject("assets/missing.png")).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledTimes(2);
+  });
 });

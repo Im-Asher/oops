@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -43,6 +44,8 @@ export function extFromMime(mime: string): string {
 export interface Storage {
   putObject(key: string, body: Uint8Array | Buffer, contentType: string): Promise<string>;
   getObject(key: string): Promise<GetObjectCommandOutput>;
+  /** 删除对象。S3 语义下删除不存在的 key 同样成功（204），天然幂等。 */
+  removeObject(key: string): Promise<void>;
 }
 
 export function createStorage(client: S3Like = defaultS3Client): Storage {
@@ -64,6 +67,10 @@ export function createStorage(client: S3Like = defaultS3Client): Storage {
       return (await client.send(
         new GetObjectCommand({ Bucket: bucket, Key: key }),
       )) as GetObjectCommandOutput;
+    },
+
+    async removeObject(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
   };
 }
