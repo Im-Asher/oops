@@ -17,7 +17,12 @@ export async function GET(req: Request): Promise<Response> {
   }
   const sessions = await createSessionRepo().list(userId);
   return Response.json({
-    sessions: sessions.map((s) => ({ id: s.id, agentId: s.agentId, title: s.title })),
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      agentId: s.agentId,
+      title: s.title,
+      updatedAt: s.updatedAt.toISOString(),
+    })),
   });
 }
 
@@ -43,5 +48,10 @@ export async function POST(req: Request): Promise<Response> {
     title: parsed.data.title,
     userId,
   });
-  return Response.json({ id: session.id, agentId: session.agentId, title: session.title });
+  return Response.json({
+    id: session.id,
+    agentId: session.agentId,
+    title: session.title,
+    updatedAt: session.updatedAt.toISOString(),
+  });
 }

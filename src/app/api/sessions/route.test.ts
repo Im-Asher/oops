@@ -14,11 +14,25 @@ vi.mock("@/server/db/session.repo", () => ({
   createSessionRepo: () => ({
     list: vi.fn(async (userId: string) => {
       h.listCalls.push(userId);
-      return [{ id: "s1", agentId: "atmosphere-designer", title: "t", userId }];
+      return [
+        {
+          id: "s1",
+          agentId: "atmosphere-designer",
+          title: "t",
+          userId,
+          updatedAt: new Date("2026-10-02T08:00:00Z"),
+        },
+      ];
     }),
     create: vi.fn(async (input: Record<string, unknown>) => {
       h.created.push(input);
-      return { id: "s-new", agentId: input.agentId, title: input.title, userId: input.userId };
+      return {
+        id: "s-new",
+        agentId: input.agentId,
+        title: input.title,
+        userId: input.userId,
+        updatedAt: new Date("2026-10-02T08:00:00Z"),
+      };
     }),
   }),
 }));

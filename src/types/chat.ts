@@ -30,6 +30,8 @@ export interface SessionInfo {
   id: string;
   agentId?: string | null;
   title?: string | null;
+  /** ISO 时间戳，用于侧栏时间分组与排序。 */
+  updatedAt?: string;
 }
 
 export type ChatEvent =
