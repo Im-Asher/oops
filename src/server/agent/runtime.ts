@@ -150,7 +150,8 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
         if (event.result && typeof event.result === "object") {
           const details = (event.result as { details?: unknown }).details;
           if (details && typeof details === "object") {
-            toolResults.push(details as Record<string, unknown>);
+            // 落库需带工具名作为 type：toUIMessage 按 type 识别图片 part，缺了刷新后图片丢失
+            toolResults.push({ type: event.toolName, ...(details as Record<string, unknown>) });
           }
         }
         break;

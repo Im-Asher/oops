@@ -150,7 +150,10 @@ describe("runAgent (runtime bridge)", () => {
     const te = events.find((e) => e.type === "tool_end") as { details: ToolEndDetails };
     expect(te.details.assetId).toBe("a1");
     const persisted = create.mock.calls[0][0] as Record<string, unknown>;
-    expect((persisted.toolCalls as { assetId: string }[])[0].assetId).toBe("a1");
+    const firstCall = (persisted.toolCalls as { assetId: string; type?: string }[])[0];
+    expect(firstCall.assetId).toBe("a1");
+    // toolCalls 必须带工具名 type：toUIMessage 按 type 识别图片 part，缺失则刷新后图片丢失
+    expect(firstCall.type).toBe("generate_image");
   });
 
   it("工具失败不崩会话：tool_end 带 error details，仍收到 finish，结果随 assistant 落库", async () => {
