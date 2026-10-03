@@ -87,6 +87,8 @@ export type CanvasAction =
       type: "addImageItems";
       /** 消息中的图片派生为画布条目；已有 assetId 的跳过（幂等）。 */
       images: Array<{ assetId: string; url: string; referenceAssetId?: string; name?: string }>;
+      /** 上传参考图等场景需立即成为引用：选中最后新增条目。 */
+      selectNew?: boolean;
     }
   | { type: "addPlaceholder"; id: string; referenceAssetId?: string; prompt?: string }
   | { type: "patchItem"; id: string; patch: Partial<Omit<CanvasItem, "id" | "edit">> }
@@ -171,6 +173,7 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
     case "addImageItems": {
       let items = state.items;
       let changed = false;
+      let lastNewId: string | undefined;
       for (const image of action.images) {
         if (items.some((item) => item.assetId === image.assetId)) continue;
         // 带血缘的修改结果放置在源图附近；其余按货架流找空位
@@ -178,10 +181,12 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
           ? items.find((item) => item.assetId === image.referenceAssetId)
           : undefined;
         const slot = source ? placeNear(source, items, 1) : placeNew(items, 1);
+        const id = createItemId();
+        lastNewId = id;
         items = [
           ...items,
           {
-            id: createItemId(),
+            id,
             assetId: image.assetId,
             url: image.url,
             x: slot.x,
@@ -196,7 +201,12 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
         ];
         changed = true;
       }
-      return changed ? { ...state, items } : state;
+      if (!changed) return state;
+      return {
+        ...state,
+        items,
+        ...(action.selectNew && lastNewId ? { selectedId: lastNewId } : {}),
+      };
     }
     case "addPlaceholder": {
       const source = action.referenceAssetId

@@ -10,6 +10,7 @@ import {
   MAX_SCALE,
   MIN_SCALE,
   normalizeCrop,
+  selectedItem,
   type CanvasItem,
   type CanvasState,
 } from "@/lib/canvas/canvas-reducer";
@@ -66,6 +67,24 @@ describe("canvasReducer 基础", () => {
     expect(next.items[1].x).toBe(344); // 源图右侧 320+24
     expect(next.items[1].y).toBe(0);
     expect(next.items[0].x).toBe(0); // 原图不动
+  });
+
+  it("addImageItems selectNew 选中最后新增条目；幂等跳过时不改变选中", () => {
+    let state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [
+        { assetId: "a", url: "/files/a.png" },
+        { assetId: "b", url: "/files/b.png" },
+      ],
+      selectNew: true,
+    });
+    expect(selectedItem(state)?.assetId).toBe("b");
+    state = canvasReducer(state, {
+      type: "addImageItems",
+      images: [{ assetId: "a", url: "/files/a.png" }],
+      selectNew: true,
+    });
+    expect(selectedItem(state)?.assetId).toBe("b");
   });
 
   it("addPlaceholder 生成中占位卡，带引用时邻近放置", () => {

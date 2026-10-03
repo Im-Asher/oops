@@ -21,15 +21,14 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   generate_image: "正在生成图片…",
 };
 
-/** 每会话工作区槽：消息、输入草稿、进行中标记与画布引用（画布引用在创作闭环接线）。 */
+/** 每会话工作区槽：消息、输入草稿与进行中标记（引用即画布选中，不单独存槽）。 */
 interface SessionSlot {
   messages: UIMessage[];
   draft: string;
   busy: boolean;
-  referenceAssetId: string | null;
 }
 
-const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false, referenceAssetId: null };
+const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false };
 
 export default function ChatPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -111,6 +110,38 @@ export default function ChatPage() {
     );
     if (images.length) dispatch({ type: "addImageItems", images });
   }, []);
+
+  // 参考图上传：走 /upload purpose=reference（绑会话资产、不写聊天消息），上画布并选中即引用。
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const uploadReference = useCallback(
+    async (file: File) => {
+      if (!currentId) return;
+      setReferenceError(null);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("purpose", "reference");
+        form.append("sessionId", currentId);
+        const res = await fetch("/upload", { method: "POST", body: form });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => null)) as
+            | { error?: { message?: string } }
+            | null;
+          throw new Error(err?.error?.message ?? `参考图上传失败（${res.status}）`);
+        }
+        const data = (await res.json()) as { assetId: string; url: string };
+        dispatch({
+          type: "addImageItems",
+          images: [{ assetId: data.assetId, url: data.url, name: file.name }],
+          selectNew: true,
+        });
+      } catch (e) {
+        setReferenceError(e instanceof Error ? e.message : "参考图上传失败");
+      }
+    },
+    [currentId],
+  );
 
   const bootstrappedRef = useRef(false);
   const loadSessions = useCallback(async () => {
@@ -287,8 +318,9 @@ export default function ChatPage() {
     const slot = sessionId ? slots[sessionId] : undefined;
     const text = slot?.draft.trim() ?? "";
     if (!sessionId || !slot || !text || slot.busy) return;
-    // 回合快照：本轮引用（画布选中 → 3.5 接多选后为数组）供占位卡血缘与请求体。
-    const roundRefs = slot.referenceAssetId ? [slot.referenceAssetId] : [];
+    // 回合快照：引用 = 画布选中条目（无选中 = 新方案），供占位卡血缘与请求体。
+    const roundRefs =
+      selectedItem(canvas)?.status === "image" ? [selectedItem(canvas)!.assetId] : [];
     updateSlot(sessionId, (s) => ({ ...s, draft: "", busy: true }));
 
     const userMsg: UIMessage = { id: `u${Date.now()}`, role: "user", parts: [{ type: "text", text }] };
@@ -467,6 +499,11 @@ export default function ChatPage() {
     agents.find((a) => a.id === currentSession?.agentId) ??
     agents.find((a) => a.id === agentId);
   const selectedCanvasItem = selectedItem(canvas);
+  // 引用 = 画布选中的图片条目；移除 chip = 取消选中（无选中 = 新方案）。
+  const composerReference =
+    selectedCanvasItem && selectedCanvasItem.status === "image"
+      ? { assetId: selectedCanvasItem.assetId, name: selectedCanvasItem.name ?? "画布图片" }
+      : null;
 
   return (
     <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
@@ -487,6 +524,9 @@ export default function ChatPage() {
           onModeChange={setMode}
           onOpenSessions={() => setDrawerOpen(true)}
           onToggleChat={() => setChatOpen((open) => !open)}
+          {...(currentId
+            ? { onUploadReference: () => fileInputRef.current?.click() }
+            : {})}
         />
 
         {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
@@ -503,8 +543,10 @@ export default function ChatPage() {
             messages={messages}
             onAgentChange={(id) => void handleAgentChange(id)}
             onInputChange={handleInputChange}
+            onRemoveReference={() => dispatch({ type: "select", id: null })}
             onSelectAsset={handleFocusAsset}
             onSend={() => void send()}
+            reference={composerReference}
             selectedAssetId={selectedCanvasItem?.assetId ?? null}
           />
         </div>
@@ -535,11 +577,36 @@ export default function ChatPage() {
                 hasSession={!!currentId}
                 onChange={handleInputChange}
                 onAgentChange={(id) => void handleAgentChange(id)}
+                onRemoveReference={() => dispatch({ type: "select", id: null })}
                 onSend={() => void send()}
+                reference={composerReference}
                 value={currentSlot?.draft ?? ""}
               />
             </div>
           ) : null}
+          {/* 参考图上传失败：画布顶部内联提示，点按消失 */}
+          {referenceError ? (
+            <button
+              className="absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-md bg-red-500/15 px-3 py-1.5 text-xs text-red-300"
+              onClick={() => setReferenceError(null)}
+              type="button"
+            >
+              {referenceError}
+            </button>
+          ) : null}
+          <input
+            accept="image/*"
+            aria-hidden
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadReference(file);
+              e.target.value = "";
+            }}
+            ref={fileInputRef}
+            tabIndex={-1}
+            type="file"
+          />
         </div>
       </div>
 
