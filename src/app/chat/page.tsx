@@ -2,7 +2,6 @@
 
 import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { Composer } from "@/components/chat/floating-composer";
 import { SessionDrawer } from "@/components/workbench/session-drawer";
 import { ToolRail } from "@/components/workbench/tool-rail";
 import { TopBar } from "@/components/workbench/top-bar";
@@ -720,26 +719,6 @@ export default function ChatPage() {
             onResetEdits={handleResetEdits}
             state={canvas}
           />
-          {/* 悬浮输入框：聊天收起后出现（与停靠输入框共享草稿，组件同一套逻辑） */}
-          {!chatOpen && currentId ? (
-            <div className="absolute bottom-4 left-1/2 z-30 hidden w-[min(560px,calc(100%-2rem))] -translate-x-1/2 md:block">
-              <Composer
-                agentId={agentId}
-                agents={agents}
-                busy={busy}
-                floating
-                focusSignal={composerFocusNonce}
-                hasSession={!!currentId}
-                onAttach={() => fileInputRef.current?.click()}
-                onChange={handleInputChange}
-                onAgentChange={(id) => void handleAgentChange(id)}
-                onRemoveReference={() => dispatch({ type: "select", id: null })}
-                onSend={() => void send()}
-                reference={composerReference}
-                value={currentSlot?.draft ?? ""}
-              />
-            </div>
-          ) : null}
           {/* 参考图上传失败：画布顶部内联提示，点按消失 */}
           {referenceError ? (
             <button
