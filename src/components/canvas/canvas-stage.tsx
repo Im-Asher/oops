@@ -16,7 +16,7 @@ import {
   type CropRect,
   type Filters,
 } from "@/lib/canvas/canvas-reducer";
-import { centerViewOn, fitView, zoomAtPoint } from "@/lib/canvas/coords";
+import { centerViewOn, fitView, panView, zoomAtPoint } from "@/lib/canvas/coords";
 import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
 import { itemRect } from "@/lib/canvas/layout";
 import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
@@ -331,11 +331,11 @@ export function CanvasStage({
     if (drag.kind === "pan") {
       dispatch({
         type: "setView",
-        view: {
-          scale: viewRef.current.scale,
-          x: drag.originX + (event.clientX - drag.startX),
-          y: drag.originY + (event.clientY - drag.startY),
-        },
+        view: panView(
+          { scale: viewRef.current.scale, x: drag.originX, y: drag.originY },
+          event.clientX - drag.startX,
+          event.clientY - drag.startY,
+        ),
       });
     } else if (drag.itemId) {
       dispatch({
