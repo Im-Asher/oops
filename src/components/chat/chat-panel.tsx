@@ -23,6 +23,8 @@ interface ChatPanelProps {
   busy: boolean;
   reference?: ComposerReference | null;
   onRemoveReference?: () => void;
+  /** 外部聚焦信号（透传停靠形态输入框）。 */
+  focusSignal?: number;
 }
 
 /**
@@ -44,6 +46,7 @@ export function ChatPanel({
   busy,
   reference,
   onRemoveReference,
+  focusSignal,
 }: ChatPanelProps) {
   return (
     <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#141416]">
@@ -59,6 +62,7 @@ export function ChatPanel({
           agents={agents}
           busy={busy}
           hasSession={hasSession}
+          focusSignal={focusSignal}
           onChange={onInputChange}
           onAgentChange={onAgentChange}
           onSend={onSend}

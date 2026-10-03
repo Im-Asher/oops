@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { shouldSendOnEnter } from "@/lib/chat/keyboard";
 import type { AgentInfo } from "@/types/chat";
 import { ArrowUpIcon, XIcon } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 export interface ComposerReference {
   assetId: string;
@@ -31,6 +31,8 @@ interface ComposerProps {
   /** 当前引用的画布图片（可移除）。 */
   reference?: ComposerReference | null;
   onRemoveReference?: () => void;
+  /** 外部聚焦信号：nonce 变化即聚焦一次（新建会话后带回聊天框）。 */
+  focusSignal?: number;
   /** 悬浮形态（画布底部）加深阴影；定位由父容器负责。 */
   floating?: boolean;
 }
@@ -51,9 +53,16 @@ export function Composer({
   hasSession,
   reference,
   onRemoveReference,
+  focusSignal,
   floating,
 }: ComposerProps) {
   const composingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 聚焦信号 nonce 变化即聚焦；两形态互斥可见，display:none 侧 focus() 为浏览器级 no-op。
+  useEffect(() => {
+    if (focusSignal) textareaRef.current?.focus();
+  }, [focusSignal]);
 
   return (
     <div
@@ -78,6 +87,7 @@ export function Composer({
       ) : null}
       <Textarea
         aria-label="消息输入"
+        ref={textareaRef}
         className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-zinc-50 shadow-none placeholder:text-zinc-500 focus-visible:ring-0"
         disabled={busy || !hasSession}
         onBlur={() => {

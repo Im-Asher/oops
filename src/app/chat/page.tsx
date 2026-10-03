@@ -46,6 +46,8 @@ export default function ChatPage() {
   // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、会话抽屉。
   const [chatOpen, setChatOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 输入框外部聚焦信号：新建会话后带回聊天框（nonce 变化触发聚焦一次）。
+  const [composerFocusNonce, setComposerFocusNonce] = useState(0);
   const [drawerQuery, setDrawerQuery] = useState("");
   // 重命名/删除等会话操作的失败提示（抽屉内联展示）。
   const [actionError, setActionError] = useState<string | null>(null);
@@ -327,6 +329,10 @@ export default function ChatPage() {
       setReveal(null);
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
+      // 新建会话转到聊天框：关抽屉、展开聊天面板并聚焦输入框。
+      setDrawerOpen(false);
+      setChatOpen(true);
+      setComposerFocusNonce((n) => n + 1);
     }
   }
 
@@ -672,6 +678,7 @@ export default function ChatPage() {
             agentId={agentId}
             agents={agents}
             busy={busy}
+            focusSignal={composerFocusNonce}
             hasSession={!!currentId}
             input={currentSlot?.draft ?? ""}
             messages={messages}
@@ -720,6 +727,7 @@ export default function ChatPage() {
                 agents={agents}
                 busy={busy}
                 floating
+                focusSignal={composerFocusNonce}
                 hasSession={!!currentId}
                 onChange={handleInputChange}
                 onAgentChange={(id) => void handleAgentChange(id)}
