@@ -132,6 +132,10 @@ export default function ChatPage() {
           );
         if (image) dispatch({ type: "addImageItems", images: [{ assetId: image.assetId, url: image.url }] });
       }
+      // 窄屏聊天/画布互斥：定位是明确的看图意图，自动切到画布视图。
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+        setChatOpen(false);
+      }
       setFocus({ assetId, nonce: Date.now() });
     },
     [canvas.items, messages],
