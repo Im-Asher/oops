@@ -13,6 +13,8 @@ import {
   isDirty,
   selectedItem,
 } from "@/lib/canvas/canvas-reducer";
+import { centerViewOn, rectVisibleInViewport } from "@/lib/canvas/coords";
+import { itemRect } from "@/lib/canvas/layout";
 import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
@@ -89,6 +91,31 @@ export default function ChatPage() {
 
   // 摘要 chip 定位请求（nonce 驱动 CanvasStage 的定位 effect）。
   const [focus, setFocus] = useState<{ assetId: string; nonce: number } | null>(null);
+  // 新结果提示请求：null 即无提示（结果在视口内静默完成）。
+  const [reveal, setReveal] = useState<{ assetId: string; nonce: number } | null>(null);
+  // 视口判定数据：画布状态镜像（SSE 流闭包内读最新值）与画布包裹层尺寸。
+  const canvasStateRef = useRef(canvas);
+  useEffect(() => {
+    canvasStateRef.current = canvas;
+  }, [canvas]);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+
+  /** "有新结果"chip 点击：以当前缩放定位并选中该结果，同时收起提示。 */
+  function handleRevealClick() {
+    const chip = reveal;
+    setReveal(null);
+    if (!chip) return;
+    const item = canvas.items.find((i) => i.assetId === chip.assetId);
+    const el = canvasWrapRef.current;
+    if (!item || !el) return;
+    const next = centerViewOn(
+      itemRect(item),
+      { width: el.clientWidth, height: el.clientHeight },
+      canvas.view.scale,
+    );
+    dispatch({ type: "select", id: item.id });
+    dispatch({ type: "setView", view: next });
+  }
 
   /**
    * 聊天摘要点击 → 画布定位并选中该 asset。
@@ -271,6 +298,7 @@ export default function ChatPage() {
     dispatch({ type: "clear" });
     // 流式进行中的会话保留本地消息（SSE 持续写入该槽），否则以服务器为准刷新。
     const cached = slots[id];
+    setReveal(null);
     if (cached?.busy) {
       deriveImages(cached.messages);
       restoreWorkspace(id);
@@ -293,6 +321,7 @@ export default function ChatPage() {
       updateSlot(data.id, () => ({ ...EMPTY_SLOT }));
       dispatch({ type: "clear" });
       restoredForRef.current = data.id;
+      setReveal(null);
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
     }
@@ -464,15 +493,31 @@ export default function ChatPage() {
           // 占位卡原位结算：成功换图、失败置失败卡（不在当前会话时由切回后的 deriveImages 重建）。
           if (currentIdRef.current === sessionId) {
             if (event.details?.url) {
+              const newAssetId = String(event.details.assetId ?? "");
               dispatch({
                 type: "patchItem",
                 id: event.id,
                 patch: {
-                  assetId: String(event.details.assetId ?? ""),
+                  assetId: newAssetId,
                   url: String(event.details.url),
                   status: "image",
                 },
               });
+              // 新结果定位提示：结果矩形不在当前视口内才浮 chip（打断与否由用户视角决定）。
+              if (newAssetId) {
+                const st = canvasStateRef.current;
+                const item = st.items.find((i) => i.id === event.id);
+                const el = canvasWrapRef.current;
+                const visible =
+                  item && el
+                    ? rectVisibleInViewport(
+                        itemRect(item),
+                        st.view,
+                        { width: el.clientWidth, height: el.clientHeight },
+                      )
+                    : true;
+                setReveal(visible ? null : { assetId: newAssetId, nonce: Date.now() });
+              }
             } else {
               dispatch({
                 type: "patchItem",
@@ -620,7 +665,19 @@ export default function ChatPage() {
         {/* 画布：工作区主体；聊天收起后扩展占满 */}
         <div
           className={`relative min-w-0 flex-1 ${chatOpen ? "hidden md:block" : "block"}`}
+          ref={canvasWrapRef}
         >
+          {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
+          {reveal ? (
+            <button
+              aria-live="polite"
+              className="absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-100 shadow-lg hover:bg-zinc-800"
+              onClick={handleRevealClick}
+              type="button"
+            >
+              有新结果，点击查看
+            </button>
+          ) : null}
           <CanvasStage
             busy={busy}
             dispatch={dispatch}
@@ -628,9 +685,9 @@ export default function ChatPage() {
             exporting={exporting}
             focus={focus}
             mode={mode}
+            onRetryItem={retryItem}
             onExport={() => void handleExport()}
             onResetEdits={handleResetEdits}
-            onRetryItem={retryItem}
             state={canvas}
           />
           {/* 悬浮输入框：聊天收起后出现（与停靠输入框共享草稿，组件同一套逻辑） */}
