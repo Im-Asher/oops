@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   handleDerivedUpload,
+  handleReferenceUpload,
   handleUpload,
   validateUpload,
 } from "./upload";
@@ -100,6 +101,42 @@ describe("handleDerivedUpload", () => {
       deps,
     );
     expect(res.status).toBe(415);
+    expect(createAsset).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleReferenceUpload", () => {
+  it("落库绑定会话的 kind=image 资产，不追加聊天消息", async () => {
+    const { deps, createAsset, createMessage } = mockDeps();
+    const res = await handleReferenceUpload(
+      { bytes: new Uint8Array([1, 2, 3]), type: "image/jpeg", name: "ref.jpg", sessionId: "sess-1", userId: "u1" },
+      deps as never,
+    );
+    expect(res.status).toBe(201);
+    const assetArg = createAsset.mock.calls[0]?.[0] as {
+      kind: string;
+      sessionId: string;
+      userId: string;
+      meta: Record<string, unknown>;
+    };
+    expect(assetArg.kind).toBe("image");
+    expect(assetArg.sessionId).toBe("sess-1");
+    expect(assetArg.userId).toBe("u1");
+    expect(assetArg.meta.purpose).toBe("reference");
+    expect(assetArg.meta.originalName).toBe("ref.jpg");
+    expect(createMessage).not.toHaveBeenCalled();
+    const body = (await res.json()) as { url: string; assetId: string };
+    expect(body.assetId).toBe("asset-1");
+    expect(body.url).toMatch(/^\/files\//);
+  });
+
+  it("拒绝超限文件（复用同一套校验），不落库", async () => {
+    const { deps, createAsset } = mockDeps();
+    const res = await handleReferenceUpload(
+      { bytes: new Uint8Array(11 * 1024 * 1024), type: "image/png", sessionId: "s", userId: "u1" },
+      deps as never,
+    );
+    expect(res.status).toBe(413);
     expect(createAsset).not.toHaveBeenCalled();
   });
 });

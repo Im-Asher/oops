@@ -70,6 +70,40 @@ export async function handleUpload(
   );
 }
 
+export interface ReferenceUploadInput extends UploadInput {
+  sessionId: string;
+}
+
+/**
+ * 处理参考图上传：复用同一套 MIME/大小校验，落库绑定 sessionId 的 kind=image
+ * 资产，但不追加任何聊天消息——参考图由画布承载，选中后经 /api/chat 引用注入。
+ */
+export async function handleReferenceUpload(
+  input: ReferenceUploadInput,
+  deps: UploadDeps,
+): Promise<Response> {
+  const rejection = validateUpload(input.type, input.bytes.length);
+  if (rejection) {
+    const status = rejection.code === "UNSUPPORTED_TYPE" ? 415 : 413;
+    return Response.json({ error: rejection }, { status });
+  }
+
+  const key = generateAssetKey(extFromMime(input.type));
+  await deps.storage.putObject(key, input.bytes, input.type);
+  const asset = await deps.assets.create({
+    storageKey: key,
+    mimeType: input.type,
+    sessionId: input.sessionId,
+    kind: "image",
+    meta: input.name
+      ? { originalName: input.name, purpose: "reference" }
+      : { purpose: "reference" },
+    userId: input.userId,
+  });
+
+  return Response.json({ url: `/files/${key}`, assetId: asset.id }, { status: 201 });
+}
+
 export interface DerivedUploadInput extends UploadInput {
   sessionId: string;
   /** 源 asset 的 id，用于记录编辑血缘 */
