@@ -35,13 +35,11 @@ interface ComposerProps {
   focusSignal?: number;
   /** 附件上传参考图入口；无会话时不提供（按钮禁用提示）。 */
   onAttach?: () => void;
-  /** 悬浮形态（画布底部）加深阴影；定位由父容器负责。 */
-  floating?: boolean;
 }
 
 /**
- * 双形态输入框：聊天面板底部停靠与画布底部悬浮共用同一组件实例逻辑，
- * 草稿/Agent 选择/引用由页面状态持有，两种形态读写同一份数据。
+ * 聊天输入框：停靠于聊天面板底部（单一形态），
+ * 草稿/Agent 选择/引用由页面状态持有。
  * IME 守卫：中文输入法组合期间的 Enter 不触发发送。
  */
 export function Composer({
@@ -57,22 +55,17 @@ export function Composer({
   onRemoveReference,
   focusSignal,
   onAttach,
-  floating,
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 聚焦信号 nonce 变化即聚焦；两形态互斥可见，display:none 侧 focus() 为浏览器级 no-op。
+  // 聚焦信号 nonce 变化即聚焦一次（新建会话后带回聊天框）。
   useEffect(() => {
     if (focusSignal) textareaRef.current?.focus();
   }, [focusSignal]);
 
   return (
-    <div
-      className={`rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600 ${
-        floating ? "shadow-lg shadow-black/30" : ""
-      }`}
-    >
+    <div className="rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600">
       {reference ? (
         <div className="flex items-center gap-1.5 px-1 pb-1.5">
           <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-300">

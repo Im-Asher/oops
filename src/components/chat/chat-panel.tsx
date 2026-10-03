@@ -1,6 +1,6 @@
 "use client";
 
-import { Composer, type ComposerReference } from "@/components/chat/floating-composer";
+import { Composer, type ComposerReference } from "@/components/chat/composer";
 import { MessageList } from "@/components/chat/message-list";
 import type { AgentInfo, UIMessage } from "@/types/chat";
 
@@ -31,7 +31,7 @@ interface ChatPanelProps {
 
 /**
  * 聊天面板：停靠左侧 340px，展示需求、回复、任务状态与结果摘要。
- * 收起后输入框由页面以悬浮 Composer 呈现于画布底部（同一份草稿与引用）。
+ * 输入框仅存在此停靠形态；收起面板后无任何输入框（草稿由页面状态保留）。
  */
 export function ChatPanel({
   agents,
