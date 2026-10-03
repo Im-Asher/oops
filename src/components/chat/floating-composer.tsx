@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { shouldSendOnEnter } from "@/lib/chat/keyboard";
 import type { AgentInfo } from "@/types/chat";
 import { ArrowUpIcon, XIcon } from "lucide-react";
 import { useRef } from "react";
@@ -90,8 +91,16 @@ export function Composer({
           composingRef.current = true;
         }}
         onKeyDown={(e) => {
-          if (e.key !== "Enter" || e.shiftKey) return;
-          if (composingRef.current || e.nativeEvent.isComposing) return;
+          if (
+            !shouldSendOnEnter({
+              key: e.key,
+              shiftKey: e.shiftKey,
+              isComposing: e.nativeEvent.isComposing,
+              composing: composingRef.current,
+            })
+          ) {
+            return;
+          }
           e.preventDefault();
           onSend();
         }}

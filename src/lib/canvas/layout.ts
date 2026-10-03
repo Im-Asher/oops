@@ -2,8 +2,12 @@
  * 画布自动排布：新结果不覆盖既有作品；带引用的修改在源图附近形成版本列。
  * 纯函数 + 确定性（同输入同输出），便于单测与持久化恢复叠加。
  */
-import { ITEM_GAP, ITEM_WIDTH, type CanvasItem } from "@/lib/canvas/canvas-reducer";
+import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import type { Rect } from "@/lib/canvas/coords";
+
+/** 条目统一显示宽度与间距（画布平面 px）；高度 = width * aspect。 */
+export const ITEM_WIDTH = 320;
+export const ITEM_GAP = 24;
 
 function intersects(a: Rect, b: Rect): boolean {
   return (

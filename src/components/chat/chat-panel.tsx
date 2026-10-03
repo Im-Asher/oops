@@ -2,7 +2,6 @@
 
 import { Composer, type ComposerReference } from "@/components/chat/floating-composer";
 import { MessageList } from "@/components/chat/message-list";
-import type { CanvasImage } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, UIMessage } from "@/types/chat";
 
 interface ChatPanelProps {
@@ -15,9 +14,9 @@ interface ChatPanelProps {
   agentIcon?: string;
   hasSession: boolean;
   messages: UIMessage[];
-  /** 过渡期：单激活图上屏联动（多作品画布落地后移除）。 */
-  activeUrl?: string | null;
-  onActivateImage?: (image: CanvasImage) => void;
+  /** 画布当前选中条目的 assetId（过渡联动：聊天缩略图高亮）。 */
+  selectedAssetId?: string | null;
+  onSelectAsset?: (assetId: string) => void;
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
@@ -37,8 +36,8 @@ export function ChatPanel({
   agentIcon,
   hasSession,
   messages,
-  activeUrl,
-  onActivateImage,
+  selectedAssetId,
+  onSelectAsset,
   input,
   onInputChange,
   onSend,
@@ -49,10 +48,10 @@ export function ChatPanel({
   return (
     <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#101012]">
       <MessageList
-        activeUrl={activeUrl}
         agentIcon={agentIcon}
         messages={messages}
-        onActivateImage={onActivateImage}
+        onSelectAsset={onSelectAsset}
+        selectedAssetId={selectedAssetId}
       />
       <div className="p-3">
         <Composer

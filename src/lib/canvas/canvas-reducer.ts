@@ -3,6 +3,7 @@
  * 画布是统一平面：items 为会话全部作品（含生成占位卡），view 为视图变换，
  * edit（裁剪/滤镜）挂在每个条目上、作用于选中条目——切换选中不丢编辑。
  */
+import { ITEM_WIDTH, placeNear, placeNew } from "@/lib/canvas/layout";
 
 export interface CanvasView {
   scale: number;
@@ -14,9 +15,8 @@ export const DEFAULT_VIEW: CanvasView = { scale: 1, x: 0, y: 0 };
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 4;
 
-/** 条目统一显示宽度（画布平面 px）；高度 = width * aspect。 */
-export const ITEM_WIDTH = 320;
-export const ITEM_GAP = 24;
+// 条目尺寸常量与排布算法归口 layout 模块（ reducer 与 UI 共用，单一真相）。
+export { ITEM_GAP, ITEM_WIDTH } from "@/lib/canvas/layout";
 
 /** 归一化裁剪矩形（相对原图）。 */
 export interface CropRect {
@@ -83,7 +83,12 @@ export const initialCanvasState: CanvasState = {
 };
 
 export type CanvasAction =
-  | { type: "addItems"; items: Array<Omit<CanvasItem, "edit">> }
+  | {
+      type: "addImageItems";
+      /** 消息中的图片派生为画布条目；已有 assetId 的跳过（幂等）。 */
+      images: Array<{ assetId: string; url: string; referenceAssetId?: string; name?: string }>;
+    }
+  | { type: "addPlaceholder"; id: string; referenceAssetId?: string; prompt?: string }
   | { type: "patchItem"; id: string; patch: Partial<Omit<CanvasItem, "id" | "edit">> }
   | { type: "removeItem"; id: string }
   | { type: "moveItem"; id: string; x: number; y: number }
@@ -94,6 +99,12 @@ export type CanvasAction =
   | { type: "setFilters"; id: string; filters: Partial<Filters> }
   | { type: "resetFilters"; id: string }
   | { type: "clear" };
+
+function createItemId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+}
 
 export function defaultEdit(): CanvasEdit {
   return { crop: null, filters: { ...DEFAULT_FILTERS } };
@@ -157,9 +168,55 @@ export function normalizeCrop(rect: CropRect): CropRect | null {
 
 export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
   switch (action.type) {
-    case "addItems": {
-      const items = action.items.map((item) => ({ ...item, edit: defaultEdit() }));
-      return { ...state, items: [...state.items, ...items] };
+    case "addImageItems": {
+      let items = state.items;
+      let changed = false;
+      for (const image of action.images) {
+        if (items.some((item) => item.assetId === image.assetId)) continue;
+        // 带血缘的修改结果放置在源图附近；其余按货架流找空位
+        const source = image.referenceAssetId
+          ? items.find((item) => item.assetId === image.referenceAssetId)
+          : undefined;
+        const slot = source ? placeNear(source, items, 1) : placeNew(items, 1);
+        items = [
+          ...items,
+          {
+            id: createItemId(),
+            assetId: image.assetId,
+            url: image.url,
+            x: slot.x,
+            y: slot.y,
+            width: ITEM_WIDTH,
+            aspect: 1,
+            status: "image",
+            name: image.name,
+            referenceAssetId: image.referenceAssetId,
+            edit: defaultEdit(),
+          },
+        ];
+        changed = true;
+      }
+      return changed ? { ...state, items } : state;
+    }
+    case "addPlaceholder": {
+      const source = action.referenceAssetId
+        ? state.items.find((item) => item.assetId === action.referenceAssetId)
+        : undefined;
+      const slot = source ? placeNear(source, state.items, 1) : placeNew(state.items, 1);
+      const item: CanvasItem = {
+        id: action.id,
+        assetId: "",
+        url: "",
+        x: slot.x,
+        y: slot.y,
+        width: ITEM_WIDTH,
+        aspect: 1,
+        status: "generating",
+        prompt: action.prompt,
+        referenceAssetId: action.referenceAssetId,
+        edit: defaultEdit(),
+      };
+      return { ...state, items: [...state.items, item] };
     }
     case "patchItem": {
       return {

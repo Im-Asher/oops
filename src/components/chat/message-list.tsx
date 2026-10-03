@@ -10,17 +10,17 @@ import {
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
 import { ImageThumbnail } from "@/components/chat/image-thumbnail";
-import type { CanvasImage } from "@/lib/canvas/canvas-reducer";
 import type { UIMessage } from "@/types/chat";
 import { BrainIcon, LoaderCircleIcon, UserIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 interface MessageListProps {
   messages: UIMessage[];
-  activeUrl?: string | null;
+  /** 画布当前选中条目的 assetId（缩略图高亮依据）。 */
+  selectedAssetId?: string | null;
   /** 当前会话所属 Agent 的头像 emoji（assistant 消息徽标）。 */
   agentIcon?: string;
-  onActivateImage?: (image: CanvasImage) => void;
+  onSelectAsset?: (assetId: string) => void;
 }
 
 function AgentAvatar({ icon }: { icon?: string }) {
@@ -84,13 +84,13 @@ function ToolStatusLine({ label }: { label: string }) {
 
 /**
  * 消息渲染：AI Elements Message 容器 + 角色头像 + 进行中反馈。
- * 图片上屏联动与激活高亮行为保持不变。
+ * 图片缩略图点击 = 画布选中对应条目（结果摘要化在创作闭环接入）。
  */
 export function MessageList({
   messages,
-  activeUrl,
+  selectedAssetId,
   agentIcon,
-  onActivateImage,
+  onSelectAsset,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -136,11 +136,9 @@ export function MessageList({
                     case "image":
                       return (
                         <ImageThumbnail
-                          active={activeUrl === p.url}
+                          active={selectedAssetId === p.assetId}
                           key={i}
-                          onActivate={() =>
-                            onActivateImage?.({ assetId: p.assetId, url: p.url })
-                          }
+                          onSelect={() => onSelectAsset?.(p.assetId)}
                           position={imagePositions.get(`${m.id}:${i}`) ?? 0}
                           url={p.url}
                         />

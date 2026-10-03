@@ -1,212 +1,304 @@
 "use client";
 
 import { CanvasEmptyState } from "@/components/canvas/canvas-empty-state";
-import { CropOverlay, type CropArea } from "@/components/canvas/crop-overlay";
+import { CropOverlay } from "@/components/canvas/crop-overlay";
 import { EditToolbar } from "@/components/canvas/edit-toolbar";
 import { FilterPanel } from "@/components/canvas/filter-panel";
 import { ViewToolbar } from "@/components/canvas/view-toolbar";
 import { Button } from "@/components/ui/button";
+import type { CanvasMode } from "@/components/workbench/tool-rail";
 import {
-  clampScale,
+  isItemDirty,
   normalizeCrop,
-  type CanvasImage,
-  type CanvasView,
+  selectedItem,
+  type CanvasAction,
+  type CanvasItem,
+  type CanvasState,
   type CropRect,
   type Filters,
 } from "@/lib/canvas/canvas-reducer";
+import { fitView, zoomAtPoint } from "@/lib/canvas/coords";
 import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
+import { itemRect } from "@/lib/canvas/layout";
+import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const ZOOM_STEP = 1.2;
+/** 点阵网格间距（屏幕 px，随视角缩放）。 */
+const GRID_SIZE = 24;
 
 interface CanvasStageProps {
-  image: CanvasImage | null;
-  view: CanvasView;
-  crop: CropRect | null;
-  filters: Filters;
-  onViewChange: (view: CanvasView) => void;
-  onResetView: () => void;
-  onCropApply: (crop: CropRect) => void;
-  onFiltersChange: (filters: Partial<Filters>) => void;
-  onResetFilters: () => void;
-  dirty: boolean;
-  exporting: boolean;
+  state: CanvasState;
+  dispatch: React.Dispatch<CanvasAction>;
+  mode: CanvasMode;
   busy: boolean;
+  exporting: boolean;
   exportError: string | null;
   onExport: () => void;
   onResetEdits: () => void;
 }
 
-/** 已应用的裁剪用 clip-path 预览：与导出共用同一套归一化坐标。 */
-function clipPathOf(crop: CropRect | null): string | undefined {
-  if (!crop) return undefined;
-  const top = crop.y * 100;
-  const right = (1 - crop.x - crop.width) * 100;
-  const bottom = (1 - crop.y - crop.height) * 100;
-  const left = crop.x * 100;
-  return `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+/** 单条目：图片按裁剪/滤镜预览；生成中/失败为占位卡。 */
+function CanvasItemView({
+  item,
+  selected,
+  interactive,
+  onPointerDown,
+  onImageLoad,
+}: {
+  item: CanvasItem;
+  selected: boolean;
+  interactive: boolean;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => void;
+  onImageLoad: (item: CanvasItem, aspect: number) => void;
+}) {
+  return (
+    <div
+      className={`absolute overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 ${
+        selected ? "ring-2 ring-violet-400" : ""
+      } ${interactive && item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
+      data-item-id={item.id}
+      onPointerDown={(event) => onPointerDown(event, item)}
+      style={{ height: item.width * item.aspect, left: item.x, top: item.y, width: item.width }}
+    >
+      {item.status === "image" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          alt={item.name ?? "画布作品"}
+          className="size-full object-cover"
+          draggable={false}
+          loading="lazy"
+          onLoad={(event) => {
+            const img = event.currentTarget;
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              onImageLoad(item, img.naturalHeight / img.naturalWidth);
+            }
+          }}
+          src={item.url}
+          style={{
+            clipPath: item.edit.crop
+              ? `inset(${item.edit.crop.y * 100}% ${(1 - item.edit.crop.x - item.edit.crop.width) * 100}% ${
+                  (1 - item.edit.crop.y - item.edit.crop.height) * 100
+                }% ${item.edit.crop.x * 100}%)`
+              : undefined,
+            filter: filtersToCssOrNone(item.edit.filters),
+          }}
+        />
+      ) : item.status === "generating" ? (
+        <div className="flex size-full flex-col items-center justify-center gap-2 border-dashed p-3 text-center">
+          <LoaderCircleIcon className="size-5 animate-spin text-zinc-400" />
+          <p className="text-xs text-zinc-300">生成中…</p>
+          {item.prompt ? <p className="line-clamp-2 text-xs text-zinc-500">{item.prompt}</p> : null}
+        </div>
+      ) : (
+        <div className="flex size-full flex-col items-center justify-center gap-2 border-red-900/60 p-3 text-center">
+          <TriangleAlertIcon className="size-5 text-red-400" />
+          <p className="text-xs text-red-200">生成失败</p>
+          {item.errorMessage ? (
+            <p className="line-clamp-2 text-xs text-zinc-500">{item.errorMessage}</p>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
- * 全屏画布：无激活图时空态引导，有激活图时 contain 居中展示。
- * 缩放平移与裁剪预览只改 view / clip，不触碰图片数据。
+ * 多作品画布平面：items 统一渲染在可平移缩放的平面上，点选选中、拖动排版、
+ * 滚轮/按钮缩放与适应全部；裁剪/滤镜作用于选中条目。
+ * 坐标换算与几何算法在 lib/canvas（纯函数），本组件只做事件采集与结果应用。
  */
 export function CanvasStage({
-  image,
-  view,
-  crop,
-  filters,
-  onViewChange,
-  onResetView,
-  onCropApply,
-  onFiltersChange,
-  onResetFilters,
-  dirty,
-  exporting,
+  state,
+  dispatch,
+  mode,
   busy,
+  exporting,
   exportError,
   onExport,
   onResetEdits,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const viewRef = useRef(view);
+  const viewRef = useRef(state.view);
+  const cropSessionRef = useRef(false);
   const [dragging, setDragging] = useState(false);
-  // 裁剪会话绑定激活图 url：换图自动失效，无需在 effect 里重置状态。
-  const [cropSession, setCropSession] = useState<{ url: string; area: CropArea } | null>(null);
+  // 裁剪会话绑定选中条目 id + url：换选中/换图自动失效，无需 effect 重置。
+  const [cropSession, setCropSession] = useState<{ itemId: string; url: string } | null>(null);
   const [draft, setDraft] = useState<CropRect | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const cropping = cropSession !== null && image?.url === cropSession.url;
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
     startY: number;
+    kind: "pan" | "item";
+    itemId?: string;
     originX: number;
     originY: number;
+    scale: number;
   } | null>(null);
+
+  const { items, view, selectedId } = state;
+  const selected = selectedItem(state);
+  const cropItem = cropSession ? items.find((i) => i.id === cropSession.itemId) : undefined;
+  const cropping =
+    !!cropSession && cropItem?.url === cropSession.url && cropItem.status === "image";
 
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
 
-  // 激活图消失时丢弃进行中的拖拽（改 ref 不触发渲染，光标由 dragging && image 推导）。
+  // 裁剪状态镜像到 ref：非被动 wheel 监听闭包内读取，避免每次裁剪开关都重挂监听。
   useEffect(() => {
-    if (!image) dragRef.current = null;
-  }, [image]);
+    cropSessionRef.current = cropping;
+  }, [cropping]);
 
-  /** 以容器坐标 (dx, dy) 为锚点缩放：该点下的图像内容保持不动。 */
-  const zoomAt = useCallback(
-    (nextScale: number, dx: number, dy: number) => {
-      const current = viewRef.current;
-      const clamped = clampScale(nextScale);
-      if (clamped === current.scale) return;
-      const ratio = clamped / current.scale;
-      const next = {
-        scale: clamped,
-        x: dx - (dx - current.x) * ratio,
-        y: dy - (dy - current.y) * ratio,
-      };
-      // 同步回写：高频滚轮事件会在 React commit 前连发，否则会基于同一旧基线重算。
+  // 选中条目消失时丢弃进行中的拖拽（改 ref 不触发渲染）。
+  useEffect(() => {
+    const drag = dragRef.current;
+    if (drag?.kind === "item" && drag.itemId && !items.some((i) => i.id === drag.itemId)) {
+      dragRef.current = null;
+      setDragging(false);
+    }
+  }, [items]);
+
+  /** 以容器中心为锚点缩放（按钮与键盘入口）。 */
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const el = containerRef.current;
+      if (!el || cropSessionRef.current) return;
+      const rect = el.getBoundingClientRect();
+      const next = zoomAtPoint(
+        viewRef.current,
+        viewRef.current.scale * factor,
+        { x: rect.width / 2, y: rect.height / 2 },
+      );
       viewRef.current = next;
-      onViewChange(next);
+      dispatch({ type: "setView", view: next });
     },
-    [onViewChange],
+    [dispatch],
   );
+
+  /** 适应全部条目（无条目时保持当前视图）。 */
+  const fitAll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const next = fitView(
+      items.map(itemRect),
+      { width: rect.width, height: rect.height },
+    );
+    if (next) {
+      viewRef.current = next;
+      dispatch({ type: "setView", view: next });
+    }
+  }, [dispatch, items]);
 
   // React 的 onWheel 是被动监听，无法 preventDefault，故手动挂非被动监听。
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !image || cropping) return;
+    if (!el) return;
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
+      if (cropSessionRef.current) return;
       const rect = el.getBoundingClientRect();
-      const dx = event.clientX - (rect.left + rect.width / 2);
-      const dy = event.clientY - (rect.top + rect.height / 2);
-      zoomAt(viewRef.current.scale * Math.exp(-event.deltaY * 0.0015), dx, dy);
+      const next = zoomAtPoint(
+        viewRef.current,
+        viewRef.current.scale * Math.exp(-event.deltaY * 0.0015),
+        { x: event.clientX - rect.left, y: event.clientY - rect.top },
+      );
+      viewRef.current = next;
+      dispatch({ type: "setView", view: next });
     };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
-  }, [image, cropping, zoomAt]);
+  }, [dispatch]);
 
-  const measureCropArea = useCallback((): CropArea | null => {
-    const img = imgRef.current;
-    const container = containerRef.current;
-    if (!img || !container) return null;
-    const imgRect = img.getBoundingClientRect();
-    const baseRect = container.getBoundingClientRect();
-    if (!imgRect.width || !imgRect.height) return null;
-    return {
-      left: imgRect.left - baseRect.left,
-      top: imgRect.top - baseRect.top,
-      width: imgRect.width,
-      height: imgRect.height,
-    };
-  }, []);
+  // 高频滚轮经 viewRef 同步回写，避免基于同一旧基线重算。
+
+  const handleImageLoad = useCallback(
+    (item: CanvasItem, aspect: number) => {
+      if (Number.isFinite(aspect) && aspect > 0 && Math.abs(aspect - item.aspect) > 0.01) {
+        dispatch({ type: "patchItem", id: item.id, patch: { aspect } });
+      }
+    },
+    [dispatch],
+  );
 
   /**
-   * 进入裁剪前先复位视图：缩放/平移状态下图片有部分在容器外，选区够不到。
-   * 复位后的几何可直接算出（contain 居中、不放大），无需等 React 提交再测量。
+   * 进入裁剪前先适应选中图：裁剪蒙层位于画布平面坐标（随视角变换），
+   * 视角锁定后无需测量与重测；窗口尺寸变化只影响可视比例不影响归一化坐标。
    */
   const startCropping = () => {
-    const img = imgRef.current;
-    const container = containerRef.current;
-    if (!img || !container || !image) return;
-    const base = container.getBoundingClientRect();
-    const naturalWidth = img.naturalWidth || img.offsetWidth;
-    const naturalHeight = img.naturalHeight || img.offsetHeight;
-    if (!naturalWidth || !naturalHeight || !base.width || !base.height) return;
-
-    onResetView();
+    if (!selected || selected.status !== "image") return;
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const next = fitView([itemRect(selected)], { width: rect.width, height: rect.height }, 80);
+    if (next) {
+      viewRef.current = next;
+      dispatch({ type: "setView", view: next });
+    }
     setFiltersOpen(false);
-    const fit = Math.min(1, base.width / naturalWidth, base.height / naturalHeight);
-    const width = naturalWidth * fit;
-    const height = naturalHeight * fit;
-    setCropSession({
-      url: image.url,
-      area: {
-        left: (base.width - width) / 2,
-        top: (base.height - height) / 2,
-        width,
-        height,
-      },
-    });
+    setCropSession({ itemId: selected.id, url: selected.url });
     setDraft(null);
   };
-
-  // 裁剪中窗口尺寸变化会让快照区域与图片错位，需重测。
-  useEffect(() => {
-    if (!cropping) return;
-    const remeasure = () => {
-      const area = measureCropArea();
-      if (area) setCropSession((prev) => (prev ? { ...prev, area } : null));
-    };
-    window.addEventListener("resize", remeasure);
-    return () => window.removeEventListener("resize", remeasure);
-  }, [cropping, measureCropArea]);
 
   const cancelCropping = () => {
     setCropSession(null);
     setDraft(null);
   };
 
-  const closeFilters = useCallback(() => setFiltersOpen(false), []);
-
   const confirmCropping = () => {
-    if (!draft) return;
+    if (!draft || !cropSession) return;
     const normalized = normalizeCrop(draft);
-    if (normalized) onCropApply(normalized);
+    if (normalized) dispatch({ type: "setCrop", id: cropSession.itemId, crop: normalized });
     cancelCropping();
   };
 
+  const handleItemPointerDown = (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => {
+    if (event.button !== 0 || cropping) return;
+    if (mode === "select") {
+      // 点下即选中；select 模式下图片可拖动排版（平移工具下仍走画布平移）。
+      dispatch({ type: "select", id: item.id });
+      if (item.status !== "image") return;
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        kind: "item",
+        itemId: item.id,
+        originX: item.x,
+        originY: item.y,
+        scale: viewRef.current.scale,
+      };
+    } else {
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        kind: "pan",
+        originX: viewRef.current.x,
+        originY: viewRef.current.y,
+        scale: 1,
+      };
+      setDragging(true);
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!image || cropping || event.button !== 0) return;
+    if (event.button !== 0 || cropping) return;
+    // 空白处：select 模式取消选中并支持拖拽平移；pan 模式平移。
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: view.x,
-      originY: view.y,
+      kind: "pan",
+      originX: viewRef.current.x,
+      originY: viewRef.current.y,
+      scale: 1,
     };
+    if (mode === "select") dispatch({ type: "select", id: null });
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -214,11 +306,23 @@ export function CanvasStage({
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    onViewChange({
-      scale: view.scale,
-      x: drag.originX + (event.clientX - drag.startX),
-      y: drag.originY + (event.clientY - drag.startY),
-    });
+    if (drag.kind === "pan") {
+      dispatch({
+        type: "setView",
+        view: {
+          scale: viewRef.current.scale,
+          x: drag.originX + (event.clientX - drag.startX),
+          y: drag.originY + (event.clientY - drag.startY),
+        },
+      });
+    } else if (drag.itemId) {
+      dispatch({
+        type: "moveItem",
+        id: drag.itemId,
+        x: drag.originX + (event.clientX - drag.startX) / drag.scale,
+        y: drag.originY + (event.clientY - drag.startY) / drag.scale,
+      });
+    }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -229,7 +333,6 @@ export function CanvasStage({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!image) return;
     if (cropping) {
       if (event.key === "Escape") {
         cancelCropping();
@@ -237,61 +340,76 @@ export function CanvasStage({
       }
       return;
     }
-    if (event.key === "+" || event.key === "=") zoomAt(view.scale * ZOOM_STEP, 0, 0);
-    else if (event.key === "-" || event.key === "_") zoomAt(view.scale / ZOOM_STEP, 0, 0);
-    else if (event.key === "0") onResetView();
+    if (event.key === "+" || event.key === "=") zoomBy(ZOOM_STEP);
+    else if (event.key === "-" || event.key === "_") zoomBy(1 / ZOOM_STEP);
+    else if (event.key === "0") fitAll();
+    else if (event.key === "Escape") dispatch({ type: "select", id: null });
     else return;
     event.preventDefault();
   };
 
-  /** 1:1：按原始像素显示（相对 contain 适配尺寸的倍率）。 */
-  const handleActualSize = () => {
-    const img = imgRef.current;
-    if (!img?.naturalWidth || !img.offsetWidth) return;
-    onViewChange({ scale: clampScale(img.naturalWidth / img.offsetWidth), x: 0, y: 0 });
-  };
+  const cropArea =
+    cropItem && cropSession
+      ? {
+          left: cropItem.x,
+          top: cropItem.y,
+          width: cropItem.width,
+          height: cropItem.width * cropItem.aspect,
+        }
+      : null;
 
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center overflow-hidden bg-[#0A0A0A] ${
-        image ? "touch-none" : ""
+      className={`absolute inset-0 touch-none overflow-hidden bg-[#0B0B0D] ${
+        dragging ? "cursor-grabbing" : mode === "pan" ? "cursor-grab" : ""
       }`}
+      style={{
+        backgroundImage:
+          "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)",
+        backgroundPosition: `${view.x}px ${view.y}px`,
+        backgroundSize: `${GRID_SIZE * view.scale}px ${GRID_SIZE * view.scale}px`,
+      }}
       onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       ref={containerRef}
-      role={image ? "application" : undefined}
-      aria-label={image ? "画布，可缩放平移" : undefined}
-      tabIndex={image ? 0 : undefined}
+      role="application"
+      aria-label="画布，可缩放、平移与拖动作品"
+      tabIndex={0}
     >
-      {image ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            alt="激活图"
-            className={`max-h-full max-w-full object-contain ${
-              dragging ? "cursor-grabbing" : "cursor-grab"
-            }`}
-            draggable={false}
-            ref={imgRef}
-            src={image.url}
-            style={{
-              transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-              // 裁剪模式下展示整图，便于重新框选
-              clipPath: cropping ? undefined : clipPathOf(crop),
-              // 与导出共用 filtersToCss，故预览与导出视觉一致
-              filter: filtersToCssOrNone(filters),
-            }}
-          />
-          {cropping && cropSession ? (
-            <CropOverlay area={cropSession.area} draft={draft} onDraftChange={setDraft} />
+      {items.length === 0 ? (
+        <CanvasEmptyState />
+      ) : (
+        <div
+          className="absolute left-0 top-0"
+          style={{
+            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+          }}
+        >
+          {items.map((item) => (
+            <CanvasItemView
+              interactive={mode === "select"}
+              item={item}
+              key={item.id}
+              onImageLoad={handleImageLoad}
+              onPointerDown={handleItemPointerDown}
+              selected={item.id === selectedId}
+            />
+          ))}
+          {cropping && cropArea ? (
+            <CropOverlay area={cropArea} draft={draft} onDraftChange={setDraft} />
           ) : null}
+        </div>
+      )}
+
+      {selected && selected.status === "image" ? (
+        <>
           <EditToolbar
             busy={busy}
             cropping={cropping}
-            dirty={dirty}
+            dirty={isItemDirty(selected)}
             exporting={exporting}
             filtersOpen={filtersOpen && !cropping}
             onExport={onExport}
@@ -301,55 +419,56 @@ export function CanvasStage({
           />
           {filtersOpen && !cropping ? (
             <FilterPanel
-              filters={filters}
-              onChange={onFiltersChange}
-              onClose={closeFilters}
-              onReset={onResetFilters}
+              filters={selected.edit.filters as Filters}
+              onChange={(filters) =>
+                dispatch({ type: "setFilters", id: selected.id, filters })
+              }
+              onClose={() => setFiltersOpen(false)}
+              onReset={() => dispatch({ type: "resetFilters", id: selected.id })}
             />
-          ) : null}
-          {cropping ? (
-            <div
-              className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-2 py-1 backdrop-blur"
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <Button
-                className="min-h-11 px-3 text-xs text-zinc-50 hover:bg-zinc-800"
-                onClick={cancelCropping}
-                size="sm"
-                variant="ghost"
-              >
-                取消
-              </Button>
-              <Button
-                className="min-h-11 px-3 text-xs"
-                disabled={!draft}
-                onClick={confirmCropping}
-                size="sm"
-              >
-                确认裁剪
-              </Button>
-            </div>
-          ) : (
-            <ViewToolbar
-              onActualSize={handleActualSize}
-              onFit={onResetView}
-              onZoomIn={() => zoomAt(view.scale * ZOOM_STEP, 0, 0)}
-              onZoomOut={() => zoomAt(view.scale / ZOOM_STEP, 0, 0)}
-              scale={view.scale}
-            />
-          )}
-          {exportError ? (
-            <p
-              className="absolute bottom-4 left-1/2 z-20 max-w-[90%] -translate-x-1/2 rounded-lg border border-red-900/60 bg-red-950/90 px-3 py-2 text-xs text-red-200"
-              role="alert"
-            >
-              {exportError}
-            </p>
           ) : null}
         </>
+      ) : null}
+
+      {cropping ? (
+        <div
+          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-2 py-1 backdrop-blur"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Button
+            className="min-h-11 px-3 text-xs text-zinc-50 hover:bg-zinc-800"
+            onClick={cancelCropping}
+            size="sm"
+            variant="ghost"
+          >
+            取消
+          </Button>
+          <Button
+            className="min-h-11 px-3 text-xs"
+            disabled={!draft}
+            onClick={confirmCropping}
+            size="sm"
+          >
+            确认裁剪
+          </Button>
+        </div>
       ) : (
-        <CanvasEmptyState />
+        <ViewToolbar
+          onFit={fitAll}
+          onZoomIn={() => zoomBy(ZOOM_STEP)}
+          onZoomOut={() => zoomBy(1 / ZOOM_STEP)}
+          scale={view.scale}
+        />
       )}
+
+      {exportError ? (
+        <p
+          className="absolute bottom-16 left-1/2 z-20 max-w-[90%] -translate-x-1/2 rounded-lg border border-red-900/60 bg-red-950/90 px-3 py-2 text-xs text-red-200"
+          role="alert"
+        >
+          {exportError}
+        </p>
+      ) : null}
     </div>
   );
 }

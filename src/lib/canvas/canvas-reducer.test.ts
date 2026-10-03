@@ -42,16 +42,39 @@ describe("canvasReducer 基础", () => {
     expect(initialCanvasState.view).toEqual(DEFAULT_VIEW);
   });
 
-  it("addItems 追加条目并带默认编辑态", () => {
-    const next = canvasReducer(initialCanvasState, {
-      type: "addItems",
-      items: [
-        { id: "x1", assetId: "a", url: "/files/a.png", x: 10, y: 20, width: 320, aspect: 1.5, status: "image" },
-      ],
+  it("addImageItems 追加条目（幂等，按 assetId 去重）", () => {
+    const image = { assetId: "a", url: "/files/a.png" };
+    let state = canvasReducer(initialCanvasState, { type: "addImageItems", images: [image] });
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0]).toMatchObject({ assetId: "a", url: "/files/a.png", status: "image", x: 0, y: 0 });
+    expect(state.items[0].edit).toEqual(defaultEdit());
+    state = canvasReducer(state, { type: "addImageItems", images: [image] });
+    expect(state.items).toHaveLength(1);
+  });
+
+  it("addImageItems 带血缘的修改结果邻近放置且原图保留", () => {
+    const state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a", url: "/files/a.png" }],
     });
-    expect(next.items).toHaveLength(1);
-    expect(next.items[0].edit).toEqual(defaultEdit());
-    expect(next.items[0].x).toBe(10);
+    const next = canvasReducer(state, {
+      type: "addImageItems",
+      images: [{ assetId: "b", url: "/files/b.png", referenceAssetId: "a" }],
+    });
+    expect(next.items).toHaveLength(2);
+    expect(next.items[1].referenceAssetId).toBe("a");
+    expect(next.items[1].x).toBe(344); // 源图右侧 320+24
+    expect(next.items[1].y).toBe(0);
+    expect(next.items[0].x).toBe(0); // 原图不动
+  });
+
+  it("addPlaceholder 生成中占位卡，带引用时邻近放置", () => {
+    const state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a", url: "/files/a.png" }],
+    });
+    const next = canvasReducer(state, { type: "addPlaceholder", id: "ph1", referenceAssetId: "a" });
+    expect(next.items[1]).toMatchObject({ id: "ph1", status: "generating", x: 344, y: 0, assetId: "" });
   });
 
   it("select 更新选中；未选中 null", () => {

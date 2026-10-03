@@ -11,10 +11,7 @@ import {
   canvasReducer,
   initialCanvasState,
   isDirty,
-  type CanvasImage,
-  type CanvasView,
-  type CropRect,
-  type Filters,
+  selectedItem,
 } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -69,30 +66,28 @@ export default function ChatPage() {
     [currentId, updateSlot],
   );
 
-  // dispatch 引用稳定，回调保持同一身份，避免画布每渲染都重挂滚轮监听。
-  const handleViewChange = useCallback(
-    (view: CanvasView) => dispatch({ type: "setView", view }),
-    [],
-  );
-  const handleResetView = useCallback(() => dispatch({ type: "resetView" }), []);
-  const handleCropApply = useCallback(
-    (crop: CropRect) => dispatch({ type: "setCrop", crop }),
-    [],
-  );
-  const handleFiltersChange = useCallback(
-    (filters: Partial<Filters>) => dispatch({ type: "setFilters", filters }),
-    [],
-  );
-  const handleResetFilters = useCallback(() => dispatch({ type: "resetFilters" }), []);
   const handleResetEdits = useCallback(() => {
-    dispatch({ type: "clearCrop" });
-    dispatch({ type: "resetFilters" });
-  }, []);
+    const sel = selectedItem(canvas);
+    if (!sel) return;
+    dispatch({ type: "setCrop", id: sel.id, crop: null });
+    dispatch({ type: "resetFilters", id: sel.id });
+  }, [canvas]);
 
-  // 缩略图上屏（过渡期）：窄屏同时切到画布视图。
-  const handleActivateImage = useCallback((image: CanvasImage) => {
-    dispatch({ type: "activate", image });
-    setChatOpen(false);
+  // 聊天图片点击 → 画布选中对应条目（摘要化前的过渡联动）。
+  const handleSelectAsset = useCallback(
+    (assetId: string) => {
+      const item = canvas.items.find((i) => i.assetId === assetId);
+      if (item) dispatch({ type: "select", id: item.id });
+    },
+    [canvas.items],
+  );
+
+  /** 从会话消息的图片 part 派生画布条目（幂等，按 assetId 去重；placeNew 排布）。 */
+  const deriveImages = useCallback((messages: UIMessage[]) => {
+    const images = messages.flatMap((m) =>
+      m.parts.flatMap((p) => (p.type === "image" ? [{ assetId: p.assetId, url: p.url }] : [])),
+    );
+    if (images.length) dispatch({ type: "addImageItems", images });
   }, []);
 
   const bootstrappedRef = useRef(false);
@@ -119,20 +114,21 @@ export default function ChatPage() {
   );
 
   const handleExport = useCallback(async () => {
-    if (!canvas.active || !currentId || !dirty) return;
+    const sel = selectedItem(canvas);
+    if (!sel || sel.status !== "image" || !currentId || !dirty) return;
     setExporting(true);
     setExportError(null);
     try {
       const { blob, width, height } = await composeEditedImage({
-        url: canvas.active.url,
-        crop: canvas.edit.crop,
-        filters: canvas.edit.filters,
+        url: sel.url,
+        crop: sel.edit.crop,
+        filters: sel.edit.filters,
       });
       const form = new FormData();
       form.append("file", blob, "export.png");
       form.append("sessionId", currentId);
-      form.append("sourceAssetId", canvas.active.assetId);
-      form.append("edits", JSON.stringify({ crop: canvas.edit.crop, filters: canvas.edit.filters }));
+      form.append("sourceAssetId", sel.assetId);
+      form.append("edits", JSON.stringify({ crop: sel.edit.crop, filters: sel.edit.filters }));
       form.append("width", String(width));
       form.append("height", String(height));
       const res = await fetch("/upload", { method: "POST", body: form });
@@ -149,7 +145,7 @@ export default function ChatPage() {
     } finally {
       setExporting(false);
     }
-  }, [canvas.active, canvas.edit.crop, canvas.edit.filters, currentId, loadMessages, handleResetEdits, dirty]);
+  }, [canvas, currentId, loadMessages, handleResetEdits, dirty]);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -174,17 +170,16 @@ export default function ChatPage() {
     // 会话切换即以会话绑定的 Agent 为准（重绑语义的展示面；存量空值回退当前选择）。
     const session = sessions.find((s) => s.id === id);
     if (session?.agentId) setAgentId(session.agentId);
+    // 画布随会话切换重建：从该会话消息图片 part 派生条目（会话级持久化在 4.1 接入）。
+    dispatch({ type: "clear" });
     // 流式进行中的会话保留本地消息（SSE 持续写入该槽），否则以服务器为准刷新。
-    if (slots[id]?.busy) return;
-    const msgs = await loadMessages(id);
-    // 过渡期：激活图回落到最近一张图（多作品画布落地后移除）。
-    const latest = [...msgs]
-      .reverse()
-      .flatMap((m) => m.parts)
-      .find((p) => p.type === "image");
-    if (latest?.type === "image") {
-      dispatch({ type: "activate", image: { assetId: latest.assetId, url: latest.url } });
+    const cached = slots[id];
+    if (cached?.busy) {
+      deriveImages(cached.messages);
+      return;
     }
+    const msgs = await loadMessages(id);
+    deriveImages(msgs);
   }
 
   async function newChat() {
@@ -197,6 +192,7 @@ export default function ChatPage() {
       const data = (await res.json()) as SessionInfo;
       setSessions((s) => [data, ...s]);
       updateSlot(data.id, () => ({ ...EMPTY_SLOT }));
+      dispatch({ type: "clear" });
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
     }
@@ -405,12 +401,13 @@ export default function ChatPage() {
     agents.find((a) => a.id === currentSession?.agentId) ??
     agents.find((a) => a.id === agentId);
   const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
+  const selectedCanvasItem = selectedItem(canvas);
 
   return (
     <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
       <TopBar
         chatVisible={chatOpen}
-        exportEnabled={dirty && !!canvas.active && !!currentId}
+        exportEnabled={dirty && selectedCanvasItem?.status === "image" && !!currentId}
         exporting={exporting}
         onExport={() => void handleExport()}
         onToggleChat={() => setChatOpen((open) => !open)}
@@ -432,7 +429,6 @@ export default function ChatPage() {
           className={`${chatOpen ? "flex" : "hidden"} w-full md:flex md:w-[340px] md:shrink-0`}
         >
           <ChatPanel
-            activeUrl={canvas.active?.url ?? null}
             agentIcon={sessionAgent?.icon}
             agentId={agentId}
             agents={agents}
@@ -440,10 +436,11 @@ export default function ChatPage() {
             hasSession={!!currentId}
             input={currentSlot?.draft ?? ""}
             messages={messages}
-            onActivateImage={handleActivateImage}
             onAgentChange={(id) => void handleAgentChange(id)}
             onInputChange={handleInputChange}
+            onSelectAsset={handleSelectAsset}
             onSend={() => void send()}
+            selectedAssetId={selectedCanvasItem?.assetId ?? null}
           />
         </div>
 
@@ -452,21 +449,14 @@ export default function ChatPage() {
           className={`relative min-w-0 flex-1 ${chatOpen ? "hidden md:block" : "block"}`}
         >
           <CanvasStage
-            crop={canvas.edit.crop}
-            dirty={dirty}
-            exporting={exporting}
             busy={busy}
+            dispatch={dispatch}
             exportError={exportError}
-            filters={canvas.edit.filters}
-            image={canvas.active}
-            onCropApply={handleCropApply}
+            exporting={exporting}
+            mode={mode}
             onExport={() => void handleExport()}
-            onFiltersChange={handleFiltersChange}
             onResetEdits={handleResetEdits}
-            onResetFilters={handleResetFilters}
-            onResetView={handleResetView}
-            onViewChange={handleViewChange}
-            view={canvas.view}
+            state={canvas}
           />
           {/* 悬浮输入框：聊天收起后出现（与停靠输入框共享草稿，组件同一套逻辑） */}
           {!chatOpen && currentId ? (
