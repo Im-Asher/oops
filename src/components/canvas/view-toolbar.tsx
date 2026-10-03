@@ -15,7 +15,7 @@ interface ViewToolbarProps {
 export function ViewToolbar({ scale, onZoomIn, onZoomOut, onFit }: ViewToolbarProps) {
   return (
     <div
-      className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/90 px-1.5 py-1 backdrop-blur"
+      className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 shadow-lg shadow-black/30"
       // 阻止冒泡到画布：否则画布的 setPointerCapture 会吞掉按钮的 click。
       onPointerDown={(event) => event.stopPropagation()}
     >

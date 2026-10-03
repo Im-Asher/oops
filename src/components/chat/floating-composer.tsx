@@ -57,8 +57,8 @@ export function Composer({
 
   return (
     <div
-      className={`rounded-xl border border-zinc-800 bg-[#17171A] p-2 transition-colors focus-within:border-zinc-600 ${
-        floating ? "shadow-lg shadow-black/40" : ""
+      className={`rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600 ${
+        floating ? "shadow-lg shadow-black/30" : ""
       }`}
     >
       {reference ? (

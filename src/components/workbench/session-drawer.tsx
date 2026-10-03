@@ -55,7 +55,7 @@ export function SessionDrawer({
         className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
-      <div className="absolute inset-y-0 left-0 flex w-[280px] shadow-lg shadow-black/40">
+      <div className="absolute inset-y-0 left-0 flex w-[280px] shadow-lg shadow-black/30">
         <SessionSidebar
           agents={agents}
           currentId={currentId}

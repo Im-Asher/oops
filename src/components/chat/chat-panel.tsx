@@ -46,7 +46,7 @@ export function ChatPanel({
   onRemoveReference,
 }: ChatPanelProps) {
   return (
-    <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#101012]">
+    <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#141416]">
       <MessageList
         agentIcon={agentIcon}
         messages={messages}

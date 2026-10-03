@@ -473,7 +473,7 @@ export function CanvasStage({
 
       {cropping ? (
         <div
-          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-2 py-1 backdrop-blur"
+          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 shadow-lg shadow-black/30"
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Button

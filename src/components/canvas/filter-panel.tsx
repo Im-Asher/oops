@@ -40,7 +40,7 @@ export function FilterPanel({ filters, onChange, onReset, onClose }: FilterPanel
   return (
     <div
       aria-label="滤镜面板"
-      className="absolute right-4 top-16 z-20 w-60 space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/95 p-3 backdrop-blur"
+      className="absolute right-4 top-16 z-20 w-60 space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 shadow-lg shadow-black/30"
       onPointerDown={(event) => event.stopPropagation()}
       role="dialog"
     >
