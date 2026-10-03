@@ -14,6 +14,7 @@ import {
   selectedItem,
 } from "@/lib/canvas/canvas-reducer";
 import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
+import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
@@ -47,7 +48,12 @@ export default function ChatPage() {
   const [drawerQuery, setDrawerQuery] = useState("");
   // 重命名/删除等会话操作的失败提示（抽屉内联展示）。
   const [actionError, setActionError] = useState<string | null>(null);
+  // 会话工作区本机持久化：保存状态机（顶栏如实显示）+ 已完成恢复的会话标记。
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoredForRef = useRef<string | null>(null);
   const dirty = isDirty(canvas);
+  const selectedCanvasItem = selectedItem(canvas);
   const currentSlot = currentId ? slots[currentId] : undefined;
   const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
   const busy = currentSlot?.busy ?? false;
@@ -144,6 +150,43 @@ export default function ChatPage() {
     [currentId],
   );
 
+  // 会话工作区本机持久化：画布/草稿变化 300ms 防抖落盘；未完成恢复的会话不写，避免切换瞬间用清空态覆盖。
+  useEffect(() => {
+    if (!currentId || restoredForRef.current !== currentId) return;
+    const snapshot = {
+      positions: Object.fromEntries(
+        canvas.items.map((i) => [i.assetId, { x: i.x, y: i.y }]),
+      ),
+      view: canvas.view,
+      draft: currentSlot?.draft ?? "",
+      referenceAssetId: selectedCanvasItem?.assetId ?? null,
+    };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus("saving");
+    saveTimerRef.current = setTimeout(() => {
+      saveWorkspace(currentId, snapshot);
+      setSaveStatus("saved");
+    }, 300);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [canvas, currentSlot, currentId, selectedCanvasItem]);
+
+  /** 切回会话后贴回本机工作区：位置/视角/草稿/引用选中。 */
+  function restoreWorkspace(id: string) {
+    const snapshot = loadWorkspace(id);
+    if (snapshot) {
+      dispatch({
+        type: "restoreSnapshot",
+        positions: snapshot.positions,
+        view: snapshot.view,
+        referenceAssetId: snapshot.referenceAssetId,
+      });
+      updateSlot(id, (s) => ({ ...s, draft: snapshot.draft }));
+    }
+    restoredForRef.current = id;
+  }
+
   const bootstrappedRef = useRef(false);
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
@@ -230,10 +273,12 @@ export default function ChatPage() {
     const cached = slots[id];
     if (cached?.busy) {
       deriveImages(cached.messages);
+      restoreWorkspace(id);
       return;
     }
     const msgs = await loadMessages(id);
     deriveImages(msgs);
+    restoreWorkspace(id);
   }
 
   async function newChat() {
@@ -247,6 +292,7 @@ export default function ChatPage() {
       setSessions((s) => [data, ...s]);
       updateSlot(data.id, () => ({ ...EMPTY_SLOT }));
       dispatch({ type: "clear" });
+      restoredForRef.current = data.id;
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
     }
@@ -281,6 +327,7 @@ export default function ChatPage() {
       delete next[id];
       return next;
     });
+    clearWorkspace(id);
     const remaining = sessions.filter((s) => s.id !== id);
     setSessions(remaining);
     if (currentId === id) {
@@ -518,7 +565,6 @@ export default function ChatPage() {
   const sessionAgent =
     agents.find((a) => a.id === currentSession?.agentId) ??
     agents.find((a) => a.id === agentId);
-  const selectedCanvasItem = selectedItem(canvas);
   // 引用 = 画布选中的图片条目；移除 chip = 取消选中（无选中 = 新方案）。
   const composerReference =
     selectedCanvasItem && selectedCanvasItem.status === "image"
@@ -533,7 +579,7 @@ export default function ChatPage() {
         exporting={exporting}
         onExport={() => void handleExport()}
         onToggleChat={() => setChatOpen((open) => !open)}
-        saveStatus="idle"
+        saveStatus={saveStatus}
         sessionTitle={currentSession?.title || (currentId ? "未命名会话" : "未选择会话")}
       />
 

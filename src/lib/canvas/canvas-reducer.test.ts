@@ -181,6 +181,26 @@ describe("canvasReducer 视图与编辑", () => {
     expect(state.items[0].edit).toEqual(defaultEdit());
   });
 
+  it("restoreSnapshot 按 assetId 贴回位置/视角，并按 assetId 恢复引用选中", () => {
+    const state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a", url: "/files/a.png" }, { assetId: "b", url: "/files/b.png" }],
+    });
+    const next = canvasReducer(state, {
+      type: "restoreSnapshot",
+      positions: { a: { x: 500, y: 600 } }, // b 不在快照中保持原位
+      view: { x: -100, y: -50, scale: 9 },
+      referenceAssetId: "b",
+    });
+    const a = next.items.find((i) => i.assetId === "a");
+    const b = next.items.find((i) => i.assetId === "b");
+    expect(a).toMatchObject({ x: 500, y: 600 });
+    expect(b?.x).toBe(state.items.find((i) => i.assetId === "b")?.x);
+    expect(next.view.scale).toBe(4); // 越界钳制
+    expect(next.view.x).toBe(-100);
+    expect(next.selectedId).toBe(b?.id);
+  });
+
   it("clear 回到初始状态", () => {
     let state = stateWith(makeItem({ id: "a" }));
     state = canvasReducer(state, { type: "setFilters", id: "a", filters: { brightness: 140 } });

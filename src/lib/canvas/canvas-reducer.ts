@@ -100,6 +100,13 @@ export type CanvasAction =
   | { type: "setCrop"; id: string; crop: CropRect | null }
   | { type: "setFilters"; id: string; filters: Partial<Filters> }
   | { type: "resetFilters"; id: string }
+  | {
+      /** 本机工作区恢复：按 assetId 贴回位置/恢复引用选中并贴回视角。 */
+      type: "restoreSnapshot";
+      positions: Record<string, { x: number; y: number }>;
+      view?: CanvasView;
+      referenceAssetId?: string | null;
+    }
   | { type: "clear" };
 
 function createItemId(): string {
@@ -291,6 +298,22 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
             : item,
         ),
       };
+    case "restoreSnapshot": {
+      const items = state.items.map((item) => {
+        const pos = action.positions[item.assetId];
+        return pos ? { ...item, x: pos.x, y: pos.y } : item;
+      });
+      const refItem = action.referenceAssetId
+        ? items.find((i) => i.assetId === action.referenceAssetId)
+        : undefined;
+      return {
+        ...state,
+        items,
+        view: action.view ? { ...action.view, scale: clampScale(action.view.scale) } : state.view,
+        // 引用即选中：按 assetId 找回派生后的新 item id
+        selectedId: refItem ? refItem.id : state.selectedId,
+      };
+    }
     case "clear":
       return initialCanvasState;
     default:
