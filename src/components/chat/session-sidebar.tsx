@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import type { AgentInfo, SessionInfo } from "@/types/chat";
 import {
   CheckIcon,
-  PanelLeftCloseIcon,
   PencilIcon,
   PlusIcon,
+  SearchIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -21,8 +21,11 @@ interface SessionSidebarProps {
   onNewChat: () => void;
   onRenameSession: (id: string, title: string) => void;
   onDeleteSession: (id: string) => void;
-  /** 折叠侧栏（桌面端由页面重排，移动端关闭抽屉）。 */
+  /** 关闭（抽屉模式下为关闭抽屉）。 */
   onCollapse: () => void;
+  /** 按标题搜索（客户端过滤已加载列表）。 */
+  query: string;
+  onQueryChange: (value: string) => void;
   /** 重命名/删除等操作的失败提示（页内联展示，无 toast 依赖）。 */
   errorMessage?: string | null;
 }
@@ -201,10 +204,18 @@ export function SessionSidebar({
   onRenameSession,
   onDeleteSession,
   onCollapse,
+  query,
+  onQueryChange,
   errorMessage,
 }: SessionSidebarProps) {
+  const keyword = query.trim().toLowerCase();
+  const visible =
+    keyword.length > 0
+      ? sessions.filter((s) => (s.title ?? "").toLowerCase().includes(keyword))
+      : sessions;
+
   return (
-    <aside className="flex h-full w-[260px] shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
+    <aside className="flex h-full w-full shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
       <div className="flex items-center gap-1 p-2">
         <Button
           className="flex-1 justify-start gap-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-800"
@@ -215,18 +226,32 @@ export function SessionSidebar({
           新会话
         </Button>
         <Button
-          aria-label="折叠会话侧栏"
+          aria-label="关闭会话抽屉"
           className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
           onClick={onCollapse}
           size="icon-sm"
           variant="ghost"
         >
-          <PanelLeftCloseIcon />
+          <XIcon />
         </Button>
       </div>
 
+      <div className="relative px-2 pb-2">
+        <SearchIcon
+          aria-hidden
+          className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500"
+        />
+        <Input
+          aria-label="搜索会话"
+          className="h-8 border-zinc-800 bg-zinc-900 pl-7 text-sm text-zinc-50 placeholder:text-zinc-500"
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="搜索会话…"
+          value={query}
+        />
+      </div>
+
       <nav aria-label="会话列表" className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
-        {groupSessions(sessions).map((group) => (
+        {groupSessions(visible).map((group) => (
           <div key={group.label}>
             <p className="px-2 pb-1 text-[11px] uppercase tracking-wide text-zinc-500">
               {group.label}
@@ -250,6 +275,9 @@ export function SessionSidebar({
           <p className="px-2 py-6 text-center text-sm text-zinc-500">
             还没有会话，点击「新会话」开始。
           </p>
+        )}
+        {sessions.length > 0 && visible.length === 0 && (
+          <p className="px-2 py-6 text-center text-sm text-zinc-500">没有匹配的会话。</p>
         )}
       </nav>
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { CanvasStage } from "@/components/canvas/canvas-stage";
-import { ChatColumn } from "@/components/chat/chat-column";
-import { SessionSidebar } from "@/components/chat/session-sidebar";
-import { Button } from "@/components/ui/button";
+import { ChatPanel } from "@/components/chat/chat-panel";
+import { Composer } from "@/components/chat/floating-composer";
+import { SessionDrawer } from "@/components/workbench/session-drawer";
+import { ToolRail, type CanvasMode } from "@/components/workbench/tool-rail";
+import { TopBar } from "@/components/workbench/top-bar";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import {
   canvasReducer,
@@ -15,33 +17,57 @@ import {
   type Filters,
 } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
-import { MessageSquareIcon, PanelLeftOpenIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 /** 工具状态行的展示文案（按工具名；未收录的用通用文案）。 */
 const TOOL_STATUS_LABELS: Record<string, string> = {
   generate_image: "正在生成图片…",
 };
 
+/** 每会话工作区槽：消息、输入草稿、进行中标记与画布引用（画布引用在创作闭环接线）。 */
+interface SessionSlot {
+  messages: UIMessage[];
+  draft: string;
+  busy: boolean;
+  referenceAssetId: string | null;
+}
+
+const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false, referenceAssetId: null };
+
 export default function ChatPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [slots, setSlots] = useState<Record<string, SessionSlot>>({});
   const [agentId, setAgentId] = useState<string>("");
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  // 三栏折叠状态（桌面端重排布局；移动端侧栏走抽屉、画布走浮层）。
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
-  const [mobileCanvasOpen, setMobileCanvasOpen] = useState(false);
-  // 重命名/删除等会话操作的失败提示（侧栏内联展示）。
+  // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、画布模式、会话抽屉。
+  const [chatOpen, setChatOpen] = useState(true);
+  const [mode, setMode] = useState<CanvasMode>("select");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerQuery, setDrawerQuery] = useState("");
+  // 重命名/删除等会话操作的失败提示（抽屉内联展示）。
   const [actionError, setActionError] = useState<string | null>(null);
   const dirty = isDirty(canvas);
+  const currentSlot = currentId ? slots[currentId] : undefined;
+  const busy = currentSlot?.busy ?? false;
+
+  const updateSlot = useCallback((id: string, fn: (slot: SessionSlot) => SessionSlot) => {
+    setSlots((prev) => {
+      const base = prev[id] ?? EMPTY_SLOT;
+      return { ...prev, [id]: fn(base) };
+    });
+  }, []);
+
+  const handleInputChange = useCallback(
+    (value: string) => {
+      if (!currentId) return;
+      updateSlot(currentId, (slot) => ({ ...slot, draft: value }));
+    },
+    [currentId, updateSlot],
+  );
 
   // dispatch 引用稳定，回调保持同一身份，避免画布每渲染都重挂滚轮监听。
   const handleViewChange = useCallback(
@@ -63,31 +89,34 @@ export default function ChatPage() {
     dispatch({ type: "resetFilters" });
   }, []);
 
-  // 缩略图上屏：移动端同时唤起画布浮层（画布列在窄屏不可见）。
+  // 缩略图上屏（过渡期）：窄屏同时切到画布视图。
   const handleActivateImage = useCallback((image: CanvasImage) => {
     dispatch({ type: "activate", image });
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      setMobileCanvasOpen(true);
-    }
+    setChatOpen(false);
   }, []);
 
+  const bootstrappedRef = useRef(false);
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
-    if (res.ok) {
-      const data = (await res.json()) as { sessions: SessionInfo[] };
-      setSessions(data.sessions);
-      if (!currentId && data.sessions[0]) setCurrentId(data.sessions[0].id);
+    if (!res.ok) return;
+    const data = (await res.json()) as { sessions: SessionInfo[] };
+    setSessions(data.sessions);
+    if (!bootstrappedRef.current) {
+      bootstrappedRef.current = true;
+      if (data.sessions[0]) setCurrentId(data.sessions[0].id);
     }
-  }, [currentId]);
-
-  // 仅拉取会话消息（不切视图/激活），用于导出后刷新聊天里的派生图消息。
-  const loadMessages = useCallback(async (id: string): Promise<UIMessage[]> => {
-    const res = await fetch(`/api/sessions/${id}`);
-    if (!res.ok) return [];
-    const data = (await res.json()) as { messages: UIMessage[] };
-    setMessages(data.messages);
-    return data.messages;
   }, []);
+
+  const loadMessages = useCallback(
+    async (id: string): Promise<UIMessage[]> => {
+      const res = await fetch(`/api/sessions/${id}`);
+      if (!res.ok) return [];
+      const data = (await res.json()) as { messages: UIMessage[] };
+      updateSlot(id, (slot) => ({ ...slot, messages: data.messages }));
+      return data.messages;
+    },
+    [updateSlot],
+  );
 
   const handleExport = useCallback(async () => {
     if (!canvas.active || !currentId || !dirty) return;
@@ -131,7 +160,7 @@ export default function ChatPage() {
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadSessions();
+    void loadSessions();
   }, [loadSessions]);
 
   useEffect(() => {
@@ -141,13 +170,14 @@ export default function ChatPage() {
   }, [currentId]);
 
   async function selectSession(id: string) {
-    dispatch({ type: "clear" });
     setCurrentId(id);
     // 会话切换即以会话绑定的 Agent 为准（重绑语义的展示面；存量空值回退当前选择）。
     const session = sessions.find((s) => s.id === id);
     if (session?.agentId) setAgentId(session.agentId);
+    // 流式进行中的会话保留本地消息（SSE 持续写入该槽），否则以服务器为准刷新。
+    if (slots[id]?.busy) return;
     const msgs = await loadMessages(id);
-    // 加载会话时把激活图回落到最近一张图；不持久化视图状态（design Non-Goals）。
+    // 过渡期：激活图回落到最近一张图（多作品画布落地后移除）。
     const latest = [...msgs]
       .reverse()
       .flatMap((m) => m.parts)
@@ -155,7 +185,6 @@ export default function ChatPage() {
     if (latest?.type === "image") {
       dispatch({ type: "activate", image: { assetId: latest.assetId, url: latest.url } });
     }
-    setMobileCanvasOpen(false);
   }
 
   async function newChat() {
@@ -167,8 +196,7 @@ export default function ChatPage() {
     if (res.ok) {
       const data = (await res.json()) as SessionInfo;
       setSessions((s) => [data, ...s]);
-      setMessages([]);
-      dispatch({ type: "clear" });
+      updateSlot(data.id, () => ({ ...EMPTY_SLOT }));
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
     }
@@ -198,6 +226,11 @@ export default function ChatPage() {
       setActionError("删除失败（资产清理未完成），请重试");
       return;
     }
+    setSlots((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     const remaining = sessions.filter((s) => s.id !== id);
     setSessions(remaining);
     if (currentId === id) {
@@ -205,7 +238,6 @@ export default function ChatPage() {
         void selectSession(remaining[0].id);
       } else {
         setCurrentId(null);
-        setMessages([]);
         dispatch({ type: "clear" });
       }
     }
@@ -233,21 +265,24 @@ export default function ChatPage() {
   }
 
   async function send() {
-    if (!input.trim() || !currentId || busy) return;
-    const text = input.trim();
-    setInput("");
-    setBusy(true);
+    const sessionId = currentId;
+    const slot = sessionId ? slots[sessionId] : undefined;
+    const text = slot?.draft.trim() ?? "";
+    if (!sessionId || !slot || !text || slot.busy) return;
+    updateSlot(sessionId, (s) => ({ ...s, draft: "", busy: true }));
 
     const userMsg: UIMessage = { id: `u${Date.now()}`, role: "user", parts: [{ type: "text", text }] };
-    const assistantMsg: UIMessage = { id: `a${Date.now()}`, role: "assistant", parts: [] };
-    setMessages((m) => [...m, userMsg, assistantMsg]);
+    const assistantId = `a${Date.now()}`;
+    const assistantMsg: UIMessage = { id: assistantId, role: "assistant", parts: [] };
+    updateSlot(sessionId, (s) => ({ ...s, messages: [...s.messages, userMsg, assistantMsg] }));
 
     const updateAssistant = (fn: (parts: UIMessage["parts"]) => UIMessage["parts"]) =>
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === assistantMsg.id ? { ...msg, parts: fn(msg.parts) } : msg,
+      updateSlot(sessionId, (s) => ({
+        ...s,
+        messages: s.messages.map((msg) =>
+          msg.id === assistantId ? { ...msg, parts: fn(msg.parts) } : msg,
         ),
-      );
+      }));
 
     const appendText = (delta: string) =>
       updateAssistant((parts) => [...parts, { type: "text", text: delta }]);
@@ -255,11 +290,11 @@ export default function ChatPage() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: currentId, agentId, message: text }),
+      body: JSON.stringify({ sessionId, agentId, message: text }),
     });
 
     if (!res.body) {
-      setBusy(false);
+      updateSlot(sessionId, (s) => ({ ...s, busy: false }));
       return;
     }
 
@@ -360,7 +395,7 @@ export default function ChatPage() {
         }
       }
     }
-    setBusy(false);
+    updateSlot(sessionId, (s) => ({ ...s, busy: false }));
     // 回合结束后刷新会话列表（首条消息自动标题 / updatedAt 排序）。
     void loadSessions();
   }
@@ -369,140 +404,103 @@ export default function ChatPage() {
   const sessionAgent =
     agents.find((a) => a.id === currentSession?.agentId) ??
     agents.find((a) => a.id === agentId);
-
-  const canvasElement = (
-    <CanvasStage
-      crop={canvas.edit.crop}
-      dirty={dirty}
-      exporting={exporting}
-      busy={busy}
-      exportError={exportError}
-      filters={canvas.edit.filters}
-      image={canvas.active}
-      onCropApply={handleCropApply}
-      onExport={handleExport}
-      onFiltersChange={handleFiltersChange}
-      onResetEdits={handleResetEdits}
-      onResetFilters={handleResetFilters}
-      onResetView={handleResetView}
-      onViewChange={handleViewChange}
-      view={canvas.view}
-    />
-  );
-
-  const sidebar = (
-    <SessionSidebar
-      agents={agents}
-      currentId={currentId}
-      errorMessage={actionError}
-      sessions={sessions}
-      onDeleteSession={(id) => void deleteSession(id)}
-      onCollapse={() => {
-        setSidebarCollapsed(true);
-        setSidebarDrawerOpen(false);
-      }}
-      onNewChat={() => void newChat()}
-      onRenameSession={(id, title) => void renameSession(id, title)}
-      onSelectSession={(id) => void selectSession(id)}
-    />
-  );
+  const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
 
   return (
-    <main className="dark fixed inset-0 flex overflow-hidden bg-[#0A0A0A] text-zinc-50">
-      {/* 桌面：会话侧栏（可折叠） */}
-      {!sidebarCollapsed && <div className="hidden md:flex">{sidebar}</div>}
+    <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
+      <TopBar
+        chatVisible={chatOpen}
+        exportEnabled={dirty && !!canvas.active && !!currentId}
+        exporting={exporting}
+        onExport={() => void handleExport()}
+        onToggleChat={() => setChatOpen((open) => !open)}
+        saveStatus="idle"
+        sessionTitle={currentSession?.title || (currentId ? "未命名会话" : "未选择会话")}
+      />
 
-      {/* 移动端：会话抽屉（overlay） */}
-      {sidebarDrawerOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
-            aria-label="关闭会话抽屉"
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setSidebarDrawerOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 flex">{sidebar}</div>
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1">
+        <ToolRail
+          chatVisible={chatOpen}
+          mode={mode}
+          onModeChange={setMode}
+          onOpenSessions={() => setDrawerOpen(true)}
+          onToggleChat={() => setChatOpen((open) => !open)}
+        />
 
-      {/* 聊天列（移动端占满，桌面与画布分栏） */}
-      {!chatCollapsed && (
-        <div className="w-full md:w-auto md:min-w-0 md:flex-1">
-          <ChatColumn
+        {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
+        <div
+          className={`${chatOpen ? "flex" : "hidden"} w-full md:flex md:w-[340px] md:shrink-0`}
+        >
+          <ChatPanel
             activeUrl={canvas.active?.url ?? null}
             agentIcon={sessionAgent?.icon}
             agentId={agentId}
             agents={agents}
             busy={busy}
             hasSession={!!currentId}
-            input={input}
+            input={currentSlot?.draft ?? ""}
             messages={messages}
             onActivateImage={handleActivateImage}
             onAgentChange={(id) => void handleAgentChange(id)}
-            onCollapse={() => setChatCollapsed(true)}
-            onInputChange={setInput}
-            onOpenSidebar={() => setSidebarDrawerOpen(true)}
+            onInputChange={handleInputChange}
             onSend={() => void send()}
-            sessionTitle={currentSession?.title || "新会话"}
           />
         </div>
-      )}
 
-      {/* 桌面：画布列 */}
-      <div className="relative hidden min-w-0 flex-1 md:block">{canvasElement}</div>
-
-      {/* 折叠面板的一键唤回（桌面端） */}
-      {(sidebarCollapsed || chatCollapsed) && (
-        <div className="absolute left-3 top-3 z-30 hidden gap-1 md:flex">
-          {sidebarCollapsed && (
-            <Button
-              aria-label="展开会话侧栏"
-              className="min-h-11 min-w-11 bg-zinc-900 text-zinc-50 hover:bg-zinc-800"
-              onClick={() => setSidebarCollapsed(false)}
-              size="icon"
-              variant="secondary"
-            >
-              <PanelLeftOpenIcon />
-            </Button>
-          )}
-          {chatCollapsed && (
-            <Button
-              aria-label="展开聊天列"
-              className="min-h-11 min-w-11 bg-zinc-900 text-zinc-50 hover:bg-zinc-800"
-              onClick={() => setChatCollapsed(false)}
-              size="icon"
-              variant="secondary"
-            >
-              <MessageSquareIcon />
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* 移动端：画布浮层 + 唤起入口 */}
-      {canvas.active && !mobileCanvasOpen && (
-        <Button
-          aria-label="查看画布"
-          className="fixed bottom-4 right-4 z-30 rounded-full md:hidden"
-          onClick={() => setMobileCanvasOpen(true)}
-          variant="secondary"
+        {/* 画布：工作区主体；聊天收起后扩展占满 */}
+        <div
+          className={`relative min-w-0 flex-1 ${chatOpen ? "hidden md:block" : "block"}`}
         >
-          查看画布
-        </Button>
-      )}
-      {mobileCanvasOpen && canvas.active && (
-        <div className="fixed inset-0 z-40 bg-[#0A0A0A] md:hidden">
-          <Button
-            aria-label="关闭画布"
-            className="absolute right-3 top-3 z-50 min-h-11 min-w-11 bg-zinc-900 text-zinc-50 hover:bg-zinc-800"
-            onClick={() => setMobileCanvasOpen(false)}
-            size="icon"
-            variant="secondary"
-          >
-            <XIcon />
-          </Button>
-          {canvasElement}
+          <CanvasStage
+            crop={canvas.edit.crop}
+            dirty={dirty}
+            exporting={exporting}
+            busy={busy}
+            exportError={exportError}
+            filters={canvas.edit.filters}
+            image={canvas.active}
+            onCropApply={handleCropApply}
+            onExport={() => void handleExport()}
+            onFiltersChange={handleFiltersChange}
+            onResetEdits={handleResetEdits}
+            onResetFilters={handleResetFilters}
+            onResetView={handleResetView}
+            onViewChange={handleViewChange}
+            view={canvas.view}
+          />
+          {/* 悬浮输入框：聊天收起后出现（与停靠输入框共享草稿，组件同一套逻辑） */}
+          {!chatOpen && currentId ? (
+            <div className="absolute bottom-4 left-1/2 z-30 hidden w-[min(560px,calc(100%-2rem))] -translate-x-1/2 md:block">
+              <Composer
+                agentId={agentId}
+                agents={agents}
+                busy={busy}
+                floating
+                hasSession={!!currentId}
+                onChange={handleInputChange}
+                onAgentChange={(id) => void handleAgentChange(id)}
+                onSend={() => void send()}
+                value={currentSlot?.draft ?? ""}
+              />
+            </div>
+          ) : null}
         </div>
-      )}
+      </div>
+
+      <SessionDrawer
+        agents={agents}
+        currentId={currentId}
+        errorMessage={actionError}
+        onClose={() => setDrawerOpen(false)}
+        onDeleteSession={(id) => void deleteSession(id)}
+        onNewChat={() => void newChat()}
+        onQueryChange={setDrawerQuery}
+        onRenameSession={(id, title) => void renameSession(id, title)}
+        onSelectSession={(id) => void selectSession(id)}
+        open={drawerOpen}
+        query={drawerQuery}
+        sessions={sessions}
+      />
     </main>
   );
 }
