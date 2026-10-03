@@ -11,7 +11,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { shouldSendOnEnter } from "@/lib/chat/keyboard";
 import type { AgentInfo } from "@/types/chat";
-import { ArrowUpIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, PaperclipIcon, XIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 export interface ComposerReference {
@@ -33,6 +33,8 @@ interface ComposerProps {
   onRemoveReference?: () => void;
   /** 外部聚焦信号：nonce 变化即聚焦一次（新建会话后带回聊天框）。 */
   focusSignal?: number;
+  /** 附件上传参考图入口；无会话时不提供（按钮禁用提示）。 */
+  onAttach?: () => void;
   /** 悬浮形态（画布底部）加深阴影；定位由父容器负责。 */
   floating?: boolean;
 }
@@ -54,6 +56,7 @@ export function Composer({
   reference,
   onRemoveReference,
   focusSignal,
+  onAttach,
   floating,
 }: ComposerProps) {
   const composingRef = useRef(false);
@@ -119,25 +122,38 @@ export function Composer({
         value={value}
       />
       <div className="flex items-center justify-between pt-1">
-        <Select onValueChange={onAgentChange} value={agentId}>
-          <SelectTrigger
-            aria-label="选择 Agent"
-            className="w-auto gap-1.5 border-0 bg-transparent px-2 text-xs text-zinc-300 shadow-none hover:bg-zinc-800"
-            size="sm"
+        <div className="flex items-center gap-0.5">
+          <Button
+            aria-label={onAttach ? "上传参考图" : "先创建会话后可上传参考图"}
+            className="size-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            disabled={!onAttach}
+            onClick={onAttach}
+            size="icon-sm"
+            title={onAttach ? "上传参考图" : "先创建会话后可上传参考图"}
+            variant="ghost"
           >
-            <SelectValue placeholder="选择 Agent" />
-          </SelectTrigger>
-          <SelectContent className="bg-zinc-900 text-zinc-50">
-            {agents.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                <span className="flex items-center gap-2">
-                  <span aria-hidden>{a.icon}</span>
-                  {a.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <PaperclipIcon />
+          </Button>
+          <Select onValueChange={onAgentChange} value={agentId}>
+            <SelectTrigger
+              aria-label="选择 Agent"
+              className="w-auto gap-1.5 border-0 bg-transparent px-2 text-xs text-zinc-300 shadow-none hover:bg-zinc-800"
+              size="sm"
+            >
+              <SelectValue placeholder="选择 Agent" />
+            </SelectTrigger>
+            <SelectContent className="bg-zinc-900 text-zinc-50">
+              {agents.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <span className="flex items-center gap-2">
+                    <span aria-hidden>{a.icon}</span>
+                    {a.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           aria-label="发送"
           className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"

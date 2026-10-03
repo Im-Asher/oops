@@ -680,6 +680,7 @@ export default function ChatPage() {
             busy={busy}
             focusSignal={composerFocusNonce}
             hasSession={!!currentId}
+            {...(currentId ? { onAttach: () => fileInputRef.current?.click() } : {})}
             input={currentSlot?.draft ?? ""}
             messages={messages}
             onAgentChange={(id) => void handleAgentChange(id)}
@@ -729,6 +730,7 @@ export default function ChatPage() {
                 floating
                 focusSignal={composerFocusNonce}
                 hasSession={!!currentId}
+                onAttach={() => fileInputRef.current?.click()}
                 onChange={handleInputChange}
                 onAgentChange={(id) => void handleAgentChange(id)}
                 onRemoveReference={() => dispatch({ type: "select", id: null })}

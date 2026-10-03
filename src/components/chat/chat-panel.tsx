@@ -25,6 +25,8 @@ interface ChatPanelProps {
   onRemoveReference?: () => void;
   /** 外部聚焦信号（透传停靠形态输入框）。 */
   focusSignal?: number;
+  /** 附件上传参考图入口（透传停靠形态输入框）。 */
+  onAttach?: () => void;
 }
 
 /**
@@ -47,6 +49,7 @@ export function ChatPanel({
   reference,
   onRemoveReference,
   focusSignal,
+  onAttach,
 }: ChatPanelProps) {
   return (
     <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#141416]">
@@ -63,6 +66,7 @@ export function ChatPanel({
           busy={busy}
           hasSession={hasSession}
           focusSignal={focusSignal}
+          onAttach={onAttach}
           onChange={onInputChange}
           onAgentChange={onAgentChange}
           onSend={onSend}
