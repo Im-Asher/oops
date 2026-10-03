@@ -282,7 +282,7 @@ oops/
 │   │       └── tools/              # ToolRegistry（ToolExecutionContext 注入 userId）+ 工具实现
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
 │   │   ├── canvas/                 # 画布工作台（多作品平面 stage / 编辑工具条 / 滤镜面板 / 裁剪 / 空态）
-│   │   ├── workbench/              # 工作台骨架（顶栏 / 56px 工具条 / 会话抽屉）
+│   │   ├── workbench/              # 工作台骨架（顶栏（会话名/保存状态/导出）/ 56px 工具条（会话抽屉、聊天显隐、底部用户入口）/ 会话抽屉）
 │   │   └── chat/                   # 聊天面板与消息渲染（摘要 chip / 双形态 composer）
 │   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储 + 单测）
 │   └── types/                      # 共享 TypeScript 类型
