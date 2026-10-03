@@ -1,5 +1,6 @@
 "use client";
 
+import { UserMenu } from "@/components/chat/user-menu";
 import { Button } from "@/components/ui/button";
 import { FolderOpenIcon, MessageSquareIcon } from "lucide-react";
 
@@ -37,6 +38,9 @@ export function ToolRail({ onOpenSessions, chatVisible, onToggleChat }: ToolRail
       >
         <MessageSquareIcon />
       </Button>
+      <div className="mt-auto">
+        <UserMenu />
+      </div>
     </nav>
   );
 }

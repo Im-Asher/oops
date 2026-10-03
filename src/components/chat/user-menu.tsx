@@ -22,7 +22,7 @@ interface ProfileSummary {
 }
 
 /**
- * 顶栏用户入口：账号摘要（只读：昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
+ * 工具条底部用户入口：账号摘要（只读：昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
  * 用户名仅在 /profile 页展示。摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
  */
 export function UserMenu() {
@@ -62,8 +62,8 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="用户菜单"
-          className="min-h-11 min-w-11 rounded-full text-zinc-50 hover:bg-zinc-800"
-          size="icon-sm"
+          className="size-10 rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
+          size="icon"
           variant="ghost"
         >
           {initial ? (
@@ -76,7 +76,7 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align="start"
         className="w-52 border-zinc-800 bg-zinc-900 text-zinc-50"
       >
         {profile ? (
