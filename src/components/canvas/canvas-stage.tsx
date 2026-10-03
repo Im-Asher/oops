@@ -6,7 +6,6 @@ import { EditToolbar } from "@/components/canvas/edit-toolbar";
 import { FilterPanel } from "@/components/canvas/filter-panel";
 import { ViewToolbar } from "@/components/canvas/view-toolbar";
 import { Button } from "@/components/ui/button";
-import type { CanvasMode } from "@/components/workbench/tool-rail";
 import {
   isItemDirty,
   normalizeCrop,
@@ -30,7 +29,6 @@ const GRID_SIZE = 24;
 interface CanvasStageProps {
   state: CanvasState;
   dispatch: React.Dispatch<CanvasAction>;
-  mode: CanvasMode;
   busy: boolean;
   exporting: boolean;
   exportError: string | null;
@@ -46,14 +44,12 @@ interface CanvasStageProps {
 function CanvasItemView({
   item,
   selected,
-  interactive,
   onPointerDown,
   onImageLoad,
   onRetry,
 }: {
   item: CanvasItem;
   selected: boolean;
-  interactive: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => void;
   onImageLoad: (item: CanvasItem, aspect: number) => void;
   onRetry?: (item: CanvasItem) => void;
@@ -62,7 +58,7 @@ function CanvasItemView({
     <div
       className={`absolute overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 ${
         selected ? "ring-2 ring-violet-400" : ""
-      } ${interactive && item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
+      } ${item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
       data-item-id={item.id}
       onPointerDown={(event) => onPointerDown(event, item)}
       style={{ height: item.width * item.aspect, left: item.x, top: item.y, width: item.width }}
@@ -132,7 +128,6 @@ function CanvasItemView({
 export function CanvasStage({
   state,
   dispatch,
-  mode,
   busy,
   exporting,
   exportError,
@@ -297,38 +292,25 @@ export function CanvasStage({
 
   const handleItemPointerDown = (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => {
     if (event.button !== 0 || cropping) return;
-    if (mode === "select") {
-      // 点下即选中；select 模式下图片可拖动排版（平移工具下仍走画布平移）。
-      dispatch({ type: "select", id: item.id });
-      if (item.status !== "image") return;
-      dragRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        kind: "item",
-        itemId: item.id,
-        originX: item.x,
-        originY: item.y,
-        scale: viewRef.current.scale,
-      };
-    } else {
-      dragRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        kind: "pan",
-        originX: viewRef.current.x,
-        originY: viewRef.current.y,
-        scale: 1,
-      };
-      setDragging(true);
-    }
+    // 点下即选中；图片可拖动排版，画布平移走空白区域拖拽。
+    dispatch({ type: "select", id: item.id });
+    if (item.status !== "image") return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      kind: "item",
+      itemId: item.id,
+      originX: item.x,
+      originY: item.y,
+      scale: viewRef.current.scale,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || cropping) return;
-    // 空白处：select 模式取消选中并支持拖拽平移；pan 模式平移。
+    // 空白处：取消选中并拖拽平移画布。
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -338,7 +320,7 @@ export function CanvasStage({
       originY: viewRef.current.y,
       scale: 1,
     };
-    if (mode === "select") dispatch({ type: "select", id: null });
+    dispatch({ type: "select", id: null });
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -401,7 +383,7 @@ export function CanvasStage({
   return (
     <div
       className={`absolute inset-0 touch-none overflow-hidden bg-[#0B0B0D] ${
-        dragging ? "cursor-grabbing" : mode === "pan" ? "cursor-grab" : ""
+        dragging ? "cursor-grabbing" : ""
       }`}
       style={{
         backgroundImage:
@@ -430,7 +412,6 @@ export function CanvasStage({
         >
           {items.map((item) => (
             <CanvasItemView
-              interactive={mode === "select"}
               item={item}
               key={item.id}
               onImageLoad={handleImageLoad}

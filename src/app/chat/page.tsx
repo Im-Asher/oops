@@ -4,7 +4,7 @@ import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { Composer } from "@/components/chat/floating-composer";
 import { SessionDrawer } from "@/components/workbench/session-drawer";
-import { ToolRail, type CanvasMode } from "@/components/workbench/tool-rail";
+import { ToolRail } from "@/components/workbench/tool-rail";
 import { TopBar } from "@/components/workbench/top-bar";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import {
@@ -43,9 +43,8 @@ export default function ChatPage() {
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、画布模式、会话抽屉。
+  // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、会话抽屉。
   const [chatOpen, setChatOpen] = useState(true);
-  const [mode, setMode] = useState<CanvasMode>("select");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerQuery, setDrawerQuery] = useState("");
   // 重命名/删除等会话操作的失败提示（抽屉内联展示）。
@@ -660,13 +659,8 @@ export default function ChatPage() {
       <div className="flex min-h-0 flex-1">
         <ToolRail
           chatVisible={chatOpen}
-          mode={mode}
-          onModeChange={setMode}
           onOpenSessions={() => setDrawerOpen(true)}
           onToggleChat={() => setChatOpen((open) => !open)}
-          {...(currentId
-            ? { onUploadReference: () => fileInputRef.current?.click() }
-            : {})}
         />
 
         {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
@@ -713,7 +707,6 @@ export default function ChatPage() {
             exportError={exportError}
             exporting={exporting}
             focus={focus}
-            mode={mode}
             onRetryItem={retryItem}
             onExport={() => void handleExport()}
             onResetEdits={handleResetEdits}
