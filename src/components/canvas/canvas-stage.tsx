@@ -17,7 +17,7 @@ import {
   type CropRect,
   type Filters,
 } from "@/lib/canvas/canvas-reducer";
-import { fitView, zoomAtPoint } from "@/lib/canvas/coords";
+import { centerViewOn, fitView, zoomAtPoint } from "@/lib/canvas/coords";
 import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
 import { itemRect } from "@/lib/canvas/layout";
 import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
@@ -34,6 +34,8 @@ interface CanvasStageProps {
   busy: boolean;
   exporting: boolean;
   exportError: string | null;
+  /** 定位请求：nonce 变化时把该 asset 条目平移到视口中心并选中（聊天摘要联动）。 */
+  focus?: { assetId: string; nonce: number } | null;
   onExport: () => void;
   onResetEdits: () => void;
 }
@@ -115,6 +117,7 @@ export function CanvasStage({
   busy,
   exporting,
   exportError,
+  focus,
   onExport,
   onResetEdits,
 }: CanvasStageProps) {
@@ -192,6 +195,23 @@ export function CanvasStage({
       dispatch({ type: "setView", view: next });
     }
   }, [dispatch, items]);
+
+  // 定位请求：以当前缩放把目标条目平移到视口中心并选中；nonce 防重复，
+  // 条目可能由消息派生稍后到达，依赖 items 使补派生后的定位仍生效。
+  const lastFocusNonce = useRef(-1);
+  useEffect(() => {
+    if (!focus || focus.nonce === lastFocusNonce.current) return;
+    const target = items.find((i) => i.assetId === focus.assetId);
+    if (!target) return;
+    lastFocusNonce.current = focus.nonce;
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const next = centerViewOn(itemRect(target), { width: rect.width, height: rect.height }, viewRef.current.scale);
+    viewRef.current = next;
+    dispatch({ type: "select", id: target.id });
+    dispatch({ type: "setView", view: next });
+  }, [focus, items, dispatch]);
 
   // React 的 onWheel 是被动监听，无法 preventDefault，故手动挂非被动监听。
   useEffect(() => {

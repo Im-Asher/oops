@@ -103,3 +103,19 @@ export function rectVisibleInViewport(
     bottomRight.y <= viewport.height
   );
 }
+
+/**
+ * 以当前缩放把条目矩形平移到视口中心（摘要点击定位选中用）。
+ * 只改平移不改缩放，避免定位时的视觉跳动。
+ */
+export function centerViewOn(
+  rect: Rect,
+  viewport: { width: number; height: number },
+  scale: number,
+): CanvasView {
+  return {
+    scale,
+    x: (viewport.width - rect.width * scale) / 2 - rect.x * scale,
+    y: (viewport.height - rect.height * scale) / 2 - rect.y * scale,
+  };
+}

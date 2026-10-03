@@ -49,7 +49,15 @@ export default function ChatPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const dirty = isDirty(canvas);
   const currentSlot = currentId ? slots[currentId] : undefined;
+  const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
   const busy = currentSlot?.busy ?? false;
+
+  // SSE 回合内的画布事件按发起会话归档：仅当发起会话仍是当前会话才上画布，
+  // 流中切会话不串图（槽内消息仍照常归档，切回时由 deriveImages 重建）。
+  const currentIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentIdRef.current = currentId;
+  }, [currentId]);
 
   const updateSlot = useCallback((id: string, fn: (slot: SessionSlot) => SessionSlot) => {
     setSlots((prev) => {
@@ -73,13 +81,27 @@ export default function ChatPage() {
     dispatch({ type: "resetFilters", id: sel.id });
   }, [canvas]);
 
-  // 聊天图片点击 → 画布选中对应条目（摘要化前的过渡联动）。
-  const handleSelectAsset = useCallback(
+  // 摘要 chip 定位请求（nonce 驱动 CanvasStage 的定位 effect）。
+  const [focus, setFocus] = useState<{ assetId: string; nonce: number } | null>(null);
+
+  /**
+   * 聊天摘要点击 → 画布定位并选中该 asset。
+   * 条目尚未在画布时（如直接点历史消息）先按消息补派生，再由 stage 定位。
+   */
+  const handleFocusAsset = useCallback(
     (assetId: string) => {
-      const item = canvas.items.find((i) => i.assetId === assetId);
-      if (item) dispatch({ type: "select", id: item.id });
+      const exists = canvas.items.some((i) => i.assetId === assetId);
+      if (!exists) {
+        const image = messages
+          .flatMap((m) => m.parts)
+          .find((p): p is Extract<UIMessage["parts"][number], { type: "image" }> =>
+            p.type === "image" && p.assetId === assetId,
+          );
+        if (image) dispatch({ type: "addImageItems", images: [{ assetId: image.assetId, url: image.url }] });
+      }
+      setFocus({ assetId, nonce: Date.now() });
     },
-    [canvas.items],
+    [canvas.items, messages],
   );
 
   /** 从会话消息的图片 part 派生画布条目（幂等，按 assetId 去重；placeNew 排布）。 */
@@ -265,6 +287,8 @@ export default function ChatPage() {
     const slot = sessionId ? slots[sessionId] : undefined;
     const text = slot?.draft.trim() ?? "";
     if (!sessionId || !slot || !text || slot.busy) return;
+    // 回合快照：本轮引用（画布选中 → 3.5 接多选后为数组）供占位卡血缘与请求体。
+    const roundRefs = slot.referenceAssetId ? [slot.referenceAssetId] : [];
     updateSlot(sessionId, (s) => ({ ...s, draft: "", busy: true }));
 
     const userMsg: UIMessage = { id: `u${Date.now()}`, role: "user", parts: [{ type: "text", text }] };
@@ -286,7 +310,12 @@ export default function ChatPage() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, agentId, message: text }),
+      body: JSON.stringify({
+        sessionId,
+        agentId,
+        message: text,
+        ...(roundRefs.length ? { referenceAssetIds: roundRefs } : {}),
+      }),
     });
 
     if (!res.body) {
@@ -328,7 +357,20 @@ export default function ChatPage() {
             ),
           );
           break;
-        case "tool_start":
+        case "tool_start": {
+          // 画布占位卡：生成工具有引用时邻近放置（血缘取模型传参，回退本轮选中引用）。
+          if (currentIdRef.current === sessionId && event.name === "generate_image") {
+            const args = (event.args ?? {}) as { referenceAssetId?: unknown; prompt?: unknown };
+            dispatch({
+              type: "addPlaceholder",
+              id: event.id,
+              referenceAssetId:
+                typeof args.referenceAssetId === "string" && args.referenceAssetId
+                  ? args.referenceAssetId
+                  : roundRefs[0],
+              prompt: typeof args.prompt === "string" ? args.prompt : undefined,
+            });
+          }
           updateAssistant((parts) => [
             ...parts,
             {
@@ -338,7 +380,31 @@ export default function ChatPage() {
             },
           ]);
           break;
+        }
         case "tool_end": {
+          // 占位卡原位结算：成功换图、失败置失败卡（不在当前会话时由切回后的 deriveImages 重建）。
+          if (currentIdRef.current === sessionId) {
+            if (event.details?.url) {
+              dispatch({
+                type: "patchItem",
+                id: event.id,
+                patch: {
+                  assetId: String(event.details.assetId ?? ""),
+                  url: String(event.details.url),
+                  status: "image",
+                },
+              });
+            } else {
+              dispatch({
+                type: "patchItem",
+                id: event.id,
+                patch: {
+                  status: "failed",
+                  errorMessage: String(event.details?.message ?? "生成失败"),
+                },
+              });
+            }
+          }
           updateAssistant((parts) => {
             const statusIdx = parts.findIndex(
               (p) => p.type === "tool_status" && p.id === event.id,
@@ -400,7 +466,6 @@ export default function ChatPage() {
   const sessionAgent =
     agents.find((a) => a.id === currentSession?.agentId) ??
     agents.find((a) => a.id === agentId);
-  const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
   const selectedCanvasItem = selectedItem(canvas);
 
   return (
@@ -438,7 +503,7 @@ export default function ChatPage() {
             messages={messages}
             onAgentChange={(id) => void handleAgentChange(id)}
             onInputChange={handleInputChange}
-            onSelectAsset={handleSelectAsset}
+            onSelectAsset={handleFocusAsset}
             onSend={() => void send()}
             selectedAssetId={selectedCanvasItem?.assetId ?? null}
           />
@@ -453,6 +518,7 @@ export default function ChatPage() {
             dispatch={dispatch}
             exportError={exportError}
             exporting={exporting}
+            focus={focus}
             mode={mode}
             onExport={() => void handleExport()}
             onResetEdits={handleResetEdits}

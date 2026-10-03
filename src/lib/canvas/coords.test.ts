@@ -1,5 +1,6 @@
 import {
   canvasToScreen,
+  centerViewOn,
   fitView,
   panView,
   rectVisibleInViewport,
@@ -85,5 +86,20 @@ describe("rectVisibleInViewport", () => {
   it("部分越界视为不可见（触发定位提示）", () => {
     expect(rectVisibleInViewport({ x: 700, y: 10, width: 320, height: 320 }, view, viewport)).toBe(false);
     expect(rectVisibleInViewport({ x: -50, y: 10, width: 320, height: 320 }, view, viewport)).toBe(false);
+  });
+});
+
+describe("centerViewOn", () => {
+  it("条目矩形中心落在视口中心，且缩放保持不变", () => {
+    const next = centerViewOn({ x: 344, y: 100, width: 320, height: 480 }, { width: 800, height: 600 }, 1.5);
+    expect(next.scale).toBe(1.5);
+    const center = canvasToScreen({ x: 344 + 160, y: 100 + 240 }, next);
+    expect(center).toEqual({ x: 400, y: 300 });
+  });
+
+  it("负坐标条目同样居中", () => {
+    const next = centerViewOn({ x: -500, y: -300, width: 320, height: 320 }, { width: 800, height: 600 }, 1);
+    const center = canvasToScreen({ x: -340, y: -140 }, next);
+    expect(center).toEqual({ x: 400, y: 300 });
   });
 });

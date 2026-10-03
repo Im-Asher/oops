@@ -9,7 +9,7 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
-import { ImageThumbnail } from "@/components/chat/image-thumbnail";
+import { ResultChip } from "@/components/chat/result-chip";
 import type { UIMessage } from "@/types/chat";
 import { BrainIcon, LoaderCircleIcon, UserIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -84,7 +84,7 @@ function ToolStatusLine({ label }: { label: string }) {
 
 /**
  * 消息渲染：AI Elements Message 容器 + 角色头像 + 进行中反馈。
- * 图片缩略图点击 = 画布选中对应条目（结果摘要化在创作闭环接入）。
+ * 图片 part 渲染为结果摘要 chip：点击把画布定位到对应条目并选中。
  */
 export function MessageList({
   messages,
@@ -98,7 +98,7 @@ export function MessageList({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  // 图片按出现顺序编号，让每张缩略图有可区分的无障碍名称。
+  // 图片按出现顺序编号，让每个摘要 chip 有可区分的无障碍名称。
   // 键基于合并后的 parts 索引，与渲染循环一致。
   const imagePositions = new Map<string, number>();
   let seq = 0;
@@ -135,12 +135,11 @@ export function MessageList({
                       );
                     case "image":
                       return (
-                        <ImageThumbnail
+                        <ResultChip
                           active={selectedAssetId === p.assetId}
                           key={i}
-                          onSelect={() => onSelectAsset?.(p.assetId)}
+                          onFocus={() => onSelectAsset?.(p.assetId)}
                           position={imagePositions.get(`${m.id}:${i}`) ?? 0}
-                          url={p.url}
                         />
                       );
                     case "file":
