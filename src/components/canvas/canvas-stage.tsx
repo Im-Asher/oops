@@ -38,6 +38,8 @@ interface CanvasStageProps {
   focus?: { assetId: string; nonce: number } | null;
   onExport: () => void;
   onResetEdits: () => void;
+  /** 失败占位卡重试：以卡内保存的原始意图重新发起一轮对话。 */
+  onRetryItem?: (item: CanvasItem) => void;
 }
 
 /** 单条目：图片按裁剪/滤镜预览；生成中/失败为占位卡。 */
@@ -47,12 +49,14 @@ function CanvasItemView({
   interactive,
   onPointerDown,
   onImageLoad,
+  onRetry,
 }: {
   item: CanvasItem;
   selected: boolean;
   interactive: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => void;
   onImageLoad: (item: CanvasItem, aspect: number) => void;
+  onRetry?: (item: CanvasItem) => void;
 }) {
   return (
     <div
@@ -99,6 +103,21 @@ function CanvasItemView({
           {item.errorMessage ? (
             <p className="line-clamp-2 text-xs text-zinc-500">{item.errorMessage}</p>
           ) : null}
+          {onRetry ? (
+            <Button
+              aria-label="重试生成"
+              className="mt-1 h-7 rounded-md bg-red-500/15 px-2.5 text-xs text-red-200 hover:bg-red-500/25"
+              onClick={(event) => {
+                // 阻止冒泡：重试不应触发画布拖拽/选中
+                event.stopPropagation();
+                onRetry(item);
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              重试
+            </Button>
+          ) : null}
         </div>
       )}
     </div>
@@ -120,6 +139,7 @@ export function CanvasStage({
   focus,
   onExport,
   onResetEdits,
+  onRetryItem,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef(state.view);
@@ -415,6 +435,7 @@ export function CanvasStage({
               key={item.id}
               onImageLoad={handleImageLoad}
               onPointerDown={handleItemPointerDown}
+              onRetry={onRetryItem}
               selected={item.id === selectedId}
             />
           ))}

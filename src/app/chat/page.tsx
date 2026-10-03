@@ -13,6 +13,7 @@ import {
   isDirty,
   selectedItem,
 } from "@/lib/canvas/canvas-reducer";
+import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
@@ -313,15 +314,14 @@ export default function ChatPage() {
     }
   }
 
-  async function send() {
-    const sessionId = currentId;
-    const slot = sessionId ? slots[sessionId] : undefined;
-    const text = slot?.draft.trim() ?? "";
-    if (!sessionId || !slot || !text || slot.busy) return;
-    // 回合快照：引用 = 画布选中条目（无选中 = 新方案），供占位卡血缘与请求体。
-    const roundRefs =
-      selectedItem(canvas)?.status === "image" ? [selectedItem(canvas)!.assetId] : [];
-    updateSlot(sessionId, (s) => ({ ...s, draft: "", busy: true }));
+  /**
+   * 一轮对话公共体：busy 守卫、消息落槽、SSE 流读取与事件归档。
+   * 正常发送（引用取画布选中）与失败占位卡重试（引用取卡内原始意图）共用。
+   */
+  async function runRound(sessionId: string, text: string, roundRefs: string[]) {
+    const slot = slots[sessionId];
+    if (!slot || !text || slot.busy) return;
+    updateSlot(sessionId, (s) => ({ ...s, busy: true }));
 
     const userMsg: UIMessage = { id: `u${Date.now()}`, role: "user", parts: [{ type: "text", text }] };
     const assistantId = `a${Date.now()}`;
@@ -494,6 +494,26 @@ export default function ChatPage() {
     void loadSessions();
   }
 
+  async function send() {
+    const sessionId = currentId;
+    const slot = sessionId ? slots[sessionId] : undefined;
+    const text = slot?.draft.trim() ?? "";
+    if (!sessionId || !slot || !text || slot.busy) return;
+    // 引用 = 画布选中条目（无选中 = 新方案）；快照后清草稿。
+    const sel = selectedItem(canvas);
+    const roundRefs = sel && sel.status === "image" ? [sel.assetId] : [];
+    updateSlot(sessionId, (s) => ({ ...s, draft: "" }));
+    await runRound(sessionId, text, roundRefs);
+  }
+
+  /** 失败占位卡重试：以卡内保存的原始意图（prompt + 原引用）重新发起一轮。 */
+  function retryItem(item: CanvasItem) {
+    if (!currentId || busy) return;
+    const text = item.prompt ? `重新生成：${item.prompt}` : "重新生成上次的图片";
+    const refs = item.referenceAssetId ? [item.referenceAssetId] : [];
+    void runRound(currentId, text, refs);
+  }
+
   const currentSession = sessions.find((s) => s.id === currentId);
   const sessionAgent =
     agents.find((a) => a.id === currentSession?.agentId) ??
@@ -564,6 +584,7 @@ export default function ChatPage() {
             mode={mode}
             onExport={() => void handleExport()}
             onResetEdits={handleResetEdits}
+            onRetryItem={retryItem}
             state={canvas}
           />
           {/* 悬浮输入框：聊天收起后出现（与停靠输入框共享草稿，组件同一套逻辑） */}
