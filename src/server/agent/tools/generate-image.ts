@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { submitAndWait } from "@/server/domain/tasks/task-executor";
+import { createAssetRepo } from "@/server/db/asset.repo";
 import type { ToolDefinition } from "./registry";
 
 const SIZES = [
@@ -18,6 +19,12 @@ export const generateImageSchema = z.object({
   prompt: z.string().min(1).describe("画面描述（建议含主体、风格、构图、色调）"),
   size: z.enum(SIZES).describe("像素尺寸，如 1024*1024"),
   aspectRatio: z.enum(RATIOS).describe("宽高比，如 1:1"),
+  // 用户引用画布图片时的血缘来源（服务端做归属校验）
+  referenceAssetId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("用户引用画布图片作为参考时传该图的 assetId；未引用时不传"),
 });
 
 export type GenerateImageArgs = z.infer<typeof generateImageSchema>;
@@ -28,6 +35,11 @@ const generateImageJsonSchema = {
     prompt: { type: "string", minLength: 1, description: "画面描述（建议含主体、风格、构图、色调）" },
     size: { type: "string", enum: [...SIZES], description: "像素尺寸，如 1024*1024" },
     aspectRatio: { type: "string", enum: [...RATIOS], description: "宽高比，如 1:1" },
+    referenceAssetId: {
+      type: "string",
+      minLength: 1,
+      description: "用户引用画布图片作为参考时传该图的 assetId；未引用时不传",
+    },
   },
   required: ["prompt", "size", "aspectRatio"],
   additionalProperties: false,
@@ -43,6 +55,7 @@ interface GenerateImageOutcome {
   size: string;
   provider: string;
   taskId: string;
+  referenceAssetId?: string;
 }
 
 export const generateImageTool: ToolDefinition<GenerateImageArgs> = {
@@ -54,6 +67,19 @@ export const generateImageTool: ToolDefinition<GenerateImageArgs> = {
   schema: generateImageSchema,
   jsonSchema: generateImageJsonSchema,
   async execute(args, ctx) {
+    // 引用血缘：归属校验（存在、本人、本会话），失败结构化回喂模型，不进生成队列。
+    if (args.referenceAssetId) {
+      const asset = await createAssetRepo().get(args.referenceAssetId);
+      const valid =
+        asset && asset.userId === ctx.userId && asset.sessionId === ctx.sessionId;
+      if (!valid) {
+        const message = "引用的图片不存在或无权使用";
+        return {
+          content: [{ type: "text", text: `图像生成失败：${message}` }],
+          details: { error: "invalid_reference", message },
+        };
+      }
+    }
     try {
       const result = (await submitAndWait(
         "generate_image",
@@ -61,6 +87,7 @@ export const generateImageTool: ToolDefinition<GenerateImageArgs> = {
           prompt: args.prompt,
           size: args.size,
           aspectRatio: args.aspectRatio,
+          ...(args.referenceAssetId ? { referenceAssetId: args.referenceAssetId } : {}),
         },
         { sessionId: ctx.sessionId, userId: ctx.userId },
       )) as GenerateImageOutcome;
@@ -79,6 +106,7 @@ export const generateImageTool: ToolDefinition<GenerateImageArgs> = {
           size: result.size,
           provider: result.provider,
           taskId: result.taskId,
+          ...(result.referenceAssetId ? { referenceAssetId: result.referenceAssetId } : {}),
         },
       };
     } catch (err) {

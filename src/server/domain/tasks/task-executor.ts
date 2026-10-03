@@ -142,10 +142,12 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 registerTaskHandler("generate_image", async (payload, ctx) => {
-  const { prompt, size, aspectRatio } = payload as {
+  const { prompt, size, aspectRatio, referenceAssetId } = payload as {
     prompt: string;
     size: string;
     aspectRatio: string;
+    /** 引用画布图片的血缘（工具侧已完成归属校验）。 */
+    referenceAssetId?: string;
   };
   const gen = await generateImage({ prompt, size, aspectRatio }, ctx.signal);
   if (!gen.ok) {
@@ -161,7 +163,13 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
     sessionId: ctx.sessionId,
     prompt,
     model: DASHSCOPE_IMAGE_MODEL,
-    meta: { provider: DASHSCOPE_IMAGE_PROVIDER, size, aspectRatio, taskId: ctx.taskId },
+    meta: {
+      provider: DASHSCOPE_IMAGE_PROVIDER,
+      size,
+      aspectRatio,
+      taskId: ctx.taskId,
+      ...(referenceAssetId ? { referenceAssetId } : {}),
+    },
     userId: ctx.userId,
   });
   return {
@@ -174,5 +182,6 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
     size,
     provider: DASHSCOPE_IMAGE_PROVIDER,
     taskId: ctx.taskId,
+    ...(referenceAssetId ? { referenceAssetId } : {}),
   };
 });
