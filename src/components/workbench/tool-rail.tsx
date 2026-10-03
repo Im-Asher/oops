@@ -1,41 +1,16 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  FolderOpenIcon,
-  HandIcon,
-  ImagePlusIcon,
-  MessageSquareIcon,
-  MousePointer2Icon,
-} from "lucide-react";
-
-/** 画布指针模式：select 点击选中图片，pan 拖拽平移画布。 */
-export type CanvasMode = "select" | "pan";
+import { FolderOpenIcon, MessageSquareIcon } from "lucide-react";
 
 interface ToolRailProps {
-  mode: CanvasMode;
-  onModeChange: (mode: CanvasMode) => void;
   onOpenSessions: () => void;
   chatVisible: boolean;
   onToggleChat: () => void;
-  /** 参考图上传在创作闭环接入后才渲染，避免假入口。 */
-  onUploadReference?: () => void;
 }
 
-const MODE_HINTS: Record<CanvasMode, string> = {
-  select: "选择：点击图片选中",
-  pan: "平移：拖动查看画布",
-};
-
-/** 56px 左侧工具条：会话抽屉、聊天显隐、选择/平移模式与参考图上传。 */
-export function ToolRail({
-  mode,
-  onModeChange,
-  onOpenSessions,
-  chatVisible,
-  onToggleChat,
-  onUploadReference,
-}: ToolRailProps) {
+/** 56px 左侧工具条：会话抽屉、聊天显隐与底部用户入口（见 user-auth「用户菜单与登出入口」）。 */
+export function ToolRail({ onOpenSessions, chatVisible, onToggleChat }: ToolRailProps) {
   return (
     <nav
       aria-label="工作台工具条"
@@ -62,43 +37,6 @@ export function ToolRail({
       >
         <MessageSquareIcon />
       </Button>
-      <span aria-hidden className="my-1 h-px w-6 bg-zinc-800" />
-      <Button
-        aria-label={MODE_HINTS.select}
-        aria-pressed={mode === "select"}
-        className="size-10 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 data-[active=true]:bg-violet-500/20 data-[active=true]:text-violet-300"
-        data-active={mode === "select"}
-        onClick={() => onModeChange("select")}
-        size="icon"
-        title={MODE_HINTS.select}
-        variant="ghost"
-      >
-        <MousePointer2Icon />
-      </Button>
-      <Button
-        aria-label={MODE_HINTS.pan}
-        aria-pressed={mode === "pan"}
-        className="size-10 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 data-[active=true]:bg-violet-500/20 data-[active=true]:text-violet-300"
-        data-active={mode === "pan"}
-        onClick={() => onModeChange("pan")}
-        size="icon"
-        title={MODE_HINTS.pan}
-        variant="ghost"
-      >
-        <HandIcon />
-      </Button>
-      {onUploadReference ? (
-        <Button
-          aria-label="上传参考图"
-          className="size-10 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
-          onClick={onUploadReference}
-          size="icon"
-          title="上传参考图"
-          variant="ghost"
-        >
-          <ImagePlusIcon />
-        </Button>
-      ) : null}
     </nav>
   );
 }
