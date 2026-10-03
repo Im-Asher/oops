@@ -650,11 +650,9 @@ export default function ChatPage() {
   return (
     <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
       <TopBar
-        chatVisible={chatOpen}
         exportEnabled={dirty && selectedCanvasItem?.status === "image" && !!currentId}
         exporting={exporting}
         onExport={() => void handleExport()}
-        onToggleChat={() => setChatOpen((open) => !open)}
         saveStatus={saveStatus}
         sessionTitle={currentSession?.title || (currentId ? "未命名会话" : "未选择会话")}
       />
