@@ -671,7 +671,7 @@ export default function ChatPage() {
 
         {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
         <div
-          className={`${chatOpen ? "flex" : "hidden"} w-full md:flex md:w-[340px] md:shrink-0`}
+          className={`${chatOpen ? "flex" : "hidden"} w-full md:w-[340px] md:shrink-0`}
         >
           <ChatPanel
             agentIcon={sessionAgent?.icon}
