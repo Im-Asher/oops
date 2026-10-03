@@ -10,7 +10,7 @@ export function CanvasEmptyState() {
       <div className="space-y-1">
         <p className="font-medium text-sm text-zinc-50">画布还是空的</p>
         <p className="max-w-xs text-sm text-zinc-400">
-          在聊天里描述你想要的图片，生成结果会直接出现在画布上
+          在聊天里描述你想要的图片，生成结果会直接出现在画布上；也可通过输入框旁的附件按钮上传参考图
         </p>
       </div>
     </div>
