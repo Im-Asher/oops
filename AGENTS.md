@@ -145,11 +145,14 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
     services.
   - **Manual smoke path** after changes to the chat flow: login → create
     session → pick agent → send message (first message auto-titles the
-    session) → observe SSE stream → verify generated asset appears on the
-    canvas (thumbnail, clickable to promote) → reload to confirm message
-    persistence → deleting a session must remove its MinIO objects and asset
-    rows (GC) → narrow-viewport check: sidebar drawer + fullscreen canvas
-    overlay.
+    session) → observe SSE stream → verify the generating placeholder appears
+    on the canvas and settles in place (image or failure card with retry) →
+    select a canvas image to attach it as a reference chip and submit a
+    follow-up edit (new version placed near the source) → chat result chip
+    locates the item on canvas → switch/reload sessions to confirm messages,
+    canvas items, draft and view restore (workspace saved locally per session)
+    → deleting a session must remove its MinIO objects and asset rows (GC)
+    → narrow-viewport check: chat/canvas toggle exclusively, session drawer.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
 - Playwright screenshot rendering is covered by a service-level test using a
   minimal HTML fixture; keep it hermetic (no network).

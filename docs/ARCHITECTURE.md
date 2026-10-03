@@ -97,7 +97,7 @@ generate_image({ prompt, size, aspectRatio })
 
 | 工具 | 语义 | 场景 |
 | --- | --- | --- |
-| `generate_image` | 同步等待结果返回 agent | 组合工作流：先生成背景图，agent 拿 URL 再写 HTML 海报 |
+| `generate_image` | 同步等待结果返回 agent；可选 `referenceAssetId`（画布引用的源图，zod + 归属校验，失败结构化回喂；通过校验后写入任务 payload 与 `assets.meta.referenceAssetId` 血缘） | 组合工作流：先生成背景图，agent 拿 URL 再写 HTML 海报 |
 | `schedule_batch`（后续） | 提交即返回 taskId | 批量出图/重生成，无需 agent 继续推理 |
 
 SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组件），10~30s 可接受。
@@ -107,12 +107,23 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ```
 ⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/chat` 未登录 → 302 `/login`）；
    业务 API 由 `requireUser` 完整验签 + 查 `users` active + 会话版本一致（唯一安全边界），未认证统一 401
-① 前端：PromptInput 提交消息+附件 → POST /api/chat { sessionId, agentId, ... } → SSE 连接
-② Route Handler：requireUser 取 userId → 用户消息落库 → AgentRegistry 取配置 → 加载历史 → agentLoop
+① 前端：Composer 提交消息（引用 = 画布选中条目，可移除 chip）→ POST /api/chat { sessionId, agentId, message, referenceAssetIds? } → SSE 连接
+② Route Handler：requireUser 取 userId → 引用资产归属校验（存在/userId/sessionId 匹配，≤5）→
+   用户消息以"原文 + 引用块"落库（content 与 UI 文本保持原文）→ AgentRegistry 取配置 → 加载历史 → agentLoop
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
 ④ 工具执行：generate_image（出图 → 下载转 base64 → 落 MinIO → assets 落库，userId 源自工具上下文）返回自有 `/files` URL
 ⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
-⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 作品库可见
+⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 画布可见
+```
+
+**画布工作台闭环**（`/chat` 页，画布为多作品平面）：
+
+```
+tool_start(generate_image) → 画布插入生成中占位卡（有引用 placeNear 邻近放置，血缘 = 模型传参优先、回退本轮选中引用）
+tool_end → 占位卡原位结算：成功换图；失败置失败卡（原因摘要 + 重试按钮，重试以卡内原始意图重新发起一轮）
+结果不在当前视口 → 顶栏下浮出"有新结果"提示（点击定位选中）；在视口内静默完成，不强制移动视角
+SSE 事件按发起会话归档（currentIdRef 守卫），流中切会话不串图；工作区（位置/视角/草稿/引用）300ms 防抖存本机
+（键 oops:workspace:v1:<sessionId>），切换会话与刷新后恢复
 ```
 
 账号入口：悬浮聊天窗顶栏头像菜单（只读账号摘要 / 个人信息 / 退出登录）→ `/profile`
@@ -182,9 +193,6 @@ invite_codes   邀请码    code(text 主键), max_uses(int, 默认 1), used_cou
 chat_sessions  会话      id(uuid), user_id(text→users.id), agent_id(uuid?), title(text?),
                         summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
                         created_at, updated_at
-chat_sessions  会话      id(uuid), user_id(text), agent_id(uuid?), title(text?),
-                        summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
-                        created_at, updated_at
 messages       消息      id(uuid), session_id(uuid→sessions FK), user_id, role(enum),
                         content(text), tool_calls(jsonb?), transcript(jsonb?, LLM 视图), created_at
 assets         素材/作品 id(uuid), user_id, session_id?(→sessions, set null),
@@ -211,6 +219,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
 > `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
+> `canvas-first-workbench` 增 `meta.referenceAssetId`（generate_image 血缘：引用的源图 assetId，
+> 参考图上传 `purpose=reference` 落 `kind=image` + `meta.purpose="reference"`，不追加聊天消息）。
 > `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
 > `summarized_up_to`（compact 水位线，迁移 `0003`），存量数据零回填（见 5.1）。
 > `user-auth` 新增 `users` / `invite_codes` 表与 `user_status` 枚举（迁移 `0004`）；
@@ -234,8 +244,8 @@ oops/
 │   │   │   ├── login/page.tsx
 │   │   │   └── register/page.tsx
 │   │   ├── files/[...path]/route.ts # 资产代理读取（登录后，安全响应头）
-│   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限）
-│   │   ├── chat/page.tsx           # 聊天工作台页（三栏：会话侧栏 / 聊天列 / 画布列；窄屏抽屉+全屏浮层）
+│   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限；purpose=reference 参考图分支，绑定会话不写消息）
+│   │   ├── chat/page.tsx           # 画布工作台页（顶栏 + 工具条 + 可收起聊天 340px + 画布平面；会话抽屉覆盖层；窄屏聊天/画布互斥切换）
 │   │   ├── profile/page.tsx        # 个人信息页（基本资料卡 + 改密卡，proxy 保护）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
@@ -271,7 +281,10 @@ oops/
 │   │       ├── definitions/        # 各 Agent 定义 + prompts/<id>.md（含 compact 摘要骨架）
 │   │       └── tools/              # ToolRegistry（ToolExecutionContext 注入 userId）+ 工具实现
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
-│   ├── lib/                        # 客户端安全共享：config / utils / canvas（+ 单测）
+│   │   ├── canvas/                 # 画布工作台（多作品平面 stage / 编辑工具条 / 滤镜面板 / 裁剪 / 空态）
+│   │   ├── workbench/              # 工作台骨架（顶栏 / 56px 工具条 / 会话抽屉）
+│   │   └── chat/                   # 聊天面板与消息渲染（摘要 chip / 双形态 composer）
+│   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储 + 单测）
 │   └── types/                      # 共享 TypeScript 类型
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
 ├── drizzle.config.ts               # drizzle-kit 配置（加载 .env.local）
