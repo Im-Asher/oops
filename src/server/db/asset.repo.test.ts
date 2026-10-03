@@ -23,6 +23,16 @@ describe("asset repo", () => {
     expect(mock.state.calls.at(-1)?.op).toBe("select.from.where.limit");
   });
 
+  it("getManyByIds batches by inArray and short-circuits on empty ids", async () => {
+    const mock = makeMockDb({ selectResult: [{ id: "a1" }, { id: "a2" }] });
+    const repo = createAssetRepo(mock.db);
+    expect(await repo.getManyByIds([])).toEqual([]);
+    expect(mock.state.calls).toHaveLength(0); // 空列表不触库
+    const rows = await repo.getManyByIds(["a1", "a2"]);
+    expect(rows.map((r) => r.id)).toEqual(["a1", "a2"]);
+    expect(mock.state.calls.at(-1)?.op).toBe("select.from.where");
+  });
+
   it("list without sessionId yields a select with limit", async () => {
     const mock = makeMockDb({ selectResult: [] });
     const repo = createAssetRepo(mock.db);

@@ -14,11 +14,17 @@ const h = vi.hoisted(() => ({
   runAgentArgs: [] as Record<string, unknown>[],
   messageCreates: [] as Record<string, unknown>[],
   userId: null as string | null,
+  assetRows: [] as { id: string; userId: string; sessionId: string; storageKey: string; prompt: string | null }[],
 }));
 
 vi.mock("@/server/agent", () => ({ default: {} }));
 vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
+}));
+vi.mock("@/server/db/asset.repo", () => ({
+  createAssetRepo: () => ({
+    getManyByIds: async (ids: string[]) => h.assetRows.filter((a) => ids.includes(a.id)),
+  }),
 }));
 vi.mock("@/server/agent/runtime", () => ({
   runAgent: vi.fn(async (args: { onEvent: (e: unknown) => void }) => {
@@ -56,12 +62,17 @@ vi.mock("@/server/agent/moderation", () => ({
 
 import { POST } from "./route";
 
-function post(message: string) {
+function post(message: string, referenceAssetIds?: string[]) {
   return POST(
     new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId: "s1", agentId: "atmosphere-designer", message }),
+      body: JSON.stringify({
+        sessionId: "s1",
+        agentId: "atmosphere-designer",
+        message,
+        ...(referenceAssetIds ? { referenceAssetIds } : {}),
+      }),
     }),
   );
 }
@@ -78,6 +89,7 @@ describe("POST /api/chat", () => {
     h.runAgentCalls = 0;
     h.runAgentArgs = [];
     h.messageCreates = [];
+    h.assetRows = [];
   });
 
   it("未认证返回 401，不触发任何下游", async () => {
@@ -164,5 +176,58 @@ describe("POST /api/chat", () => {
     expect(res.headers.get("content-type")).toContain("text/event-stream");
     expect(h.runAgentCalls).toBe(1);
     expect(h.messageCreates).toHaveLength(1);
+  });
+
+  it("引用注入：userText = 原文 + 引用块（assetId/url/原prompt），content 列保持原文，transcript 与 userText 一致", async () => {
+    h.assetRows = [
+      { id: "a1", userId: "u1", sessionId: "s1", storageKey: "assets/x.png", prompt: "海边日落" },
+      { id: "a2", userId: "u1", sessionId: "s1", storageKey: "assets/y.png", prompt: null },
+    ];
+    h.events = [JSON.stringify({ type: "finish", stopReason: "stop" })];
+    await post("改成夜景", ["a1", "a2"]);
+    const args = h.runAgentArgs[0] as { userText: string };
+    expect(args.userText.startsWith("改成夜景")).toBe(true);
+    expect(args.userText).toContain("[引用画布图片]");
+    expect(args.userText).toContain("- assetId: a1, url: /files/assets/x.png, 原prompt: 海边日落");
+    expect(args.userText).toContain("- assetId: a2, url: /files/assets/y.png, 原prompt: (无)");
+    // content 列与 UI 文本保持原文，不携带引用块
+    expect(h.messageCreates[0].content).toBe("改成夜景");
+    // transcript 视图与本轮 userText 一致
+    const transcript = h.messageCreates[0].transcript as {
+      v: number;
+      messages: { role: string; content: string }[];
+    };
+    expect(transcript.v).toBe(1);
+    expect(transcript.messages[0].role).toBe("user");
+    expect(transcript.messages[0].content).toBe(args.userText);
+  });
+
+  it("引用校验：越权（他人资产）引用整体拒绝，不落库不进 LLM", async () => {
+    h.assetRows = [{ id: "a1", userId: "u2", sessionId: "s1", storageKey: "x.png", prompt: null }];
+    const res = await post("改成夜景", ["a1"]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID_REFERENCE");
+    expect(h.runAgentCalls).toBe(0);
+    expect(h.messageCreates).toHaveLength(0);
+  });
+
+  it("引用校验：跨会话与不存在的引用同样拒绝", async () => {
+    h.assetRows = [
+      { id: "a1", userId: "u1", sessionId: "s-other", storageKey: "x.png", prompt: null },
+    ];
+    const res = await post("改成夜景", ["a1", "missing"]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID_REFERENCE");
+    expect(h.runAgentCalls).toBe(0);
+  });
+
+  it("引用超过 5 个：schema 层 400", async () => {
+    const res = await post("改成夜景", ["a", "b", "c", "d", "e", "f"]);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("INVALID");
+    expect(h.runAgentCalls).toBe(0);
   });
 });

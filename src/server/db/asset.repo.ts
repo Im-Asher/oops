@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db as defaultDb } from ".";
 import { assets, type Asset } from "./schema";
 
@@ -19,6 +19,8 @@ export interface AssetInput {
 export interface AssetRepo {
   create(input: AssetInput): Promise<Asset>;
   get(id: string): Promise<Asset | undefined>;
+  /** 按 id 批量取资产（引用注入用；归属校验由调用方完成）。 */
+  getManyByIds(ids: string[]): Promise<Asset[]>;
   list(sessionId?: string): Promise<Asset[]>;
   /** 会话删除时的资产 GC：无上限列出该会话全部对象的 storageKey。 */
   listKeysBySession(sessionId: string): Promise<string[]>;
@@ -56,6 +58,11 @@ export function createAssetRepo(db: typeof defaultDb = defaultDb): AssetRepo {
         .where(eq(assets.id, id))
         .limit(1);
       return rows[0];
+    },
+
+    async getManyByIds(ids) {
+      if (ids.length === 0) return [];
+      return db.select().from(assets).where(inArray(assets.id, ids));
     },
 
     async list(sessionId) {
