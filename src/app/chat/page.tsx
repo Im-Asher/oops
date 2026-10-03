@@ -398,6 +398,21 @@ export default function ChatPage() {
     const slot = slots[sessionId];
     if (!slot || !text || slot.busy) return;
     updateSlot(sessionId, (s) => ({ ...s, busy: true }));
+    // 本轮画布占位卡记账：SSE error/断流时统一收尾置失败。
+    const roundPlaceholders: string[] = [];
+    function failPendingPlaceholders(targetSessionId: string, message: string) {
+      if (currentIdRef.current !== targetSessionId) return;
+      for (const pid of roundPlaceholders) {
+        const item = canvasStateRef.current.items.find((i) => i.id === pid);
+        if (item?.status === "generating") {
+          dispatch({
+            type: "patchItem",
+            id: pid,
+            patch: { status: "failed", errorMessage: message },
+          });
+        }
+      }
+    }
 
     const userMsg: UIMessage = { id: `u${Date.now()}`, role: "user", parts: [{ type: "text", text }] };
     const assistantId = `a${Date.now()}`;
@@ -467,8 +482,11 @@ export default function ChatPage() {
           break;
         case "tool_start": {
           // 画布占位卡：生成工具有引用时邻近放置（血缘取模型传参，回退本轮选中引用）。
+          // 已知限制：生成中刷新页面会丢失占位卡（本地态），且本轮 SSE 不恢复；
+          // 服务端任务与消息仍在，刷新后重新拉取消息由 deriveImages 重建已完成的图。
           if (currentIdRef.current === sessionId && event.name === "generate_image") {
             const args = (event.args ?? {}) as { referenceAssetId?: unknown; prompt?: unknown };
+            roundPlaceholders.push(event.id);
             dispatch({
               type: "addPlaceholder",
               id: event.id,
@@ -552,38 +570,47 @@ export default function ChatPage() {
         }
         case "error":
           appendText(`\n[错误] ${event.message}`);
+          // 聊天与画布一致呈现：本轮仍在生成中的占位卡同步置失败，不留悬空转圈。
+          failPendingPlaceholders(sessionId, event.message);
           break;
         default:
           break;
       }
     };
 
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const chunks = buffer.split("\n\n");
-      buffer = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const lines = chunk.split("\n");
-        let eventType = "";
-        let data = "";
-        for (const line of lines) {
-          if (line.startsWith("event:")) eventType = line.slice(6).trim();
-          else if (line.startsWith("data:")) data += line.slice(5).trim();
-        }
-        if (eventType && data) {
-          try {
-            handleEvent({ type: eventType, ...JSON.parse(data) } as ChatEvent);
-          } catch {
-            /* ignore malformed */
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() ?? "";
+        for (const chunk of chunks) {
+          const lines = chunk.split("\n");
+          let eventType = "";
+          let data = "";
+          for (const line of lines) {
+            if (line.startsWith("event:")) eventType = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          if (eventType && data) {
+            try {
+              handleEvent({ type: eventType, ...JSON.parse(data) } as ChatEvent);
+            } catch {
+              /* ignore malformed */
+            }
           }
         }
       }
+    } catch {
+      // 网络/流中断：聊天侧补错误行，画布侧未结算占位卡置失败（服务端回合可能已完成，切回会话时以服务器为准）。
+      appendText("\n[错误] 连接中断，请重试");
+      failPendingPlaceholders(sessionId, "连接中断，生成未完成");
+    } finally {
+      updateSlot(sessionId, (s) => ({ ...s, busy: false }));
+      // 回合结束后刷新会话列表（首条消息自动标题 / updatedAt 排序）。
+      void loadSessions();
     }
-    updateSlot(sessionId, (s) => ({ ...s, busy: false }));
-    // 回合结束后刷新会话列表（首条消息自动标题 / updatedAt 排序）。
-    void loadSessions();
   }
 
   async function send() {
