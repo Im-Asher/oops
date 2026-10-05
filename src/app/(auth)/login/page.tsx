@@ -24,7 +24,7 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       if (res.ok) {
-        router.replace("/chat");
+        router.replace("/home");
         router.refresh();
         return;
       }

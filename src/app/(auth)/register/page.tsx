@@ -35,7 +35,7 @@ export default function RegisterPage() {
         body: JSON.stringify({ inviteCode, username, displayName, password }),
       });
       if (res.ok) {
-        router.replace("/chat");
+        router.replace("/home");
         router.refresh();
         return;
       }

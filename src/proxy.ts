@@ -32,14 +32,14 @@ export default function proxy(req: NextRequest): NextResponse {
     return isAuthed ? NextResponse.next() : json401();
   }
 
-  // 首页归宿：`/` 重定向（门厅即登录页，仍无独立首页，design D6）
+  // 首页归宿：`/` 重定向到首页（已登录）/ 登录页（未认证）
   if (pathname === "/") {
-    return NextResponse.redirect(new URL(isAuthed ? "/chat" : "/login", req.url));
+    return NextResponse.redirect(new URL(isAuthed ? "/home" : "/login", req.url));
   }
 
-  // 登录/注册页公开；已登录访问则进工作台
+  // 登录/注册页公开；已登录访问则进首页
   if (pathname === "/login" || pathname === "/register") {
-    return isAuthed ? NextResponse.redirect(new URL("/chat", req.url)) : NextResponse.next();
+    return isAuthed ? NextResponse.redirect(new URL("/home", req.url)) : NextResponse.next();
   }
 
   // 静态资源放行（/files 已在上面拦下，不受此规则影响）
