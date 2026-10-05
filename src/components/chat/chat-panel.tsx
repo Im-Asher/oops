@@ -106,6 +106,12 @@ export function ChatPanel({
           onChange={onInputChange}
           onAgentChange={onAgentChange}
           onSend={onSend}
+          // 空会话灵感卡：仅「有会话且无消息」时展示当前 Agent 的 presets
+          presets={
+            hasSession && messages.length === 0
+              ? agents.find((a) => a.id === agentId)?.presets
+              : undefined
+          }
           reference={reference}
           onRemoveReference={onRemoveReference}
           value={input}

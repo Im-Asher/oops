@@ -37,6 +37,8 @@ interface ComposerProps {
   focusSignal?: number;
   /** 附件上传参考图入口；无会话时不提供（按钮禁用提示）。 */
   onAttach?: () => void;
+  /** 空会话灵感卡：当前 Agent 的示例需求文案（点击填入不发送）。 */
+  presets?: string[];
 }
 
 /**
@@ -58,6 +60,7 @@ export function Composer({
   onRemoveReference,
   focusSignal,
   onAttach,
+  presets,
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -67,8 +70,30 @@ export function Composer({
     if (focusSignal) textareaRef.current?.focus();
   }, [focusSignal]);
 
+  /** 灵感卡点击：填入草稿（父层受控更新）并聚焦输入框，不自动发送。 */
+  function pickPreset(text: string) {
+    onChange(text);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
   return (
     <div className="rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600">
+      {presets?.length ? (
+        <div className="flex flex-col gap-1.5 px-1 pb-2" data-testid="preset-cards">
+          <p className="text-xs text-zinc-500">试试这样描述：</p>
+          {presets.map((text) => (
+            <button
+              className="flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-left text-xs text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
+              key={text}
+              onClick={() => pickPreset(text)}
+              type="button"
+            >
+              <span aria-hidden>💡</span>
+              <span>{text}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       {reference ? (
         <div className="flex items-center gap-1.5 px-1 pb-1.5">
           <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-300">
@@ -113,7 +138,7 @@ export function Composer({
           e.preventDefault();
           onSend();
         }}
-        placeholder={hasSession ? "描述你的图片需求…" : "先在会话抽屉新建会话"}
+        placeholder={hasSession ? "描述你的设计需求…" : "先创建会话"}
         rows={1}
         value={value}
       />
