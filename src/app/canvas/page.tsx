@@ -1,11 +1,11 @@
 "use client";
 
 import { CanvasStage } from "@/components/canvas/canvas-stage";
+import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionDrawer } from "@/components/workbench/session-drawer";
-import { ToolRail } from "@/components/workbench/tool-rail";
-import { TopBar } from "@/components/workbench/top-bar";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
+import { DownloadIcon } from "lucide-react";
 import {
   canvasReducer,
   initialCanvasState,
@@ -675,25 +675,9 @@ export default function ChatPage() {
 
   return (
     <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
-      <TopBar
-        exportEnabled={dirty && selectedCanvasItem?.status === "image" && !!currentId}
-        exporting={exporting}
-        onExport={() => void handleExport()}
-        saveStatus={saveStatus}
-        sessionTitle={currentSession?.title || (currentId ? "未命名会话" : "未选择会话")}
-      />
-
       <div className="flex min-h-0 flex-1">
-        <ToolRail
-          chatVisible={chatOpen}
-          onOpenSessions={() => setDrawerOpen(true)}
-          onToggleChat={() => setChatOpen((open) => !open)}
-        />
-
         {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
-        <div
-          className={`${chatOpen ? "flex" : "hidden"} w-full md:w-[340px] md:shrink-0`}
-        >
+        <div className={`${chatOpen ? "flex" : "hidden"} w-full md:w-[340px] md:shrink-0`}>
           <ChatPanel
             agentIcon={sessionAgent?.icon}
             agentId={agentId}
@@ -720,6 +704,28 @@ export default function ChatPage() {
           className={`relative min-w-0 flex-1 ${chatOpen ? "hidden md:block" : "block"}`}
           ref={canvasWrapRef}
         >
+          {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
+          <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+            <span
+              aria-live="polite"
+              className="rounded-full bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 backdrop-blur"
+            >
+              {saveStatus === "idle"
+                ? null
+                : saveStatus === "saving"
+                  ? "保存中…"
+                  : "已保存（本机）"}
+            </span>
+            <Button
+              className="h-8 gap-1.5 bg-violet-500/90 px-3 text-xs text-white hover:bg-violet-500"
+              disabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
+              onClick={() => void handleExport()}
+              size="sm"
+            >
+              <DownloadIcon />
+              {exporting ? "导出中…" : "导出"}
+            </Button>
+          </div>
           {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
           {reveal ? (
             <button
@@ -732,13 +738,10 @@ export default function ChatPage() {
             </button>
           ) : null}
           <CanvasStage
-            busy={busy}
             dispatch={dispatch}
             exportError={exportError}
-            exporting={exporting}
             focus={focus}
             onRetryItem={retryItem}
-            onExport={() => void handleExport()}
             onResetEdits={handleResetEdits}
             state={canvas}
           />

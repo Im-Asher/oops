@@ -29,12 +29,9 @@ const GRID_SIZE = 24;
 interface CanvasStageProps {
   state: CanvasState;
   dispatch: React.Dispatch<CanvasAction>;
-  busy: boolean;
-  exporting: boolean;
   exportError: string | null;
   /** 定位请求：nonce 变化时把该 asset 条目平移到视口中心并选中（聊天摘要联动）。 */
   focus?: { assetId: string; nonce: number } | null;
-  onExport: () => void;
   onResetEdits: () => void;
   /** 失败占位卡重试：以卡内保存的原始意图重新发起一轮对话。 */
   onRetryItem?: (item: CanvasItem) => void;
@@ -128,11 +125,8 @@ function CanvasItemView({
 export function CanvasStage({
   state,
   dispatch,
-  busy,
-  exporting,
   exportError,
   focus,
-  onExport,
   onResetEdits,
   onRetryItem,
 }: CanvasStageProps) {
@@ -429,12 +423,9 @@ export function CanvasStage({
       {selected && selected.status === "image" ? (
         <>
           <EditToolbar
-            busy={busy}
             cropping={cropping}
             dirty={isItemDirty(selected)}
-            exporting={exporting}
             filtersOpen={filtersOpen && !cropping}
-            onExport={onExport}
             onResetEdits={onResetEdits}
             onToggleCrop={cropping ? cancelCropping : startCropping}
             onToggleFilters={() => setFiltersOpen((open) => !open)}
