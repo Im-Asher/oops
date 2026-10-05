@@ -201,9 +201,6 @@ export default function HomePage() {
                 {fileError}
               </p>
             ) : null}
-            <p className="mt-2 px-1 text-xs text-muted-foreground/80">
-              回车或点 ↑ 直接在 AI 画布新建会话并发送；附件将作为参考图一并发送。
-            </p>
             <input
               accept="image/*"
               aria-hidden
