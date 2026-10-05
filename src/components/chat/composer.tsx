@@ -155,7 +155,7 @@ export function Composer({
       <Textarea
         aria-label="消息输入"
         ref={textareaRef}
-        className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0"
+        className={`field-sizing-content ${variant === "landing" ? "max-h-60 min-h-15" : "max-h-40 min-h-10"} resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0`}
         disabled={busy || !sessionReady}
         onBlur={() => {
           composingRef.current = false;
