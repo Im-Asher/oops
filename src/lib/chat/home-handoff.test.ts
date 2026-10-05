@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   getPendingHandoffFiles,
+  hasPendingHandoff,
   setPendingHandoffFiles,
   takePendingHandoffFiles,
 } from "./home-handoff";
@@ -11,6 +12,7 @@ function file(name: string): File {
 
 beforeEach(() => {
   setPendingHandoffFiles([]);
+  takePendingHandoffFiles();
 });
 
 describe("home-handoff 待传附件暂存", () => {
@@ -35,5 +37,13 @@ describe("home-handoff 待传附件暂存", () => {
     setPendingHandoffFiles(next);
     expect(getPendingHandoffFiles()).toEqual(next);
     expect(getPendingHandoffFiles()).not.toBe(next);
+  });
+
+  it("staged 标记：set 置位、take 复位，支撑画布侧判别刷新丢附件", () => {
+    expect(hasPendingHandoff()).toBe(false);
+    setPendingHandoffFiles([]);
+    expect(hasPendingHandoff()).toBe(true);
+    takePendingHandoffFiles();
+    expect(hasPendingHandoff()).toBe(false);
   });
 });
