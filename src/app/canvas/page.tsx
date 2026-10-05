@@ -18,17 +18,24 @@ import { itemRect } from "@/lib/canvas/layout";
 import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 /** 工具状态行的展示文案（按工具名；未收录的用通用文案）。 */
 const TOOL_STATUS_LABELS: Record<string, string> = {
   generate_image: "正在生成图片…",
 };
 
-/** 读取当前 URL 查询参数（SSR 安全：服务端无 window 时返回 null）。 */
-function urlParam(name: string): string | null {
-  if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get(name);
+/**
+ * useSearchParams 需要客户端回退边界：静态预渲染期间由 Suspense 兜底。
+ * 内部组件见 ChatPageInner。
+ */
+export default function ChatPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChatPageInner />
+    </Suspense>
+  );
 }
 
 /** 每会话工作区槽：消息、输入草稿与进行中标记（引用即画布选中，不单独存槽）。 */
@@ -40,13 +47,12 @@ interface SessionSlot {
 
 const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false };
 
-export default function ChatPage() {
+function ChatPageInner() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [slots, setSlots] = useState<Record<string, SessionSlot>>({});
-  // Agent 预选（首页 Agent 卡片跳转 ?agent=）：惰性初始化直读 URL
-  const [agentId, setAgentId] = useState<string>(() => urlParam("agent") ?? "");
+  // Agent 预选在下方 useSearchParams 处初始化（?agent=）
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -321,22 +327,44 @@ export default function ChatPage() {
     void loadSessions();
   }, [loadSessions]);
 
-  // 首页创作输入带来的草稿（?draft=）：填入当前会话输入框并聚焦，不自动发送；
-  // 无会话时挂起等待首个会话出现（新建/自动选中）后填入。
-  const [pendingDraft, setPendingDraft] = useState<string | null>(() => urlParam("draft"));
+  // 首页创作输入带来的草稿（?draft=）与 Agent 预选（?agent=）。
+  // 读 useSearchParams（路由状态）而非 window.location——SPA 跳转挂载时后者可能滞后。
+  // 草稿消费点必须在 restoreWorkspace 之后（否则会被本机快照的旧草稿覆盖）：
+  // selectSession/newChat 末尾消费；restore 在途或无会话时挂起，由下方 effect 兜底。
+  const searchParams = useSearchParams();
+  const agentParam = searchParams.get("agent");
+  const draftParam = searchParams.get("draft");
+  const [agentId, setAgentId] = useState<string>(agentParam ?? "");
+  const pendingDraftRef = useRef<string | null>(null);
+  const queuedDraftParamRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingDraft) return;
-    if (!currentId) return;
-    // 一次性事件消费：URL 草稿写入会话槽并聚焦后立即清除，非派生状态同步
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    updateSlot(currentId, (slot) => ({ ...slot, draft: pendingDraft }));
+    // 入队：同值不重复（地址栏清理后路由状态归零，不会再触发）
+    if (draftParam && queuedDraftParamRef.current !== draftParam) {
+      queuedDraftParamRef.current = draftParam;
+      pendingDraftRef.current = draftParam;
+    }
+    if (agentParam) {
+      setAgentId(agentParam);
+    }
+  }, [draftParam, agentParam]);
+  function applyPendingDraft(id: string) {
+    const draft = pendingDraftRef.current;
+    if (!draft) return;
+    pendingDraftRef.current = null;
+    updateSlot(id, (slot) => ({ ...slot, draft }));
     setComposerFocusNonce((n) => n + 1);
-    setPendingDraft(null);
-  }, [pendingDraft, currentId, updateSlot]);
-  // URL 参数已在 useState 惰性初始化中消费，这里仅清理地址栏避免刷新重复回填
+  }
+  // 兜底消费：实例复用（无新 selectSession）或 restore 完成后仍未消费的草稿
   useEffect(() => {
-    if (urlParam("draft") || urlParam("agent")) window.history.replaceState(null, "", "/canvas");
-  }, []);
+    if (!currentId || restoredForRef.current !== currentId) return;
+    applyPendingDraft(currentId);
+    // applyPendingDraft 每渲染重建；以 currentId 为触发源即可（draft 经 ref 传递）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
+  // 消费后清理地址栏参数，避免刷新重复回填（replaceState 与路由状态同步）
+  useEffect(() => {
+    if (draftParam || agentParam) window.history.replaceState(null, "", "/canvas");
+  }, [draftParam, agentParam]);
 
   useEffect(() => {
     if (currentId) void selectSession(currentId);
@@ -364,6 +392,7 @@ export default function ChatPage() {
     const msgs = await loadMessages(id);
     deriveImages(msgs, sig);
     restoreWorkspace(id);
+    applyPendingDraft(id);
   }
 
   async function newChat() {
@@ -385,6 +414,7 @@ export default function ChatPage() {
       setHistoryOpen(false);
       setChatOpen(true);
       setComposerFocusNonce((n) => n + 1);
+      applyPendingDraft(data.id);
     }
   }
 
@@ -870,6 +900,7 @@ export default function ChatPage() {
           onStop={stopGeneration}
           reference={composerReference}
           selectedAssetId={selectedCanvasItem?.assetId ?? null}
+          sessionTitle={sessions.find((s) => s.id === currentId)?.title ?? ""}
         />
       </div>
 

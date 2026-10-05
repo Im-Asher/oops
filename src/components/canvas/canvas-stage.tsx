@@ -60,7 +60,11 @@ function CanvasItemView({
         selected ? "ring-2 ring-violet-400" : ""
       } ${item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
       data-item-id={item.id}
-      onPointerDown={(event) => onPointerDown(event, item)}
+      onPointerDown={(event) => {
+        // 阻断冒泡：否则画布背景 handler 会把选中清空、拖图覆盖为平移
+        event.stopPropagation();
+        onPointerDown(event, item);
+      }}
       style={{ height: item.width * item.aspect, left: item.x, top: item.y, width: item.width }}
     >
       {item.agentName || item.agentIcon ? (
