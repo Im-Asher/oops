@@ -7,7 +7,7 @@
 一体化 Next.js 全栈应用（无独立后端），Route Handlers 承载 SSE 流与上传接口。
 
 ```
-浏览器 (shadcn/ui：全屏画布工作台 + 左侧悬浮聊天面板；生图以缩略图上屏)
+浏览器 (shadcn/ui：/home 落地页 + /canvas AI 画布页——点阵画布全屏 + 左上悬浮聊天面板；明暗双主题)
    │  SSE 流式消息 / 工具调用状态
    ▼
 Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
@@ -29,6 +29,8 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
 | 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
+| 前端骨架 | 双页结构：`/home` 轻量落地页（侧栏导航 + 创作输入/Agent 卡片入口）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
+| 主题 | 手写 ThemeProvider（零依赖）：html `dark` class 切换 + localStorage（`oops-theme`）持久化 + layout 首屏阻塞脚本防闪烁；明暗两套 CSS token |
 
 ## 2. 技术栈
 
@@ -105,7 +107,7 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ## 5. 端到端流程（用户发送一条消息）
 
 ```
-⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/chat` 未登录 → 302 `/login`）；
+⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/` → 已登录 `/home` 否则 `/login`；`/home`、`/canvas` 未登录 → 302 `/login`；旧路径 `/chat` 由页面级 redirect 到 `/canvas`）；
    业务 API 由 `requireUser` 完整验签 + 查 `users` active + 会话版本一致（唯一安全边界），未认证统一 401
 ① 前端：Composer 提交消息（引用 = 画布选中条目，可移除 chip）→ POST /api/chat { sessionId, agentId, message, referenceAssetIds? } → SSE 连接
 ② Route Handler：requireUser 取 userId → 引用资产归属校验（存在/userId/sessionId 匹配，≤5）→
@@ -116,23 +118,24 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 画布可见
 ```
 
-**画布工作台闭环**（`/chat` 页，画布为多作品平面）：
+**画布工作台闭环**（`/canvas` 页，画布为多作品平面）：
 
 ```
 tool_start(generate_image) → 画布插入生成中占位卡（有引用 placeNear 邻近放置，血缘 = 模型传参优先、回退本轮选中引用）
 tool_end → 占位卡原位结算：成功换图；失败置失败卡（原因摘要 + 重试按钮，重试以卡内原始意图重新发起一轮）
-结果不在当前视口 → 顶栏下浮出"有新结果"提示（点击定位选中）；在视口内静默完成，不强制移动视角
+结果不在当前视口 → 画布顶部居中浮出"有新结果"提示（点击定位选中）；在视口内静默完成，不强制移动视角
 SSE 事件按发起会话归档（currentIdRef 守卫），流中切会话不串图；工作区（位置/视角/草稿/引用）300ms 防抖存本机
 （键 oops:workspace:v1:<sessionId>），切换会话与刷新后恢复
 ```
 
-账号入口：悬浮聊天窗顶栏头像菜单（只读账号摘要 / 个人信息 / 退出登录）→ `/profile`
+账号入口：聊天面板头部时钟下拉底部用户区 + 首页侧栏底部头像菜单（只读账号摘要 / 个人信息 / 退出登录）→ `/profile`
 维护昵称/性别/签名与改密（改密成功后当前端保持登录、其他端全部下线）。
 
 要点：
 
 - **事件即持久化**：每个 SSE 事件边推边存，刷新页面从 DB 重建完整会话，无需重放 agent。
 - **失败回喂**：工具失败返回结构化错误给 agent，由 agent 用自然语言解释并建议重试，会话不崩。
+- **用户中断生成**：流进行中发送钮变停止钮；点击断开 SSE（AbortController）→ 服务端捕获断连后中断 agent 循环与未结算任务，已生成部分照常落库。前端本轮聊天侧标记"[已停止生成]"（仅本轮 UI 态，不进持久化正文），画布未结算占位卡移除；刷新后以服务端落库的部分内容呈现，历史一致。
 
 ### 5.1 会话记忆：双视图持久化与上下文压缩（compact）
 
@@ -156,6 +159,24 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 生成摘要写入 `sessions.summary`，并单调推进水位线 `sessions.summarized_up_to`（目标压到
 ~10k 以内）。**原文永不删除**——摘要幂等可重算；compact 失败降级为按现有摘要/水位线回放，
 不中断用户回合；摘要被清空时下次 compact 从原文重建。
+
+### 5.2 前端骨架：双页路由、首页跳转协议与主题
+
+**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布可用，未实现项置灰禁用；主区创作横幅、
+创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
+左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/chat` 页面级
+`redirect("/canvas")` 保存量入口。窄屏（md 以下）聊天与画布互斥切换显示。
+
+**首页 → 画布跳转协议**：创作输入提交携带 `?draft=<文本>`，Agent 卡片点击携带 `?agent=<id>`
+（画布空态预选；已有会话时会话绑定 Agent 优先）。画布页用 `useSearchParams`（路由状态）读取
+参数——不读 `window.location`（SPA 挂载时其更新时序滞后）；草稿入队 ref，在「本机工作区回贴
+完成」之后消费（避免快照旧草稿覆盖首页带来的新草稿），无会话时挂起等待首个会话；消费后
+`history.replaceState` 清参防刷新重复回填（replaceState 与路由状态同步）。
+
+**主题**：`components/theme-provider.tsx` 手写 Context（零依赖）——`applyTheme` 切 html
+`dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本按存储/系统偏好预设 class 防
+首屏闪烁。颜色一律走明/暗两套 CSS token（globals.css class-based dark variant），切换入口在
+首页侧栏底部与画布聊天面板头部。
 
 ## 6. 不可控输入的分流
 
