@@ -22,10 +22,11 @@ interface ProfileSummary {
 }
 
 /**
- * 工具条底部用户入口：账号摘要（只读：昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
- * 用户名仅在 /profile 页展示。摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
+ * 用户菜单内容：账号摘要（昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
+ * 独立导出供时钟下拉底部复用（须渲染在某个 DropdownMenu 根内）。
+ * 摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
  */
-export function UserMenu() {
+export function UserMenuContent() {
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -55,6 +56,58 @@ export function UserMenu() {
   }
 
   const nickname = profile ? resolveDisplayName(profile) : "";
+
+  return (
+    <>
+      {profile ? (
+        <>
+          <DropdownMenuLabel className="font-normal">
+            <span className="block truncate text-sm">{nickname}</span>
+            <span className="block truncate text-xs text-zinc-400">
+              oops_{profile.oopsId}
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator className="bg-zinc-800" />
+        </>
+      ) : null}
+      <DropdownMenuItem asChild>
+        <Link href="/profile">个人信息</Link>
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        className="text-red-400 focus:text-red-300"
+        disabled={loggingOut}
+        onSelect={(e) => {
+          e.preventDefault();
+          void onLogout();
+        }}
+      >
+        <LogOutIcon />
+        {loggingOut ? "退出中…" : "退出登录"}
+      </DropdownMenuItem>
+    </>
+  );
+}
+
+/**
+ * 用户入口（原工具条底部）：头像触发 + 用户菜单内容。
+ */
+export function UserMenu() {
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: ProfileSummary | null) => {
+        if (alive && body) setProfile(body);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const nickname = profile ? resolveDisplayName(profile) : "";
   const initial = nickname[0] ?? "";
 
   return (
@@ -79,31 +132,7 @@ export function UserMenu() {
         align="start"
         className="w-52 border-zinc-800 bg-zinc-900 text-zinc-50"
       >
-        {profile ? (
-          <>
-            <DropdownMenuLabel className="font-normal">
-              <span className="block truncate text-sm">{nickname}</span>
-              <span className="block truncate text-xs text-zinc-400">
-                oops_{profile.oopsId}
-              </span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-zinc-800" />
-          </>
-        ) : null}
-        <DropdownMenuItem asChild>
-          <Link href="/profile">个人信息</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-red-400 focus:text-red-300"
-          disabled={loggingOut}
-          onSelect={(e) => {
-            e.preventDefault();
-            void onLogout();
-          }}
-        >
-          <LogOutIcon />
-          {loggingOut ? "退出中…" : "退出登录"}
-        </DropdownMenuItem>
+        <UserMenuContent />
       </DropdownMenuContent>
     </DropdownMenu>
   );

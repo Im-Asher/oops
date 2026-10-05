@@ -4,6 +4,7 @@ import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionSidebar } from "@/components/chat/session-sidebar";
+import { UserMenuContent } from "@/components/chat/user-menu";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import { DownloadIcon, MessageSquareIcon } from "lucide-react";
 import {
@@ -779,22 +780,28 @@ export default function ChatPage() {
           }}
           historyContent={
             <div className="flex h-[420px] flex-col overflow-hidden">
-              <SessionSidebar
-                agents={agents}
-                currentId={currentId}
-                errorMessage={actionError}
-                onDeleteSession={(id) => void deleteSession(id)}
-                onCollapse={() => setHistoryOpen(false)}
-                onNewChat={() => void newChat()}
-                onQueryChange={setHistoryQuery}
-                onRenameSession={(id, title) => void renameSession(id, title)}
-                onSelectSession={(id) => {
-                  setHistoryOpen(false);
-                  void selectSession(id);
-                }}
-                query={historyQuery}
-                sessions={sessions}
-              />
+              <div className="min-h-0 flex-1">
+                <SessionSidebar
+                  agents={agents}
+                  currentId={currentId}
+                  errorMessage={actionError}
+                  onDeleteSession={(id) => void deleteSession(id)}
+                  onCollapse={() => setHistoryOpen(false)}
+                  onNewChat={() => void newChat()}
+                  onQueryChange={setHistoryQuery}
+                  onRenameSession={(id, title) => void renameSession(id, title)}
+                  onSelectSession={(id) => {
+                    setHistoryOpen(false);
+                    void selectSession(id);
+                  }}
+                  query={historyQuery}
+                  sessions={sessions}
+                />
+              </div>
+              {/* 用户区：无会话空态下用户入口仍可达（时钟下拉常开） */}
+              <div className="shrink-0 border-t border-zinc-800 bg-zinc-950 p-1">
+                <UserMenuContent />
+              </div>
             </div>
           }
           historyOpen={historyOpen}
