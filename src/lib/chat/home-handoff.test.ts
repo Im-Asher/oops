@@ -33,6 +33,7 @@ describe("home-handoff 待传附件暂存", () => {
     setPendingHandoffFiles([file("a.png")]);
     const next = [file("b.png")];
     setPendingHandoffFiles(next);
-    expect(getPendingHandoffFiles()).toBe(next);
+    expect(getPendingHandoffFiles()).toEqual(next);
+    expect(getPendingHandoffFiles()).not.toBe(next);
   });
 });
