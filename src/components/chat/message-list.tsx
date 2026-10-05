@@ -119,6 +119,11 @@ export function MessageList({
             key={m.id}
             className={`flex w-full items-start gap-2 ${
               isUser ? "justify-end" : "justify-start"
+            } ${
+              // 用户消息上浮入场（仅末条，避免会话切换整列表重播）；GPU 合成、motion-reduce 降级
+              isUser && isLast
+                ? "motion-reduce:animate-none animate-in fade-in slide-in-from-bottom-2 duration-300"
+                : ""
             }`}
           >
             {!isUser && <AgentAvatar icon={agentIcon} />}

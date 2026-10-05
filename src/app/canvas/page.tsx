@@ -20,6 +20,7 @@ import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/works
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { hasPendingHandoff, takePendingHandoffFiles } from "@/lib/chat/home-handoff";
 
 /** 工具状态行的展示文案（按工具名；未收录的用通用文案）。 */
 const TOOL_STATUS_LABELS: Record<string, string> = {
@@ -186,7 +187,25 @@ function ChatPageInner() {
     [],
   );
 
-  // 参考图上传：走 /upload purpose=reference（绑会话资产、不写聊天消息），上画布并选中即引用。
+  // 参考图上传内核：/upload purpose=reference（绑会话资产、不写聊天消息）。直发衔接复用。
+  const uploadReferenceTo = useCallback(
+    async (sessionId: string, file: File): Promise<{ assetId: string; url: string }> => {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("purpose", "reference");
+      form.append("sessionId", sessionId);
+      const res = await fetch("/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+        throw new Error(err?.error?.message ?? `参考图上传失败（${res.status}）`);
+      }
+      return (await res.json()) as { assetId: string; url: string };
+    },
+    [],
+  );
+  // 参考图上传：上传后落画布并选中即引用（手动路径，错误以 chip 下方提示呈现）。
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const uploadReference = useCallback(
@@ -194,18 +213,7 @@ function ChatPageInner() {
       if (!currentId) return;
       setReferenceError(null);
       try {
-        const form = new FormData();
-        form.append("file", file);
-        form.append("purpose", "reference");
-        form.append("sessionId", currentId);
-        const res = await fetch("/upload", { method: "POST", body: form });
-        if (!res.ok) {
-          const err = (await res.json().catch(() => null)) as
-            | { error?: { message?: string } }
-            | null;
-          throw new Error(err?.error?.message ?? `参考图上传失败（${res.status}）`);
-        }
-        const data = (await res.json()) as { assetId: string; url: string };
+        const data = await uploadReferenceTo(currentId, file);
         dispatch({
           type: "addImageItems",
           images: [{ assetId: data.assetId, url: data.url, name: file.name }],
@@ -215,7 +223,7 @@ function ChatPageInner() {
         setReferenceError(e instanceof Error ? e.message : "参考图上传失败");
       }
     },
-    [currentId],
+    [currentId, uploadReferenceTo],
   );
 
   // 会话工作区本机持久化：画布/草稿变化 300ms 防抖落盘；未完成恢复的会话不写，避免切换瞬间用清空态覆盖。
@@ -255,7 +263,20 @@ function ChatPageInner() {
     restoredForRef.current = id;
   }
 
+  const searchParams = useSearchParams();
+  const agentParam = searchParams.get("agent");
+  const draftParam = searchParams.get("draft");
+  const sendParam = searchParams.get("send");
+  // 直发去重 nonce（首页提交时间戳）：同文案连发两次时 draft 相同也能再次入队。
+  const sendNonceParam = searchParams.get("t");
+  // 直发意图：首渲染即判定，先于 loadSessions 的 bootstrap 引导读取。
+  const directSendRef = useRef(sendParam === "1");
+  // 直发衔接的新会话 id：newChat 建会话后置位，slot 落地（渲染提交）后由衔接 effect 消费。
+  const directSendSessionRef = useRef<string | null>(null);
   const bootstrappedRef = useRef(false);
+  // newChat 每渲染重建；loadSessions（deps []）经 ref 调用当次最新版本——
+  // 直发衔接由 bootstrap 引导完成时触发建会话（B1）。
+  const newChatRef = useRef<() => Promise<void>>(async () => {});
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
     if (!res.ok) return;
@@ -263,7 +284,11 @@ function ChatPageInner() {
     setSessions(data.sessions);
     if (!bootstrappedRef.current) {
       bootstrappedRef.current = true;
-      if (data.sessions[0]) setCurrentId(data.sessions[0].id);
+      // 直发衔接：不切最近会话（spec/canvas-workspace「直发衔接进入」），
+      // 引导完成后立即新建会话（newChat 为函数声明，运行时已提升、可前向调用；
+      // 其用到的 setter/ref 与首渲染 agentId 初始化在此语境下均正确）。
+      if (data.sessions[0] && !directSendRef.current) setCurrentId(data.sessions[0].id);
+      else if (directSendRef.current) void newChatRef.current();
     }
   }, []);
 
@@ -331,22 +356,36 @@ function ChatPageInner() {
   // 读 useSearchParams（路由状态）而非 window.location——SPA 跳转挂载时后者可能滞后。
   // 草稿消费点必须在 restoreWorkspace 之后（否则会被本机快照的旧草稿覆盖）：
   // selectSession/newChat 末尾消费；restore 在途或无会话时挂起，由下方 effect 兜底。
-  const searchParams = useSearchParams();
-  const agentParam = searchParams.get("agent");
-  const draftParam = searchParams.get("draft");
   const [agentId, setAgentId] = useState<string>(agentParam ?? "");
   const pendingDraftRef = useRef<string | null>(null);
   const queuedDraftParamRef = useRef<string | null>(null);
+  const queuedSendNonceRef = useRef<string | null>(null);
+  // 直发衔接状态行（聊天面板展示）；null 即非衔接中。
+  const [directSendStatus, setDirectSendStatus] = useState<{
+    text: string;
+    tone: "progress" | "error";
+  } | null>(null);
   useEffect(() => {
-    // 入队：同值不重复（地址栏清理后路由状态归零，不会再触发）
-    if (draftParam && queuedDraftParamRef.current !== draftParam) {
+    // 入队：同值不重复（地址栏清理后路由状态归零，不会再触发）；
+    // nonce 变化视为新一次直发（同文案连发场景）。
+    if (
+      draftParam &&
+      (queuedDraftParamRef.current !== draftParam || sendNonceParam !== queuedSendNonceRef.current)
+    ) {
       queuedDraftParamRef.current = draftParam;
+      queuedSendNonceRef.current = sendNonceParam;
       pendingDraftRef.current = draftParam;
+      // 直发意图需 handoff 暂存仍在：跳转后刷新会清空模块内存，此时降级为草稿回填
+      // 不直发（spec/canvas-workspace「刷新丢附件保草稿」）。
+      directSendRef.current = sendParam === "1" && hasPendingHandoff();
+      if (directSendRef.current) {
+        setDirectSendStatus({ text: "正在创建会话…", tone: "progress" });
+      }
     }
     if (agentParam) {
       setAgentId(agentParam);
     }
-  }, [draftParam, agentParam]);
+  }, [draftParam, agentParam, sendParam, sendNonceParam]);
   function applyPendingDraft(id: string) {
     const draft = pendingDraftRef.current;
     if (!draft) return;
@@ -354,13 +393,25 @@ function ChatPageInner() {
     updateSlot(id, (slot) => ({ ...slot, draft }));
     setComposerFocusNonce((n) => n + 1);
   }
-  // 兜底消费：实例复用（无新 selectSession）或 restore 完成后仍未消费的草稿
+  // 兜底消费：实例复用（无新 selectSession）或 restore 完成后仍未消费的草稿；
+  // 直发衔接中草稿由 runDirectSend 接管，兜底不抢（否则草稿被填入输入框且直发丢字）。
   useEffect(() => {
     if (!currentId || restoredForRef.current !== currentId) return;
+    if (directSendRef.current) return;
     applyPendingDraft(currentId);
     // applyPendingDraft 每渲染重建；以 currentId 为触发源即可（draft 经 ref 传递）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
+  // 直发衔接消费：新会话 slot 在渲染中落地后执行上传与自动发送（spec「直发衔接进入」）。
+  useEffect(() => {
+    const id = directSendSessionRef.current;
+    if (!id || currentId !== id || !slots[id]) return;
+    directSendSessionRef.current = null;
+    void runDirectSend(id);
+    // runDirectSend 每渲染重建，此处闭包取当次渲染版本（slots 已含新会话 slot）；
+    // 以 currentId/slots 为触发源（草稿/附件经 ref 与 handoff store 传递）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, slots]);
   // 消费后清理地址栏参数，避免刷新重复回填（replaceState 与路由状态同步）
   useEffect(() => {
     if (draftParam || agentParam) window.history.replaceState(null, "", "/canvas");
@@ -414,8 +465,107 @@ function ChatPageInner() {
       setHistoryOpen(false);
       setChatOpen(true);
       setComposerFocusNonce((n) => n + 1);
+      if (directSendRef.current) {
+        // 衔接接管：置位新会话 id，待 slot 在渲染中落地后由衔接 effect 执行上传+直发。
+        // 不在此同步调 runDirectSend——runRound 读取当次渲染的 slots 闭包，
+        // state 提交前调用会读到陈旧 slots 而静默空转（code review B2）。
+        directSendSessionRef.current = data.id;
+        return;
+      }
       applyPendingDraft(data.id);
+    } else if (directSendRef.current) {
+      // 注意：不预先清 pendingDraftRef——无会话可回填时需保留排队供「新会话」重试。
+      const text = pendingDraftRef.current ?? "";
+      await recoverDirectSendFailure(text);
     }
+  }
+  newChatRef.current = newChat;
+
+  /**
+   * 直发衔接：消费 ?draft&send=1 —— 附件并行上传（任一失败即不发送，已成功的
+   * 仍落画布，草稿回填），随后以 assetId 显式为引用自动发送首轮（不依赖选中态，
+   * spec/canvas-workspace「直发衔接进入」）。
+   */
+  async function runDirectSend(sessionId: string) {
+    const text = pendingDraftRef.current ?? "";
+    pendingDraftRef.current = null;
+    directSendRef.current = false;
+    const files = takePendingHandoffFiles();
+    try {
+      let refs: string[] = [];
+      if (files.length) {
+        setDirectSendStatus({ text: `正在上传附件（0/${files.length}）…`, tone: "progress" });
+        let done = 0;
+        const settled = await Promise.allSettled(
+          files.map(async (file) => {
+            const data = await uploadReferenceTo(sessionId, file);
+            done += 1;
+            setDirectSendStatus({
+              text: `正在上传附件（${done}/${files.length}）…`,
+              tone: "progress",
+            });
+            return { ...data, name: file.name };
+          }),
+        );
+        const ok = settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+        if (ok.length < files.length) {
+          // 原子性：任一失败即不发送；已成功条目仍落画布（可见可复用），草稿回填。
+          if (ok.length) {
+            dispatch({
+              type: "addImageItems",
+              images: ok.map((v) => ({ assetId: v.assetId, url: v.url, name: v.name })),
+            });
+          }
+          updateSlot(sessionId, (slot) => ({ ...slot, draft: text }));
+          setComposerFocusNonce((n) => n + 1);
+          setDirectSendStatus({
+            text: `${files.length - ok.length} 个附件上传失败，已停止发送；草稿已回填，可重新添加附件后手动发送`,
+            tone: "error",
+          });
+          return;
+        }
+        dispatch({
+          type: "addImageItems",
+          images: ok.map((v) => ({ assetId: v.assetId, url: v.url, name: v.name })),
+        });
+        refs = ok.map((v) => v.assetId);
+      }
+      setDirectSendStatus({ text: "正在发送…", tone: "progress" });
+      await runRound(sessionId, text, refs);
+      setDirectSendStatus(null);
+    } catch (e) {
+      // 上传/发送环节异常：文案回填不丢字。
+      updateSlot(sessionId, (slot) => ({ ...slot, draft: text }));
+      setComposerFocusNonce((n) => n + 1);
+      setDirectSendStatus({
+        text: e instanceof Error ? e.message : "直发失败，草稿已回填输入框",
+        tone: "error",
+      });
+    }
+  }
+
+  /** 直发建会话失败：退回常规入口（引导最近会话）并回填草稿；无任何会话时保留排队待重试。 */
+  async function recoverDirectSendFailure(text: string) {
+    directSendRef.current = false;
+    setDirectSendStatus(null);
+    const res = await fetch("/api/sessions");
+    if (res.ok) {
+      const data = (await res.json()) as { sessions: SessionInfo[] };
+      setSessions(data.sessions);
+      const first = data.sessions[0];
+      if (first) {
+        pendingDraftRef.current = null;
+        bootstrappedRef.current = true;
+        await selectSession(first.id);
+        updateSlot(first.id, (slot) => ({ ...slot, draft: text }));
+        setComposerFocusNonce((n) => n + 1);
+        setDirectSendStatus({ text: "会话创建失败，草稿已回填输入框，可修改后重发", tone: "error" });
+        return;
+      }
+    }
+    // 无会话可回填（如首次使用）：草稿留在队列，点「新会话」即按常规路径消费。
+    pendingDraftRef.current = text;
+    setDirectSendStatus({ text: "会话创建失败，文案已保留，可点击「新会话」重试", tone: "error" });
   }
 
   /** 重命名会话：乐观更新本地列表，失败回滚并提示。 */
@@ -760,8 +910,11 @@ function ChatPageInner() {
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-background text-foreground">
-      {/* 画布：全屏唯一主舞台，全局件与其悬浮层都在其上 */}
-      <div className="absolute inset-0" ref={canvasWrapRef}>
+      {/* 画布：全屏唯一主舞台，全局件与其悬浮层都在其上（入场淡入，motion-reduce 降级） */}
+      <div
+        className="absolute inset-0 motion-reduce:animate-none animate-in fade-in duration-500"
+        ref={canvasWrapRef}
+      >
         {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
           <span
@@ -840,11 +993,13 @@ function ChatPageInner() {
         </button>
       ) : null}
 
-      {/* 聊天面板：md+ 为画布上方左上悬浮卡片（可收起）；<md 全屏互斥切换 */}
+      {/* 聊天面板：md+ 为画布上方左上悬浮卡片（可收起）；<md 全屏互斥切换。
+          入场动效（Level 1）：自左滑入+缩放+淡入；hidden（display:none）切换会重启动画，
+          收起再展开会重播——已拍板接受（design.md D5）。仅 transform/opacity，GPU 合成。 */}
       <div
         className={
           chatOpen
-            ? "absolute inset-0 z-40 flex md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-border/80 md:shadow-2xl md:shadow-black/40"
+            ? "absolute inset-0 z-40 flex motion-reduce:animate-none animate-in fade-in slide-in-from-left-4 zoom-in-[0.98] duration-300 ease-out md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-border/80 md:shadow-2xl md:shadow-black/40"
             : "hidden"
         }
         data-testid="chat-panel-container"
@@ -900,6 +1055,7 @@ function ChatPageInner() {
           onStop={stopGeneration}
           reference={composerReference}
           selectedAssetId={selectedCanvasItem?.assetId ?? null}
+          statusLine={directSendStatus}
           sessionTitle={sessions.find((s) => s.id === currentId)?.title ?? ""}
         />
       </div>

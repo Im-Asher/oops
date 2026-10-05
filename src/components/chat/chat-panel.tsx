@@ -43,6 +43,8 @@ interface ChatPanelProps {
   focusSignal?: number;
   /** 附件上传参考图入口（透传停靠形态输入框）。 */
   onAttach?: () => void;
+  /** 直发衔接状态行（进度/错误）；null 即不展示。 */
+  statusLine?: { text: string; tone: "progress" | "error" } | null;
 }
 
 /**
@@ -74,6 +76,7 @@ export function ChatPanel({
   onRemoveReference,
   focusSignal,
   onAttach,
+  statusLine,
 }: ChatPanelProps) {
   return (
     <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-card">
@@ -94,6 +97,17 @@ export function ChatPanel({
         onSelectAsset={onSelectAsset}
         selectedAssetId={selectedAssetId}
       />
+      {statusLine ? (
+        <div aria-live="polite" className="px-3 pb-1" data-testid="chat-status-line">
+          <span
+            className={
+              statusLine.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
+            }
+          >
+            {statusLine.text}
+          </span>
+        </div>
+      ) : null}
       <div className="p-3">
         <Composer
           agentId={agentId}
