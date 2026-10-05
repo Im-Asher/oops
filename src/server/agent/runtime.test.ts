@@ -9,6 +9,8 @@ const h = vi.hoisted(() => ({
   session: null as { summary: string | null; summarizedUpTo: string | null } | null,
   completeSimple: vi.fn(),
   updateSummary: vi.fn(async () => ({})),
+  // 中断测试用闸门：非空时 prompt 在每个事件派发前等待，测试可在此窗口触发 abort
+  gate: null as Promise<void> | null,
 }));
 
 vi.mock("@/server/db/session.repo", () => ({
@@ -21,6 +23,7 @@ vi.mock("@/server/db/session.repo", () => ({
 vi.mock("@earendil-works/pi-agent-core", () => ({
   Agent: class {
     private cb: (e: unknown) => void = () => {};
+    private abortRequested = false;
     state: { messages: unknown[] } = { messages: [] };
     constructor(opts: {
       initialState?: { messages?: unknown[] };
@@ -32,10 +35,34 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
     subscribe(cb: (e: unknown) => void) {
       this.cb = cb;
     }
+    // 贴近真实 Agent.abort()（探针结论）：中断后循环截断，state 留下
+    // stopReason="aborted" 的部分 assistant 消息，prompt 正常返回
+    abort() {
+      this.abortRequested = true;
+    }
     async prompt() {
       // 贴近真实 Agent：prompt 将本轮消息追加到历史之后（不整体替换）
       this.state = { messages: [...this.state.messages, ...h.stateMessages] };
-      for (const ev of h.scripted) this.cb(ev);
+      for (const ev of h.scripted) {
+        if (this.abortRequested) break;
+        this.cb(ev);
+        // 让出微任务 + 闸门（非空时挂起）：测试可在事件间触发 abort
+        await new Promise((r) => setTimeout(r, 0));
+        if (h.gate) await h.gate;
+      }
+      if (this.abortRequested) {
+        // 探针结论：真实库中断后仍以 agent_end 收尾，state 留部分 assistant 消息。
+        // 注入式用例（h.stateMessages 非空）已自带中断消息，不再重复合成
+        if (h.stateMessages.length === 0) {
+          this.state.messages.push({
+            role: "assistant",
+            stopReason: "aborted",
+            content: [{ type: "text", text: "部分回答" }],
+            timestamp: Date.now(),
+          });
+        }
+        this.cb({ type: "agent_end" });
+      }
     }
   },
 }));
@@ -100,6 +127,7 @@ describe("runAgent (runtime bridge)", () => {
   beforeEach(() => {
     h.stateMessages = [];
     h.session = null;
+    h.gate = null;
     h.completeSimple.mockReset();
     h.updateSummary.mockClear();
   });
@@ -510,5 +538,139 @@ describe("runAgent (runtime bridge)", () => {
     };
     expect(JSON.stringify(initial.messages[0].content)).toContain("旧摘要");
     expect(JSON.stringify(initial.messages)).toContain("近期原文");
+  });
+
+  it("中断：abort 后停止累积，部分文本落库（无结果工具不落 toolCalls）", async () => {
+    const { repo, create } = makeRepo();
+    h.scripted = [
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "部分回答" } },
+      {
+        type: "tool_execution_start",
+        toolCallId: "c9",
+        toolName: "generate_image",
+        args: { prompt: "x" },
+      },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "不应累积" } },
+      { type: "agent_end" },
+    ];
+    let release!: () => void;
+    h.gate = new Promise<void>((r) => (release = r));
+    const ac = new AbortController();
+    const events: Record<string, unknown>[] = [];
+    const p = runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "test-agent",
+      userText: "hi",
+      userMessageId: "mu1",
+      signal: ac.signal,
+      onEvent: (e: Record<string, unknown>) => events.push(e),
+      repos: { message: repo as never },
+    });
+    // 等首个 delta 事件送达后，在闸门窗口内触发中断
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.type === "message_delta")).toBe(true);
+    });
+    ac.abort();
+    release();
+    await p;
+    h.gate = null;
+    // finish 如实标记 aborted；中断点之后的 delta 不再累积
+    expect(events[events.length - 1]).toMatchObject({ type: "finish", stopReason: "aborted" });
+    expect(JSON.stringify(events)).not.toContain("不应累积");
+    // 部分落库：已生成文本入库，无结果 tool-start 不产生 toolCalls
+    const persisted = create.mock.calls[0][0] as {
+      content: string;
+      toolCalls?: unknown;
+      transcript: { messages: { role: string; stopReason?: string }[] };
+    };
+    expect(persisted.content).toBe("部分回答");
+    expect(persisted.toolCalls).toBeUndefined();
+    expect(persisted.transcript.messages.at(-1)?.stopReason).toBe("aborted");
+  });
+
+  it("中断于工具执行中：transcript 保留带 toolCall 的 assistant 消息（无对应 toolResult）", async () => {
+    const { repo, create } = makeRepo();
+    h.stateMessages = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "我来生成" },
+          { type: "toolCall", id: "c8", name: "generate_image", arguments: { prompt: "x" } },
+        ],
+        api: "openai-completions",
+        provider: "test",
+        model: "m",
+        stopReason: "aborted",
+        timestamp: 5,
+      },
+    ];
+    h.scripted = [
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "我来生成" } },
+      {
+        type: "tool_execution_start",
+        toolCallId: "c8",
+        toolName: "generate_image",
+        args: { prompt: "x" },
+      },
+      { type: "agent_end" },
+    ];
+    let release!: () => void;
+    h.gate = new Promise<void>((r) => (release = r));
+    const ac = new AbortController();
+    const p = runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "test-agent",
+      userText: "hi",
+      userMessageId: "mu1",
+      signal: ac.signal,
+      onEvent: () => {},
+      repos: { message: repo as never },
+    });
+    // 等待 runtime 完成异步准备并派发首个事件（prompt 已挂起在闸门）
+    await new Promise((r) => setTimeout(r, 5));
+    ac.abort();
+    release();
+    await p;
+    h.gate = null;
+    const persisted = create.mock.calls[0][0] as {
+      transcript: { messages: { role: string; content: { type: string }[] }[] };
+    };
+    expect(persisted.transcript.messages.map((m) => m.role)).toEqual(["assistant"]);
+    expect(persisted.transcript.messages[0].content.map((c) => c.type)).toEqual(["text", "toolCall"]);
+  });
+
+  it("下游容忍：被中断回合的 toolCall 无 toolResult，下一轮回放不抛错且原样保留", async () => {
+    const { repo } = makeRepo([
+      {
+        id: "m1",
+        transcript: {
+          v: 1,
+          messages: [
+            {
+              role: "assistant",
+              content: [
+                { type: "text", text: "生成中" },
+                { type: "toolCall", id: "c7", name: "generate_image", arguments: { prompt: "被中断" } },
+              ],
+              api: "openai-completions",
+              provider: "test",
+              model: "m",
+              stopReason: "aborted",
+              timestamp: 1,
+            },
+            // 注意：没有对应 toolResult 行（中断遗留的不完整回合）
+          ],
+        },
+      },
+    ]);
+    await run([{ type: "agent_end" }], repo as never);
+    const initial = (h.capturedInitialState?.initialState ?? {}) as {
+      messages: { role: string; content: { type: string }[] }[];
+    };
+    expect(initial.messages).toHaveLength(1);
+    expect(initial.messages[0].role).toBe("assistant");
+    expect(initial.messages[0].content.map((c) => c.type)).toEqual(["text", "toolCall"]);
   });
 });

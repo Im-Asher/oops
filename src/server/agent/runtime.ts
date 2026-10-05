@@ -156,15 +156,30 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
         }
         break;
       case "agent_end":
-        args.onEvent({ type: "finish", stopReason: "stop" });
+        args.onEvent({ type: "finish", stopReason: args.signal.aborted ? "aborted" : "stop" });
         break;
     }
   });
 
+  // 中断接线：route 层 signal（客户端断开或用户点停止）→ 真停 agentLoop。
+  // 实测（见 change notes abort-probe）：abort 后 prompt() 正常 resolve，state 留下
+  // stopReason="aborted" 的部分 assistant 消息 → 下方统一落库即天然部分落库。
+  const onAbort = () => agent.abort();
+  if (args.signal.aborted) {
+    onAbort();
+  } else {
+    args.signal.addEventListener("abort", onAbort, { once: true });
+  }
+
   try {
     await agent.prompt(args.userText);
   } catch (err) {
-    args.onEvent({ type: "error", message: (err as Error)?.message ?? "生成失败" });
+    // 中断引发的异常不外推（SSE 已断，收尾事件无法也无需送达），仅吞掉
+    if (!args.signal.aborted) {
+      args.onEvent({ type: "error", message: (err as Error)?.message ?? "生成失败" });
+    }
+  } finally {
+    args.signal.removeEventListener("abort", onAbort);
   }
 
   if (assistantText || toolResults.length > 0) {
