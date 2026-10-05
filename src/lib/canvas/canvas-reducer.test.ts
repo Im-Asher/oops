@@ -265,3 +265,56 @@ describe("normalizeCrop", () => {
     expect(rect).toEqual({ x: 0, y: 0, width: 0.5, height: 0.5 });
   });
 });
+
+describe("署名徽标（agentIcon/agentName）", () => {
+  it("addPlaceholder 带署名；patchItem 更新状态后署名保留", () => {
+    let state = canvasReducer(
+      initialCanvasState,
+      { type: "addPlaceholder", id: "p1", agentIcon: "📸", agentName: "产品摄影师" },
+    );
+    expect(state.items[0]).toMatchObject({
+      status: "generating",
+      agentIcon: "📸",
+      agentName: "产品摄影师",
+    });
+    state = canvasReducer(state, {
+      type: "patchItem",
+      id: "p1",
+      patch: { assetId: "a1", url: "/files/a1.png", status: "image" },
+    });
+    expect(state.items[0]).toMatchObject({
+      assetId: "a1",
+      status: "image",
+      agentIcon: "📸",
+      agentName: "产品摄影师",
+    });
+  });
+
+  it("addImageItems 带署名写入；不带（上传链路）则无字段", () => {
+    let state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a1", url: "/files/a1.png", agentIcon: "🌄", agentName: "氛围图设计师" }],
+    });
+    expect(state.items[0]).toMatchObject({ agentIcon: "🌄", agentName: "氛围图设计师" });
+
+    state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a2", url: "/files/a2.png", name: "ref.png" }],
+    });
+    expect(state.items[0].agentIcon).toBeUndefined();
+    expect(state.items[0].agentName).toBeUndefined();
+  });
+
+  it("幂等派生：已存在 assetId 再派生不覆盖原条目署名", () => {
+    let state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a1", url: "/files/a1.png", agentIcon: "📸", agentName: "产品摄影师" }],
+    });
+    state = canvasReducer(state, {
+      type: "addImageItems",
+      images: [{ assetId: "a1", url: "/files/a1.png" }],
+    });
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0]).toMatchObject({ agentIcon: "📸", agentName: "产品摄影师" });
+  });
+});

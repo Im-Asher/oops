@@ -123,6 +123,15 @@ export default function ChatPage() {
    * 聊天摘要点击 → 画布定位并选中该 asset。
    * 条目尚未在画布时（如直接点历史消息）先按消息补派生，再由 stage 定位。
    */
+  /** 会话绑定 Agent 的署名签名（画布条目徽标用；无匹配返回 undefined=无徽标）。 */
+  const agentSigOf = useCallback(
+    (agentIdStr: string | null | undefined) => {
+      const a = agents.find((ag) => ag.id === agentIdStr);
+      return a ? { agentIcon: a.icon, agentName: a.name } : undefined;
+    },
+    [agents],
+  );
+
   const handleFocusAsset = useCallback(
     (assetId: string) => {
       const exists = canvas.items.some((i) => i.assetId === assetId);
@@ -132,7 +141,15 @@ export default function ChatPage() {
           .find((p): p is Extract<UIMessage["parts"][number], { type: "image" }> =>
             p.type === "image" && p.assetId === assetId,
           );
-        if (image) dispatch({ type: "addImageItems", images: [{ assetId: image.assetId, url: image.url }] });
+        if (image) {
+          const sig = agentSigOf(
+            currentId ? sessions.find((s) => s.id === currentId)?.agentId : undefined,
+          );
+          dispatch({
+            type: "addImageItems",
+            images: [{ assetId: image.assetId, url: image.url, ...(sig ?? {}) }],
+          });
+        }
       }
       // 窄屏聊天/画布互斥：定位是明确的看图意图，自动切到画布视图。
       if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
@@ -140,16 +157,21 @@ export default function ChatPage() {
       }
       setFocus({ assetId, nonce: Date.now() });
     },
-    [canvas.items, messages],
+    [canvas.items, messages, currentId, sessions, agentSigOf],
   );
 
   /** 从会话消息的图片 part 派生画布条目（幂等，按 assetId 去重；placeNew 排布）。 */
-  const deriveImages = useCallback((messages: UIMessage[]) => {
-    const images = messages.flatMap((m) =>
-      m.parts.flatMap((p) => (p.type === "image" ? [{ assetId: p.assetId, url: p.url }] : [])),
-    );
-    if (images.length) dispatch({ type: "addImageItems", images });
-  }, []);
+  const deriveImages = useCallback(
+    (messages: UIMessage[], sig?: { agentIcon?: string; agentName?: string }) => {
+      const images = messages.flatMap((m) =>
+        m.parts.flatMap((p) =>
+          p.type === "image" ? [{ assetId: p.assetId, url: p.url, ...(sig ?? {}) }] : [],
+        ),
+      );
+      if (images.length) dispatch({ type: "addImageItems", images });
+    },
+    [],
+  );
 
   // 参考图上传：走 /upload purpose=reference（绑会话资产、不写聊天消息），上画布并选中即引用。
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -305,13 +327,15 @@ export default function ChatPage() {
     // 流式进行中的会话保留本地消息（SSE 持续写入该槽），否则以服务器为准刷新。
     const cached = slots[id];
     setReveal(null);
+    // 会话图片统一署名为该会话绑定的 Agent
+    const sig = agentSigOf(sessions.find((s) => s.id === id)?.agentId);
     if (cached?.busy) {
-      deriveImages(cached.messages);
+      deriveImages(cached.messages, sig);
       restoreWorkspace(id);
       return;
     }
     const msgs = await loadMessages(id);
-    deriveImages(msgs);
+    deriveImages(msgs, sig);
     restoreWorkspace(id);
   }
 
@@ -506,6 +530,7 @@ export default function ChatPage() {
           if (currentIdRef.current === sessionId && event.name === "generate_image") {
             const args = (event.args ?? {}) as { referenceAssetId?: unknown; prompt?: unknown };
             roundPlaceholders.push(event.id);
+            const sig = agentSigOf(currentSession?.agentId ?? agentId);
             dispatch({
               type: "addPlaceholder",
               id: event.id,
@@ -514,6 +539,7 @@ export default function ChatPage() {
                   ? args.referenceAssetId
                   : roundRefs[0],
               prompt: typeof args.prompt === "string" ? args.prompt : undefined,
+              ...(sig ?? {}),
             });
           }
           updateAssistant((parts) => [

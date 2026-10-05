@@ -41,12 +41,15 @@ interface CanvasStageProps {
 function CanvasItemView({
   item,
   selected,
+  inverseScale,
   onPointerDown,
   onImageLoad,
   onRetry,
 }: {
   item: CanvasItem;
   selected: boolean;
+  /** 画布缩放的倒数：署名徽标反向缩放以保持屏幕恒定尺寸。 */
+  inverseScale: number;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => void;
   onImageLoad: (item: CanvasItem, aspect: number) => void;
   onRetry?: (item: CanvasItem) => void;
@@ -60,6 +63,16 @@ function CanvasItemView({
       onPointerDown={(event) => onPointerDown(event, item)}
       style={{ height: item.width * item.aspect, left: item.x, top: item.y, width: item.width }}
     >
+      {item.agentName || item.agentIcon ? (
+        // 署名徽标：角落小徽章，pointer-events-none 不影响拖拽/选中，反向缩放恒定屏幕尺寸
+        <span
+          className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex max-w-[85%] items-center gap-1 rounded-full bg-zinc-950/70 px-1.5 py-0.5 text-[10px] leading-3 text-zinc-200 backdrop-blur"
+          style={{ transform: `scale(${inverseScale})`, transformOrigin: "top left" }}
+        >
+          {item.agentIcon ? <span aria-hidden>{item.agentIcon}</span> : null}
+          <span className="truncate">{item.agentName}</span>
+        </span>
+      ) : null}
       {item.status === "image" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -408,6 +421,7 @@ export function CanvasStage({
             <CanvasItemView
               item={item}
               key={item.id}
+              inverseScale={1 / view.scale}
               onImageLoad={handleImageLoad}
               onPointerDown={handleItemPointerDown}
               onRetry={onRetryItem}

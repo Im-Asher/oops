@@ -66,6 +66,9 @@ export interface CanvasItem {
   prompt?: string;
   /** 修改血缘：该条目由哪个 asset 修改而来（版本邻近放置依据）。 */
   referenceAssetId?: string;
+  /** 署名徽标：生成来源 Agent（上传图无字段）。 */
+  agentIcon?: string;
+  agentName?: string;
   errorMessage?: string;
   edit: CanvasEdit;
 }
@@ -86,11 +89,25 @@ export type CanvasAction =
   | {
       type: "addImageItems";
       /** 消息中的图片派生为画布条目；已有 assetId 的跳过（幂等）。 */
-      images: Array<{ assetId: string; url: string; referenceAssetId?: string; name?: string }>;
+      images: Array<{
+        assetId: string;
+        url: string;
+        referenceAssetId?: string;
+        name?: string;
+        agentIcon?: string;
+        agentName?: string;
+      }>;
       /** 上传参考图等场景需立即成为引用：选中最后新增条目。 */
       selectNew?: boolean;
     }
-  | { type: "addPlaceholder"; id: string; referenceAssetId?: string; prompt?: string }
+  | {
+      type: "addPlaceholder";
+      id: string;
+      referenceAssetId?: string;
+      prompt?: string;
+      agentIcon?: string;
+      agentName?: string;
+    }
   | { type: "patchItem"; id: string; patch: Partial<Omit<CanvasItem, "id" | "edit">> }
   | { type: "removeItem"; id: string }
   | { type: "moveItem"; id: string; x: number; y: number }
@@ -203,6 +220,8 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
             status: "image",
             name: image.name,
             referenceAssetId: image.referenceAssetId,
+            agentIcon: image.agentIcon,
+            agentName: image.agentName,
             edit: defaultEdit(),
           },
         ];
@@ -231,6 +250,8 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
         status: "generating",
         prompt: action.prompt,
         referenceAssetId: action.referenceAssetId,
+        agentIcon: action.agentIcon,
+        agentName: action.agentName,
         edit: defaultEdit(),
       };
       return { ...state, items: [...state.items, item] };
