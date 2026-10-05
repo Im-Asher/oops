@@ -2,6 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { APP_VERSION } from "@/lib/version";
 import HomePage from "./page";
 
 const push = vi.fn();
@@ -85,5 +86,12 @@ describe("首页落地页", () => {
     render(<HomePage />);
     await userEvent.click(await screen.findByText("氛围图设计师"));
     expect(push).toHaveBeenCalledWith("/canvas?agent=atmosphere-designer");
+  });
+
+  it("侧栏品牌区在 logo 旁展示版本徽标", async () => {
+    render(<HomePage />);
+    const badge = await screen.findByTestId("app-version-badge");
+    expect(badge.textContent).toBe(`v${APP_VERSION}`);
+    expect(screen.getByText("oops")).toBeTruthy();
   });
 });

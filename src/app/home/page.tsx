@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
+import { APP_VERSION } from "@/lib/version";
 import type { AgentInfo } from "@/types/chat";
 
 /** 侧栏导航项：可用项为链接，禁用项仅展示（本版未实现的能力）。 */
@@ -82,7 +83,16 @@ export default function HomePage() {
     <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
       {/* 左侧栏：首页 / 创建分组（AI画布可用，创建设计置灰）/ 其他导航项置灰 / 底部用户入口 */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-4">
-        <div className="px-3 pb-4 text-base font-semibold tracking-wide text-foreground">oops</div>
+        <div className="flex items-center gap-2 px-3 pb-4">
+          <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
+          <span
+            className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+            data-testid="app-version-badge"
+            title={`构建版本 ${APP_VERSION}`}
+          >
+            v{APP_VERSION}
+          </span>
+        </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label="主导航">
           <NavItem active href="/home" icon={LayoutDashboardIcon} label="首页" />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">创建</p>
