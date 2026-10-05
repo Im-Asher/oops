@@ -19,6 +19,11 @@ export interface ComposerReference {
   name: string;
 }
 
+export interface ComposerPendingFile {
+  id: string;
+  name: string;
+}
+
 interface ComposerProps {
   agents: AgentInfo[];
   agentId: string;
@@ -39,11 +44,18 @@ interface ComposerProps {
   onAttach?: () => void;
   /** 空会话灵感卡：当前 Agent 的示例需求文案（点击填入不发送）。 */
   presets?: string[];
+  /** landing：首页直发形态——无会话门槛（会话在画布侧创建），其余能力与画布一致。 */
+  variant?: "default" | "landing";
+  /** landing 待传附件 chip（跳转后在画布侧真实上传）。 */
+  pendingFiles?: ComposerPendingFile[];
+  onRemovePendingFile?: (id: string) => void;
 }
 
 /**
- * 聊天输入框：停靠于聊天面板底部（单一形态），
+ * 聊天输入框：停靠于聊天面板底部；
  * 草稿/Agent 选择/引用由页面状态持有。
+ * landing 变体：首页直发——无会话门槛；灵感卡/引用/pendingFiles 是否呈现
+ * 完全由调用方传参决定，组件不按 variant 额外屏蔽。
  * IME 守卫：中文输入法组合期间的 Enter 不触发发送。
  */
 export function Composer({
@@ -61,9 +73,20 @@ export function Composer({
   focusSignal,
   onAttach,
   presets,
+  variant,
+  pendingFiles,
+  onRemovePendingFile,
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // landing 形态下会话在跳转后由画布创建，首页输入不设门槛。
+  const sessionReady = variant === "landing" || hasSession;
+  // landing 语境下无「会话」概念，附件钮文案随之调整。
+  const attachLabel = onAttach
+    ? variant === "landing"
+      ? "添加附件"
+      : "上传参考图"
+    : "先创建会话后可上传参考图";
 
   // 聚焦信号 nonce 变化即聚焦一次（新建会话后带回聊天框）。
   useEffect(() => {
@@ -109,11 +132,31 @@ export function Composer({
           </span>
         </div>
       ) : null}
+      {pendingFiles?.length ? (
+        <div className="flex flex-wrap gap-1.5 px-1 pb-1.5" data-testid="composer-pending-files">
+          {pendingFiles.map((f) => (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300"
+              key={f.id}
+            >
+              附件：{f.name}
+              <button
+                aria-label={`移除附件 ${f.name}`}
+                className="ml-0.5 hover:text-violet-700 dark:hover:text-violet-200"
+                onClick={() => onRemovePendingFile?.(f.id)}
+                type="button"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       <Textarea
         aria-label="消息输入"
         ref={textareaRef}
         className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0"
-        disabled={busy || !hasSession}
+        disabled={busy || !sessionReady}
         onBlur={() => {
           composingRef.current = false;
         }}
@@ -138,19 +181,19 @@ export function Composer({
           e.preventDefault();
           onSend();
         }}
-        placeholder={hasSession ? "描述你的设计需求…" : "先创建会话"}
+        placeholder={sessionReady ? "描述你的设计需求…" : "先创建会话"}
         rows={1}
         value={value}
       />
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-0.5">
           <Button
-            aria-label={onAttach ? "上传参考图" : "先创建会话后可上传参考图"}
+            aria-label={attachLabel}
             className="size-8 text-muted-foreground hover:bg-accent hover:text-foreground/85"
             disabled={!onAttach}
             onClick={onAttach}
             size="icon-sm"
-            title={onAttach ? "上传参考图" : "先创建会话后可上传参考图"}
+            title={attachLabel}
             variant="ghost"
           >
             <PaperclipIcon />
@@ -190,7 +233,7 @@ export function Composer({
           <Button
             aria-label="发送"
             className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
-            disabled={busy || !hasSession || !value.trim()}
+            disabled={busy || !sessionReady || !value.trim()}
             onClick={onSend}
             size="icon-sm"
           >
