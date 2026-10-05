@@ -167,11 +167,16 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/chat` 页面级
 `redirect("/canvas")` 保存量入口。窄屏（md 以下）聊天与画布互斥切换显示。
 
-**首页 → 画布跳转协议**：创作输入提交携带 `?draft=<文本>`，Agent 卡片点击携带 `?agent=<id>`
-（画布空态预选；已有会话时会话绑定 Agent 优先）。画布页用 `useSearchParams`（路由状态）读取
-参数——不读 `window.location`（SPA 挂载时其更新时序滞后）；草稿入队 ref，在「本机工作区回贴
-完成」之后消费（避免快照旧草稿覆盖首页带来的新草稿），无会话时挂起等待首个会话；消费后
-`history.replaceState` 清参防刷新重复回填（replaceState 与路由状态同步）。
+**首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
+选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
+内存暂存）交接。画布页用 `useSearchParams`（路由状态）读取参数——不读 `window.location`（SPA 挂载时其
+更新时序滞后）。直发衔接：bootstrap 跳过「选中最近会话」，引导完成后由 `loadSessions` 触发 `newChat`，
+新会话 slot 在渲染中落地后由衔接 effect 消费（`runRound` 依赖当次渲染 slots 闭包，不可在 state 提交前同步
+调用）——附件并行上传（`allSettled`，任一失败阻断发送、已成功条目仍落画布、草稿回填）后以 assetId 显式
+引用自动发送首轮。`t` 为去重 nonce（同文案连发可再次入队）；跳转后刷新会清空内存 store，此时降级为
+草稿回填不直发（「刷新丢附件保草稿」）。消费后 `history.replaceState` 清参防刷新重复触发。Agent 卡片
+点击仍携带 `?agent=<id>`（空态预选；已有会话时会话绑定 Agent 优先），无会话时草稿挂起等待首个会话；
+「本机工作区回贴完成」之后才消费草稿（避免快照旧草稿覆盖首页带来的新草稿）。
 
 **主题**：`components/theme-provider.tsx` 手写 Context（零依赖）——`applyTheme` 切 html
 `dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本按存储/系统偏好预设 class 防
