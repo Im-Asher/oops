@@ -21,6 +21,11 @@ interface ProfileSummary {
   displayName: string | null;
 }
 
+/** 摘要响应最小校验：非约定形状（如网关返回 HTML/JSON 错误体）按未登录处理，避免渲染崩溃。 */
+function isProfileSummary(value: unknown): value is ProfileSummary {
+  return !!value && typeof value === "object" && typeof (value as ProfileSummary).oopsId === "string";
+}
+
 /**
  * 用户菜单内容：账号摘要（昵称——默认裸 oops ID + oops_ 前缀 ID）/ 个人信息 / 退出登录。
  * 独立导出供时钟下拉底部复用（须渲染在某个 DropdownMenu 根内）。
@@ -35,8 +40,8 @@ export function UserMenuContent() {
     let alive = true;
     fetch("/api/profile")
       .then((res) => (res.ok ? res.json() : null))
-      .then((body: ProfileSummary | null) => {
-        if (alive && body) setProfile(body);
+      .then((body: unknown) => {
+        if (alive && isProfileSummary(body)) setProfile(body);
       })
       .catch(() => {});
     return () => {
@@ -98,8 +103,8 @@ export function UserMenu() {
     let alive = true;
     fetch("/api/profile")
       .then((res) => (res.ok ? res.json() : null))
-      .then((body: ProfileSummary | null) => {
-        if (alive && body) setProfile(body);
+      .then((body: unknown) => {
+        if (alive && isProfileSummary(body)) setProfile(body);
       })
       .catch(() => {});
     return () => {

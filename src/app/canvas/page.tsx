@@ -25,6 +25,12 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   generate_image: "正在生成图片…",
 };
 
+/** 读取当前 URL 查询参数（SSR 安全：服务端无 window 时返回 null）。 */
+function urlParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get(name);
+}
+
 /** 每会话工作区槽：消息、输入草稿与进行中标记（引用即画布选中，不单独存槽）。 */
 interface SessionSlot {
   messages: UIMessage[];
@@ -39,7 +45,8 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [slots, setSlots] = useState<Record<string, SessionSlot>>({});
-  const [agentId, setAgentId] = useState<string>("");
+  // Agent 预选（首页 Agent 卡片跳转 ?agent=）：惰性初始化直读 URL
+  const [agentId, setAgentId] = useState<string>(() => urlParam("agent") ?? "");
   const [canvas, dispatch] = useReducer(canvasReducer, initialCanvasState);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -304,12 +311,32 @@ export default function ChatPage() {
       .then((r) => r.json())
       .then((d: { agents: AgentInfo[] }) => {
         setAgents(d.agents);
-        if (d.agents[0]) setAgentId(d.agents[0].id);
+        // URL 预选的 Agent（首页 Agent 卡片跳转）仍有效时保留
+        if (d.agents[0]) {
+          setAgentId((prev) => (prev && d.agents.some((a) => a.id === prev) ? prev : d.agents[0].id));
+        }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSessions();
   }, [loadSessions]);
+
+  // 首页创作输入带来的草稿（?draft=）：填入当前会话输入框并聚焦，不自动发送；
+  // 无会话时挂起等待首个会话出现（新建/自动选中）后填入。
+  const [pendingDraft, setPendingDraft] = useState<string | null>(() => urlParam("draft"));
+  useEffect(() => {
+    if (!pendingDraft) return;
+    if (!currentId) return;
+    // 一次性事件消费：URL 草稿写入会话槽并聚焦后立即清除，非派生状态同步
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    updateSlot(currentId, (slot) => ({ ...slot, draft: pendingDraft }));
+    setComposerFocusNonce((n) => n + 1);
+    setPendingDraft(null);
+  }, [pendingDraft, currentId, updateSlot]);
+  // URL 参数已在 useState 惰性初始化中消费，这里仅清理地址栏避免刷新重复回填
+  useEffect(() => {
+    if (urlParam("draft") || urlParam("agent")) window.history.replaceState(null, "", "/canvas");
+  }, []);
 
   useEffect(() => {
     if (currentId) void selectSession(currentId);
