@@ -23,6 +23,8 @@ export interface AgentInfo {
   description: string;
   /** 头像徽标 emoji。 */
   icon: string;
+  /** 空会话灵感卡示例需求文案。 */
+  presets: string[];
   tools: string[];
 }
 

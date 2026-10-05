@@ -24,6 +24,7 @@ describe("AgentRegistry", () => {
         name: "测试",
         description: "测试 Agent",
         icon: "🧪",
+        presets: [],
         tools: ["generate_image"],
         systemPrompt: "x",
       }),
@@ -41,6 +42,7 @@ describe("AgentRegistry", () => {
         name: "测试",
         description: "测试 Agent",
         icon: "🧪",
+        presets: [],
         tools: ["gen_tool"],
         systemPrompt: "x",
       }),
@@ -50,19 +52,20 @@ describe("AgentRegistry", () => {
     expect(tools.some((t) => t.name === "extra_tool")).toBe(false);
   });
 
-  it("元数据导出：metadata() 含 icon 且不含 systemPrompt", () => {
+  it("元数据导出：metadata() 含 icon 与 presets 且不含 systemPrompt", () => {
     agentRegistry.register(
       defineAgent({
         id: "meta-test",
         name: "测试",
         description: "测试 Agent",
         icon: "🧪",
+        presets: ["需求一", "需求二"],
         tools: [],
         systemPrompt: "secret-prompt",
       }),
     );
     const meta = agentRegistry.metadata().find((a) => a.id === "meta-test");
-    expect(meta).toMatchObject({ id: "meta-test", icon: "🧪", tools: [] });
+    expect(meta).toMatchObject({ id: "meta-test", icon: "🧪", presets: ["需求一", "需求二"], tools: [] });
     expect(meta).not.toHaveProperty("systemPrompt");
   });
 
@@ -80,5 +83,7 @@ describe("AgentRegistry", () => {
       tools: ["generate_image"],
     });
     expect(meta.find((a) => a.id === "product-photographer")).not.toHaveProperty("systemPrompt");
+    expect(meta.find((a) => a.id === "atmosphere-designer")?.presets).toHaveLength(3);
+    expect(meta.find((a) => a.id === "product-photographer")?.presets).toHaveLength(3);
   });
 });

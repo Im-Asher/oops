@@ -78,6 +78,7 @@ async function run(script: Record<string, unknown>[], repo: MessageRepo, agentId
       name: "test",
       description: "test",
       icon: "🧪",
+      presets: [],
       tools: ["generate_image"],
       systemPrompt: "x",
     }),

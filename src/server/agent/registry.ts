@@ -7,6 +7,8 @@ export interface AgentDefinition {
   description: string;
   /** 前端头像徽标用 emoji（声明即所得，避免维护名称到图标的映射）。 */
   icon: string;
+  /** 空会话灵感卡示例需求文案（面向最终用户、可直接使用）。 */
+  presets: string[];
   /** 允许该 Agent 调用的工具名（按名授权）。 */
   tools: string[];
   systemPrompt: string;
@@ -18,6 +20,7 @@ export interface AgentMetadata {
   name: string;
   description: string;
   icon: string;
+  presets: string[];
   tools: string[];
 }
 
@@ -42,11 +45,12 @@ class AgentRegistry {
   }
 
   metadata(): AgentMetadata[] {
-    return this.list().map(({ id, name, description, icon, tools }) => ({
+    return this.list().map(({ id, name, description, icon, presets, tools }) => ({
       id,
       name,
       description,
       icon,
+      presets,
       tools,
     }));
   }
