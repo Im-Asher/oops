@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionDrawer } from "@/components/workbench/session-drawer";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, MessageSquareIcon } from "lucide-react";
 import {
   canvasReducer,
   initialCanvasState,
@@ -674,101 +674,115 @@ export default function ChatPage() {
       : null;
 
   return (
-    <main className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0B0B0D] text-zinc-50">
-      <div className="flex min-h-0 flex-1">
-        {/* 聊天面板：桌面停靠 340px 可收起；窄屏与画布切换显示 */}
-        <div className={`${chatOpen ? "flex" : "hidden"} w-full md:w-[340px] md:shrink-0`}>
-          <ChatPanel
-            agentIcon={sessionAgent?.icon}
-            agentId={agentId}
-            agents={agents}
-            busy={busy}
-            focusSignal={composerFocusNonce}
-            hasSession={!!currentId}
-            {...(currentId ? { onAttach: () => fileInputRef.current?.click() } : {})}
-            input={currentSlot?.draft ?? ""}
-            messages={messages}
-            onAgentChange={(id) => void handleAgentChange(id)}
-            onInputChange={handleInputChange}
-            onRemoveReference={() => dispatch({ type: "select", id: null })}
-            onSelectAsset={handleFocusAsset}
-            onSend={() => void send()}
-            onStop={stopGeneration}
-            reference={composerReference}
-            selectedAssetId={selectedCanvasItem?.assetId ?? null}
-          />
+    <main className="dark fixed inset-0 overflow-hidden bg-[#0B0B0D] text-zinc-50">
+      {/* 画布：全屏唯一主舞台，全局件与其悬浮层都在其上 */}
+      <div className="absolute inset-0" ref={canvasWrapRef}>
+        {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+          <span
+            aria-live="polite"
+            className="rounded-full bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 backdrop-blur"
+          >
+            {saveStatus === "idle"
+              ? null
+              : saveStatus === "saving"
+                ? "保存中…"
+                : "已保存（本机）"}
+          </span>
+          <Button
+            className="h-8 gap-1.5 bg-violet-500/90 px-3 text-xs text-white hover:bg-violet-500"
+            disabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
+            onClick={() => void handleExport()}
+            size="sm"
+          >
+            <DownloadIcon />
+            {exporting ? "导出中…" : "导出"}
+          </Button>
         </div>
+        {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
+        {reveal ? (
+          <button
+            aria-live="polite"
+            className="absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-100 shadow-lg hover:bg-zinc-800"
+            onClick={handleRevealClick}
+            type="button"
+          >
+            有新结果，点击查看
+          </button>
+        ) : null}
+        <CanvasStage
+          dispatch={dispatch}
+          exportError={exportError}
+          focus={focus}
+          onRetryItem={retryItem}
+          onResetEdits={handleResetEdits}
+          state={canvas}
+        />
+        {/* 参考图上传失败：画布顶部内联提示，点按消失 */}
+        {referenceError ? (
+          <button
+            className="absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-md bg-red-500/15 px-3 py-1.5 text-xs text-red-300"
+            onClick={() => setReferenceError(null)}
+            type="button"
+          >
+            {referenceError}
+          </button>
+        ) : null}
+        <input
+          accept="image/*"
+          aria-hidden
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadReference(file);
+            e.target.value = "";
+          }}
+          ref={fileInputRef}
+          tabIndex={-1}
+          type="file"
+        />
+      </div>
 
-        {/* 画布：工作区主体；聊天收起后扩展占满 */}
-        <div
-          className={`relative min-w-0 flex-1 ${chatOpen ? "hidden md:block" : "block"}`}
-          ref={canvasWrapRef}
+      {/* 聊天收起后的重开入口：画布左上悬浮 */}
+      {!chatOpen ? (
+        <button
+          aria-label="打开聊天"
+          className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/90 text-zinc-100 shadow-lg hover:bg-zinc-800"
+          onClick={() => setChatOpen(true)}
+          type="button"
         >
-          {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
-          <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
-            <span
-              aria-live="polite"
-              className="rounded-full bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 backdrop-blur"
-            >
-              {saveStatus === "idle"
-                ? null
-                : saveStatus === "saving"
-                  ? "保存中…"
-                  : "已保存（本机）"}
-            </span>
-            <Button
-              className="h-8 gap-1.5 bg-violet-500/90 px-3 text-xs text-white hover:bg-violet-500"
-              disabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
-              onClick={() => void handleExport()}
-              size="sm"
-            >
-              <DownloadIcon />
-              {exporting ? "导出中…" : "导出"}
-            </Button>
-          </div>
-          {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
-          {reveal ? (
-            <button
-              aria-live="polite"
-              className="absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-100 shadow-lg hover:bg-zinc-800"
-              onClick={handleRevealClick}
-              type="button"
-            >
-              有新结果，点击查看
-            </button>
-          ) : null}
-          <CanvasStage
-            dispatch={dispatch}
-            exportError={exportError}
-            focus={focus}
-            onRetryItem={retryItem}
-            onResetEdits={handleResetEdits}
-            state={canvas}
-          />
-          {/* 参考图上传失败：画布顶部内联提示，点按消失 */}
-          {referenceError ? (
-            <button
-              className="absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-md bg-red-500/15 px-3 py-1.5 text-xs text-red-300"
-              onClick={() => setReferenceError(null)}
-              type="button"
-            >
-              {referenceError}
-            </button>
-          ) : null}
-          <input
-            accept="image/*"
-            aria-hidden
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void uploadReference(file);
-              e.target.value = "";
-            }}
-            ref={fileInputRef}
-            tabIndex={-1}
-            type="file"
-          />
-        </div>
+          <MessageSquareIcon className="size-4" />
+        </button>
+      ) : null}
+
+      {/* 聊天面板：md+ 为画布上方左上悬浮卡片（可收起）；<md 全屏互斥切换 */}
+      <div
+        className={
+          chatOpen
+            ? "absolute inset-0 z-40 flex md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-zinc-800/80 md:shadow-2xl md:shadow-black/40"
+            : "hidden"
+        }
+        data-testid="chat-panel-container"
+      >
+        <ChatPanel
+          agentIcon={sessionAgent?.icon}
+          agentId={agentId}
+          agents={agents}
+          busy={busy}
+          focusSignal={composerFocusNonce}
+          hasSession={!!currentId}
+          {...(currentId ? { onAttach: () => fileInputRef.current?.click() } : {})}
+          input={currentSlot?.draft ?? ""}
+          messages={messages}
+          onAgentChange={(id) => void handleAgentChange(id)}
+          onInputChange={handleInputChange}
+          onRemoveReference={() => dispatch({ type: "select", id: null })}
+          onSelectAsset={handleFocusAsset}
+          onSend={() => void send()}
+          onStop={stopGeneration}
+          reference={composerReference}
+          selectedAssetId={selectedCanvasItem?.assetId ?? null}
+        />
       </div>
 
       <SessionDrawer
