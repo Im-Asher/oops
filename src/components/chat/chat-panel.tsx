@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatPanelHeader } from "@/components/chat/chat-panel-header";
 import { Composer, type ComposerReference } from "@/components/chat/composer";
 import { MessageList } from "@/components/chat/message-list";
 import type { AgentInfo, UIMessage } from "@/types/chat";
@@ -10,9 +11,19 @@ interface ChatPanelProps {
   agentId: string;
   /** 切换 Agent：新会话仅更新选择；已有会话由页面重绑（PATCH，下一轮生效）。 */
   onAgentChange: (id: string) => void;
-  /** 消息头像 emoji（会话当前绑定 Agent 的 icon）。 */
+  /** 消息与头部头像 emoji（会话当前绑定 Agent 的 icon）。 */
   agentIcon?: string;
+  /** 头部展示的 Agent 名称。 */
+  agentName?: string;
+  /** 当前会话标题（头部展示与重命名初始值）。 */
+  sessionTitle?: string;
   hasSession: boolean;
+  /** 重命名当前会话（乐观更新与失败回滚由页面层负责）。 */
+  onRename?: (title: string) => void;
+  /** 头部时钟下拉：打开会话列表。 */
+  onOpenHistory?: () => void;
+  /** 收起聊天面板（画布左上出现重开入口）。 */
+  onCollapse?: () => void;
   messages: UIMessage[];
   /** 画布当前选中条目的 assetId（过渡联动：聊天缩略图高亮）。 */
   selectedAssetId?: string | null;
@@ -32,15 +43,20 @@ interface ChatPanelProps {
 }
 
 /**
- * 聊天面板：停靠左侧 340px，展示需求、回复、任务状态与结果摘要。
- * 输入框仅存在此停靠形态；收起面板后无任何输入框（草稿由页面状态保留）。
+ * 聊天面板：悬浮卡片（md+ 画布左上、<md 全屏），展示需求、回复、任务状态与结果摘要。
+ * 输入框仅存在此面板内；收起面板后无任何输入框（草稿由页面状态保留）。
  */
 export function ChatPanel({
   agents,
   agentId,
   onAgentChange,
   agentIcon,
+  agentName,
+  sessionTitle,
   hasSession,
+  onRename,
+  onOpenHistory,
+  onCollapse,
   messages,
   selectedAssetId,
   onSelectAsset,
@@ -56,6 +72,15 @@ export function ChatPanel({
 }: ChatPanelProps) {
   return (
     <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#141416]">
+      <ChatPanelHeader
+        agentIcon={agentIcon}
+        agentName={agentName}
+        canRename={hasSession && !!onRename}
+        onCollapse={onCollapse}
+        onOpenHistory={onOpenHistory}
+        onRename={(title) => onRename?.(title)}
+        sessionTitle={sessionTitle}
+      />
       <MessageList
         agentIcon={agentIcon}
         messages={messages}

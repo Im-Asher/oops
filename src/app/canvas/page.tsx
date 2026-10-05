@@ -767,10 +767,15 @@ export default function ChatPage() {
         <ChatPanel
           agentIcon={sessionAgent?.icon}
           agentId={agentId}
+          agentName={sessionAgent?.name}
           agents={agents}
           busy={busy}
           focusSignal={composerFocusNonce}
           hasSession={!!currentId}
+          onCollapse={() => setChatOpen(false)}
+          onRename={(title) => {
+            if (currentId) void renameSession(currentId, title);
+          }}
           {...(currentId ? { onAttach: () => fileInputRef.current?.click() } : {})}
           input={currentSlot?.draft ?? ""}
           messages={messages}
