@@ -11,7 +11,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { shouldSendOnEnter } from "@/lib/chat/keyboard";
 import type { AgentInfo } from "@/types/chat";
-import { ArrowUpIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, PaperclipIcon, SquareIcon, XIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 export interface ComposerReference {
@@ -26,6 +26,8 @@ interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  /** busy 时停止按钮回调（提供则以停止钮替代禁用转圈）。 */
+  onStop?: () => void;
   busy: boolean;
   hasSession: boolean;
   /** 当前引用的画布图片（可移除）。 */
@@ -49,6 +51,7 @@ export function Composer({
   value,
   onChange,
   onSend,
+  onStop,
   busy,
   hasSession,
   reference,
@@ -147,19 +150,32 @@ export function Composer({
             </SelectContent>
           </Select>
         </div>
-        <Button
-          aria-label="发送"
-          className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
-          disabled={busy || !hasSession || !value.trim()}
-          onClick={onSend}
-          size="icon-sm"
-        >
-          {busy ? (
-            <span className="block size-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          ) : (
-            <ArrowUpIcon />
-          )}
-        </Button>
+        {busy && onStop ? (
+          // 生成中：发送钮变为停止钮（点击中断本轮流，服务端真停并部分落库）
+          <Button
+            aria-label="停止生成"
+            className="size-8 rounded-full bg-zinc-700 hover:bg-zinc-600"
+            onClick={onStop}
+            size="icon-sm"
+            title="停止生成"
+          >
+            <SquareIcon className="size-3 fill-current" />
+          </Button>
+        ) : (
+          <Button
+            aria-label="发送"
+            className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
+            disabled={busy || !hasSession || !value.trim()}
+            onClick={onSend}
+            size="icon-sm"
+          >
+            {busy ? (
+              <span className="block size-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+            ) : (
+              <ArrowUpIcon />
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

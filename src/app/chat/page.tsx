@@ -402,6 +402,12 @@ export default function ChatPage() {
    * 一轮对话公共体：busy 守卫、消息落槽、SSE 流读取与事件归档。
    * 正常发送（引用取画布选中）与失败占位卡重试（引用取卡内原始意图）共用。
    */
+  // 本轮中断控制器：busy 时发送按钮变为停止按钮（见 stopGeneration）。
+  const abortRef = useRef<AbortController | null>(null);
+  function stopGeneration() {
+    abortRef.current?.abort();
+  }
+
   async function runRound(sessionId: string, text: string, roundRefs: string[]) {
     const slot = slots[sessionId];
     if (!slot || !text || slot.busy) return;
@@ -438,9 +444,12 @@ export default function ChatPage() {
     const appendText = (delta: string) =>
       updateAssistant((parts) => [...parts, { type: "text", text: delta }]);
 
+    const ac = new AbortController();
+    abortRef.current = ac;
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
       body: JSON.stringify({
         sessionId,
         agentId,
@@ -611,10 +620,23 @@ export default function ChatPage() {
         }
       }
     } catch {
-      // 网络/流中断：聊天侧补错误行，画布侧未结算占位卡置失败（服务端回合可能已完成，切回会话时以服务器为准）。
-      appendText("\n[错误] 连接中断，请重试");
-      failPendingPlaceholders(sessionId, "连接中断，生成未完成");
+      if (ac.signal.aborted) {
+        // 用户主动停止：当轮标记已停止（仅本轮 UI 状态，不进持久化正文），
+        // 未结算占位卡移除——服务端已将已生成部分落库，刷新后以部分内容呈现。
+        appendText("\n[已停止生成]");
+        if (currentIdRef.current === sessionId) {
+          for (const pid of roundPlaceholders) {
+            const item = canvasStateRef.current.items.find((i) => i.id === pid);
+            if (item?.status === "generating") dispatch({ type: "removeItem", id: pid });
+          }
+        }
+      } else {
+        // 网络/流中断：聊天侧补错误行，画布侧未结算占位卡置失败（服务端回合可能已完成，切回会话时以服务器为准）。
+        appendText("\n[错误] 连接中断，请重试");
+        failPendingPlaceholders(sessionId, "连接中断，生成未完成");
+      }
     } finally {
+      abortRef.current = null;
       updateSlot(sessionId, (s) => ({ ...s, busy: false }));
       // 回合结束后刷新会话列表（首条消息自动标题 / updatedAt 排序）。
       void loadSessions();
@@ -687,6 +709,7 @@ export default function ChatPage() {
             onRemoveReference={() => dispatch({ type: "select", id: null })}
             onSelectAsset={handleFocusAsset}
             onSend={() => void send()}
+            onStop={stopGeneration}
             reference={composerReference}
             selectedAssetId={selectedCanvasItem?.assetId ?? null}
           />

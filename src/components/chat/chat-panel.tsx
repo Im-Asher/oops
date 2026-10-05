@@ -20,6 +20,8 @@ interface ChatPanelProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  /** busy 时停止按钮回调（无则维持禁用转圈）。 */
+  onStop?: () => void;
   busy: boolean;
   reference?: ComposerReference | null;
   onRemoveReference?: () => void;
@@ -45,6 +47,7 @@ export function ChatPanel({
   input,
   onInputChange,
   onSend,
+  onStop,
   busy,
   reference,
   onRemoveReference,
@@ -64,6 +67,7 @@ export function ChatPanel({
           agentId={agentId}
           agents={agents}
           busy={busy}
+          onStop={onStop}
           hasSession={hasSession}
           focusSignal={focusSignal}
           onAttach={onAttach}
