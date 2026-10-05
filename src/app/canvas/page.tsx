@@ -273,6 +273,9 @@ function ChatPageInner() {
   const directSendRef = useRef(sendParam === "1");
   // 直发衔接的新会话 id：newChat 建会话后置位，slot 落地（渲染提交）后由衔接 effect 消费。
   const directSendSessionRef = useRef<string | null>(null);
+  // 刚由 newChat 创建的会话 id：其 selectSession 必须跳过——新会话无历史消息，
+  // 且 loadMessages 异步回包会覆盖直发 runRound 乐观 append 的用户消息（竞态）。
+  const justCreatedRef = useRef<string | null>(null);
   const bootstrappedRef = useRef(false);
   // newChat 每渲染重建；loadSessions（deps []）经 ref 调用当次最新版本——
   // 直发衔接由 bootstrap 引导完成时触发建会话（B1）。
@@ -418,7 +421,12 @@ function ChatPageInner() {
   }, [draftParam, agentParam]);
 
   useEffect(() => {
-    if (currentId) void selectSession(currentId);
+    if (!currentId) return;
+    if (justCreatedRef.current === currentId) {
+      justCreatedRef.current = null;
+      return;
+    }
+    void selectSession(currentId);
     // selectSession 依赖仅 currentId：避免将其纳入依赖导致每渲染重拉消息。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
@@ -459,6 +467,7 @@ function ChatPageInner() {
       dispatch({ type: "clear" });
       restoredForRef.current = data.id;
       setReveal(null);
+      justCreatedRef.current = data.id;
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
       // 新建会话转到聊天框：关下拉、展开聊天面板并聚焦输入框。
@@ -887,6 +896,8 @@ function ChatPageInner() {
     const sel = selectedItem(canvas);
     const roundRefs = sel && sel.status === "image" ? [sel.assetId] : [];
     updateSlot(sessionId, (s) => ({ ...s, draft: "" }));
+    // 手动发送接管对话流后，旧的直发衔接状态行（如残留错误）不再有信息量，一并清理。
+    setDirectSendStatus(null);
     await runRound(sessionId, text, roundRefs);
   }
 
