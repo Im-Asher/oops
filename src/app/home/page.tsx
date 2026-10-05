@@ -1,11 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Composer } from "@/components/chat/composer";
 import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
 import {
-  ArrowUpIcon,
   ImageIcon,
   ImagesIcon,
   LayoutDashboardIcon,
@@ -16,9 +14,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
+import { setPendingHandoffFiles } from "@/lib/chat/home-handoff";
 import { APP_VERSION } from "@/lib/version";
 import type { AgentInfo } from "@/types/chat";
+
+/** 单个待传附件（id 供 chip 移除定位，自增序号即唯一）。 */
+interface HomePendingFile {
+  id: string;
+  file: File;
+}
 
 /** 侧栏导航项：可用项为链接，禁用项仅展示（本版未实现的能力）。 */
 function NavItem({
@@ -58,12 +63,21 @@ function NavItem({
 
 /**
  * 首页落地页（spec/home-landing）：左侧栏（首页/创建分组/用户入口）+ 创作横幅、
- * 创作输入框与 Agent 卡片。提交携带草稿跳 /canvas 填入不直发；Agent 卡片跳转预选。
+ * 完整创作 composer（Agent 选择/附件）与 Agent 卡片。提交即直发：跳 /canvas 后
+ * 由画布侧新建会话并自动发送（含附件为参考图）；Agent 卡片跳转预选。
  */
 export default function HomePage() {
   const router = useRouter();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [draft, setDraft] = useState("");
+  const [agentId, setAgentId] = useState("");
+  // 待传附件：首页仅内存暂存，跳转建会话后由画布侧真实上传（home-handoff store）。
+  const [files, setFiles] = useState<HomePendingFile[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  // 直发乐观态：按钮转圈 + 输入卡弱化 + 路由锁（跳转期间不可再触发）。
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const nextFileIdRef = useRef(0);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -72,11 +86,48 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
-  /** 提交创作输入：仅携带草稿跳转，画布侧填入输入框聚焦、不自动发送。 */
-  function submitDraft() {
+  /**
+   * 提交直发：携带文本 + Agent（空 = 服务端默认）+ send 标记跳转，附件经
+   * handoff store 交给画布侧上传；nonce 保证同文案连发也能再次触发衔接。
+   */
+  function submitDirect() {
     const text = draft.trim();
-    if (!text) return;
-    router.push(`/canvas?draft=${encodeURIComponent(text)}`);
+    if (!text || submitting) return;
+    setSubmitting(true);
+    setPendingHandoffFiles(files.map((f) => f.file));
+    const params = new URLSearchParams({ draft: text, send: "1", t: String(Date.now()) });
+    if (agentId) params.set("agent", agentId);
+    router.push(`/canvas?${params.toString()}`);
+  }
+
+  /** 附件校验：仅图片、至多 5 个；违规部分拒绝并提示（不中断已合法部分的添加）。 */
+  function addFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const picked = Array.from(list);
+    const images = picked.filter((f) => f.type.startsWith("image/"));
+    const nonImage = picked.length - images.length;
+    const room = Math.max(0, 5 - files.length);
+    const accepted = images.slice(0, room);
+    const overflow = images.length - accepted.length;
+    if (nonImage > 0 || overflow > 0) {
+      const parts: string[] = [];
+      if (nonImage > 0) parts.push(`仅支持图片，${nonImage} 个文件未添加`);
+      if (overflow > 0) parts.push(`最多 5 个附件，超出 ${overflow} 个未添加`);
+      setFileError(parts.join("；"));
+    } else {
+      setFileError(null);
+    }
+    if (accepted.length) {
+      setFiles((prev) => [
+        ...prev,
+        ...accepted.map((file) => ({ file, id: `f${++nextFileIdRef.current}` })),
+      ]);
+    }
+  }
+
+  function removeFile(id: string) {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setFileError(null);
   }
 
   return (
@@ -123,33 +174,49 @@ export default function HomePage() {
           </section>
 
           <section>
-            <div className="rounded-xl border border-border bg-card p-2 transition-colors focus-within:border-ring">
-              <Textarea
-                aria-label="创作输入"
-                className="max-h-40 min-h-16 resize-none border-0 bg-transparent px-2 text-sm text-foreground focus-visible:ring-0"
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    submitDraft();
-                  }
-                }}
-                placeholder="描述你的设计需求…（例如：为这款保温杯拍一张纯白背景主图）"
+            <div
+              className={
+                submitting
+                  ? "scale-[0.99] opacity-60 transition-all duration-200"
+                  : "transition-all duration-200"
+              }
+            >
+              <Composer
+                agents={agents}
+                agentId={agentId}
+                busy={submitting}
+                hasSession={false}
+                onChange={setDraft}
+                onAgentChange={setAgentId}
+                onAttach={() => fileInputRef.current?.click()}
+                onRemovePendingFile={removeFile}
+                onSend={submitDirect}
+                pendingFiles={files.map((f) => ({ id: f.id, name: f.file.name }))}
                 value={draft}
+                variant="landing"
               />
-              <div className="flex justify-end px-1 pb-1">
-                <Button
-                  aria-label="去画布生成"
-                  className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
-                  disabled={!draft.trim()}
-                  onClick={submitDraft}
-                  size="icon-sm"
-                >
-                  <ArrowUpIcon />
-                </Button>
-              </div>
             </div>
-            <p className="mt-2 px-1 text-xs text-muted-foreground/80">回车跳转 AI 画布，草稿会自动填入输入框。</p>
+            {fileError ? (
+              <p className="mt-2 px-1 text-xs text-red-500" data-testid="home-file-error" role="alert">
+                {fileError}
+              </p>
+            ) : null}
+            <p className="mt-2 px-1 text-xs text-muted-foreground/80">
+              回车或点 ↑ 直接在 AI 画布新建会话并发送；附件将作为参考图一并发送。
+            </p>
+            <input
+              accept="image/*"
+              aria-hidden
+              className="hidden"
+              multiple
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+              ref={fileInputRef}
+              tabIndex={-1}
+              type="file"
+            />
           </section>
 
           <section>
