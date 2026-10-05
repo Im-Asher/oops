@@ -145,12 +145,6 @@ describe("首页落地页", () => {
     expect(handed[0].name).toBe("ref.png");
   });
 
-  it("Agent 卡片点击跳 /canvas 并预选该 Agent（不经 composer 直发）", async () => {
-    render(<HomePage />);
-    await userEvent.click(await screen.findByText("氛围图设计师"));
-    expect(push).toHaveBeenCalledWith("/canvas?agent=atmosphere-designer");
-  });
-
   it("侧栏品牌区在 logo 旁展示版本徽标", async () => {
     render(<HomePage />);
     const badge = await screen.findByTestId("app-version-badge");

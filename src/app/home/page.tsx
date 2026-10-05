@@ -62,9 +62,9 @@ function NavItem({
 }
 
 /**
- * 首页落地页（spec/home-landing）：左侧栏（首页/创建分组/用户入口）+ 创作横幅、
- * 完整创作 composer（Agent 选择/附件）与 Agent 卡片。提交即直发：跳 /canvas 后
- * 由画布侧新建会话并自动发送（含附件为参考图）；Agent 卡片跳转预选。
+ * 首页落地页（spec/home-landing）：左侧栏（首页/创建分组/用户入口）+ 垂直居中的
+ * 创作横幅与完整创作 composer（Agent 选择/附件）。提交即直发：跳 /canvas 后
+ * 由画布侧新建会话并自动发送（含附件为参考图）。
  */
 export default function HomePage() {
   const router = useRouter();
@@ -163,9 +163,9 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* 主区：创作横幅 + 创作输入框 + Agent 卡片 */}
+      {/* 主区：创作横幅 + 创作输入框（垂直居中） */}
       <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-16">
+        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
           <section className="flex flex-col items-center gap-3 text-center">
             <h1 className="text-3xl font-semibold text-foreground">用一句话，生成电商好图</h1>
             <p className="text-sm text-muted-foreground">
@@ -217,36 +217,6 @@ export default function HomePage() {
               tabIndex={-1}
               type="file"
             />
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-medium text-foreground/80">选择一个专属 Agent</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {agents.map((agent) => (
-                <button
-                  className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-ring"
-                  key={agent.id}
-                  onClick={() => router.push(`/canvas?agent=${encodeURIComponent(agent.id)}`)}
-                  type="button"
-                >
-                  <span
-                    aria-hidden
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg"
-                  >
-                    {agent.icon}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-foreground">{agent.name}</span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {agent.description}
-                    </span>
-                  </span>
-                </button>
-              ))}
-              {!agents.length ? (
-                <p className="col-span-full text-xs text-muted-foreground/80">Agent 列表加载中…</p>
-              ) : null}
-            </div>
           </section>
         </div>
       </div>
