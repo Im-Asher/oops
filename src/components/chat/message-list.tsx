@@ -27,9 +27,9 @@ function AgentAvatar({ icon }: { icon?: string }) {
   return (
     <span
       aria-hidden
-      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-sm leading-none"
+      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm leading-none"
     >
-      {icon ?? <BrainIcon className="size-3.5 text-zinc-400" />}
+      {icon ?? <BrainIcon className="size-3.5 text-muted-foreground" />}
     </span>
   );
 }
@@ -38,7 +38,7 @@ function UserAvatar() {
   return (
     <span
       aria-hidden
-      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-zinc-200"
+      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-foreground/85"
     >
       <UserIcon className="size-3.5" />
     </span>
@@ -66,16 +66,16 @@ function mergeTextParts(parts: UIMessage["parts"]): UIMessage["parts"] {
 function ThinkingPlaceholder() {
   return (
     <span aria-label="思考中" className="inline-flex items-center gap-1 py-1.5">
-      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s]" />
-      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s]" />
-      <span className="size-1.5 animate-bounce rounded-full bg-zinc-400" />
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+      <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
     </span>
   );
 }
 
 function ToolStatusLine({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <LoaderCircleIcon className="size-3 animate-spin" />
       {label}
     </span>
@@ -166,7 +166,7 @@ export function MessageList({
         );
       })}
       {messages.length === 0 && (
-        <p className="text-sm text-zinc-400">选择 Agent 并描述你想要的商品/场景图。</p>
+        <p className="text-sm text-muted-foreground">选择 Agent 并描述你想要的商品/场景图。</p>
       )}
     </div>
   );

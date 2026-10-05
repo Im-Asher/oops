@@ -23,14 +23,14 @@ export function EditToolbar({
 }: EditToolbarProps) {
   return (
     <div
-      className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900 px-1.5 py-1 shadow-lg shadow-black/30"
+      className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-full border border-border bg-popover px-1.5 py-1 shadow-lg shadow-black/30"
       // 同 ViewToolbar：阻止冒泡到画布，否则指针捕获会吞掉 click。
       onPointerDown={(event) => event.stopPropagation()}
     >
       <Button
         aria-label="裁剪模式"
         aria-pressed={cropping}
-        className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+        className="min-h-11 min-w-11 text-foreground hover:bg-accent"
         onClick={onToggleCrop}
         size="icon-sm"
         variant={cropping ? "secondary" : "ghost"}
@@ -40,7 +40,7 @@ export function EditToolbar({
       <Button
         aria-label="滤镜面板"
         aria-pressed={filtersOpen}
-        className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+        className="min-h-11 min-w-11 text-foreground hover:bg-accent"
         onClick={onToggleFilters}
         size="icon-sm"
         variant={filtersOpen ? "secondary" : "ghost"}
@@ -50,7 +50,7 @@ export function EditToolbar({
       {!cropping ? (
         <Button
           aria-label="重置编辑"
-          className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+          className="min-h-11 min-w-11 text-foreground hover:bg-accent"
           disabled={!dirty}
           onClick={onResetEdits}
           size="icon-sm"

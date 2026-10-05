@@ -729,14 +729,14 @@ export default function ChatPage() {
       : null;
 
   return (
-    <main className="dark fixed inset-0 overflow-hidden bg-[#0B0B0D] text-zinc-50">
+    <main className="fixed inset-0 overflow-hidden bg-background text-foreground">
       {/* 画布：全屏唯一主舞台，全局件与其悬浮层都在其上 */}
       <div className="absolute inset-0" ref={canvasWrapRef}>
         {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
           <span
             aria-live="polite"
-            className="rounded-full bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 backdrop-blur"
+            className="rounded-full bg-popover/80 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur"
           >
             {saveStatus === "idle"
               ? null
@@ -758,7 +758,7 @@ export default function ChatPage() {
         {reveal ? (
           <button
             aria-live="polite"
-            className="absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1.5 text-xs text-zinc-100 shadow-lg hover:bg-zinc-800"
+            className="absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-popover/90 px-3 py-1.5 text-xs text-foreground shadow-lg hover:bg-accent"
             onClick={handleRevealClick}
             type="button"
           >
@@ -802,7 +802,7 @@ export default function ChatPage() {
       {!chatOpen ? (
         <button
           aria-label="打开聊天"
-          className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900/90 text-zinc-100 shadow-lg hover:bg-zinc-800"
+          className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-full border border-border bg-popover/90 text-foreground shadow-lg hover:bg-accent"
           onClick={() => setChatOpen(true)}
           type="button"
         >
@@ -814,7 +814,7 @@ export default function ChatPage() {
       <div
         className={
           chatOpen
-            ? "absolute inset-0 z-40 flex md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-zinc-800/80 md:shadow-2xl md:shadow-black/40"
+            ? "absolute inset-0 z-40 flex md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-border/80 md:shadow-2xl md:shadow-black/40"
             : "hidden"
         }
         data-testid="chat-panel-container"
@@ -852,7 +852,7 @@ export default function ChatPage() {
                 />
               </div>
               {/* 用户区：无会话空态下用户入口仍可达（时钟下拉常开） */}
-              <div className="shrink-0 border-t border-zinc-800 bg-zinc-950 p-1">
+              <div className="shrink-0 border-t border-border bg-background p-1">
                 <UserMenuContent />
               </div>
             </div>

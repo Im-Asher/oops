@@ -76,7 +76,7 @@ export function ChatPanel({
   onAttach,
 }: ChatPanelProps) {
   return (
-    <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-[#141416]">
+    <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-card">
       <ChatPanelHeader
         agentIcon={agentIcon}
         agentName={agentName}

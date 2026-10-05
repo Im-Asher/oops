@@ -68,11 +68,11 @@ export function UserMenuContent() {
         <>
           <DropdownMenuLabel className="font-normal">
             <span className="block truncate text-sm">{nickname}</span>
-            <span className="block truncate text-xs text-zinc-400">
+            <span className="block truncate text-xs text-muted-foreground">
               oops_{profile.oopsId}
             </span>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-zinc-800" />
+          <DropdownMenuSeparator className="bg-muted" />
         </>
       ) : null}
       <DropdownMenuItem asChild>
@@ -120,12 +120,12 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label="用户菜单"
-          className="size-10 rounded-full text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
+          className="size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground"
           size="icon"
           variant="ghost"
         >
           {initial ? (
-            <span className="flex size-6 items-center justify-center rounded-full bg-zinc-700 text-xs">
+            <span className="flex size-6 items-center justify-center rounded-full bg-accent text-xs">
               {initial}
             </span>
           ) : (
@@ -135,7 +135,7 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-52 border-zinc-800 bg-zinc-900 text-zinc-50"
+        className="w-52 border-border bg-popover text-foreground"
       >
         <UserMenuContent />
       </DropdownMenuContent>

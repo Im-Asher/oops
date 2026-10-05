@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
 import {
   ArrowUpIcon,
@@ -33,10 +34,10 @@ function NavItem({
   const disabled = !href;
   const className = `flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${
     active
-      ? "bg-zinc-800 text-zinc-50"
+      ? "bg-muted text-foreground"
       : disabled
-        ? "cursor-not-allowed text-zinc-600"
-        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-50"
+        ? "cursor-not-allowed text-muted-foreground/50"
+        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
   }`;
   if (disabled) {
     return (
@@ -78,23 +79,24 @@ export default function HomePage() {
   }
 
   return (
-    <main className="dark fixed inset-0 flex overflow-hidden bg-[#0B0B0D] text-zinc-50">
+    <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
       {/* 左侧栏：首页 / 创建分组（AI画布可用，创建设计置灰）/ 其他导航项置灰 / 底部用户入口 */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-zinc-800 bg-[#111113] px-3 py-4">
-        <div className="px-3 pb-4 text-base font-semibold tracking-wide text-zinc-50">oops</div>
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-4">
+        <div className="px-3 pb-4 text-base font-semibold tracking-wide text-foreground">oops</div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label="主导航">
           <NavItem active href="/home" icon={LayoutDashboardIcon} label="首页" />
-          <p className="px-3 pb-1 pt-4 text-xs text-zinc-500">创建</p>
+          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">创建</p>
           <NavItem href="/canvas" icon={SparklesIcon} label="AI 画布" />
           <NavItem icon={PaletteIcon} label="创建设计" />
-          <p className="px-3 pb-1 pt-4 text-xs text-zinc-500">库</p>
+          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">库</p>
           <NavItem icon={ImageIcon} label="作品集" />
           <NavItem icon={ImagesIcon} label="素材库" />
           <NavItem icon={MessageSquareIcon} label="消息中心" />
         </nav>
-        <div className="flex items-center gap-1 border-t border-zinc-800 pt-3">
+        <div className="flex items-center gap-1 border-t border-border pt-3">
           <NavItem icon={SettingsIcon} label="设置" />
-          <div className="ml-auto pr-1">
+          <div className="ml-auto flex items-center gap-0.5 pr-1">
+            <ThemeToggle />
             <UserMenu />
           </div>
         </div>
@@ -104,17 +106,17 @@ export default function HomePage() {
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-16">
           <section className="flex flex-col items-center gap-3 text-center">
-            <h1 className="text-3xl font-semibold text-zinc-50">用一句话，生成电商好图</h1>
-            <p className="text-sm text-zinc-400">
+            <h1 className="text-3xl font-semibold text-foreground">用一句话，生成电商好图</h1>
+            <p className="text-sm text-muted-foreground">
               描述你的商品与场景，AI 画布替你完成主图、详情与氛围图。
             </p>
           </section>
 
           <section>
-            <div className="rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600">
+            <div className="rounded-xl border border-border bg-card p-2 transition-colors focus-within:border-ring">
               <Textarea
                 aria-label="创作输入"
-                className="max-h-40 min-h-16 resize-none border-0 bg-transparent px-2 text-sm text-zinc-50 focus-visible:ring-0"
+                className="max-h-40 min-h-16 resize-none border-0 bg-transparent px-2 text-sm text-foreground focus-visible:ring-0"
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -137,35 +139,35 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <p className="mt-2 px-1 text-xs text-zinc-500">回车跳转 AI 画布，草稿会自动填入输入框。</p>
+            <p className="mt-2 px-1 text-xs text-muted-foreground/80">回车跳转 AI 画布，草稿会自动填入输入框。</p>
           </section>
 
           <section>
-            <h2 className="mb-3 text-sm font-medium text-zinc-300">选择一个专属 Agent</h2>
+            <h2 className="mb-3 text-sm font-medium text-foreground/80">选择一个专属 Agent</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {agents.map((agent) => (
                 <button
-                  className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-[#141416] p-4 text-left transition-colors hover:border-zinc-600"
+                  className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-ring"
                   key={agent.id}
                   onClick={() => router.push(`/canvas?agent=${encodeURIComponent(agent.id)}`)}
                   type="button"
                 >
                   <span
                     aria-hidden
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-lg"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg"
                   >
                     {agent.icon}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-zinc-50">{agent.name}</span>
-                    <span className="mt-0.5 block truncate text-xs text-zinc-400">
+                    <span className="block text-sm font-medium text-foreground">{agent.name}</span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                       {agent.description}
                     </span>
                   </span>
                 </button>
               ))}
               {!agents.length ? (
-                <p className="col-span-full text-xs text-zinc-500">Agent 列表加载中…</p>
+                <p className="col-span-full text-xs text-muted-foreground/80">Agent 列表加载中…</p>
               ) : null}
             </div>
           </section>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,15 +66,15 @@ export function ChatPanelHeader({
   };
 
   return (
-    <header className="shrink-0 border-b border-zinc-800 px-3 pb-2 pt-2.5">
+    <header className="shrink-0 border-b border-border px-3 pb-2 pt-2.5">
       <div className="flex items-center gap-2">
         <span
           aria-hidden
-          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs"
         >
           {agentIcon ?? "🤖"}
         </span>
-        <span className="truncate text-sm font-medium text-zinc-100">
+        <span className="truncate text-sm font-medium text-foreground">
           {agentName ?? "选择 Agent"}
         </span>
       </div>
@@ -82,7 +83,7 @@ export function ChatPanelHeader({
           <>
             <Input
               aria-label="会话标题"
-              className="h-7 border-zinc-700 bg-zinc-900 px-2 text-sm text-zinc-50"
+              className="h-7 border-border bg-popover px-2 text-sm text-foreground"
               onBlur={commit}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -94,7 +95,7 @@ export function ChatPanelHeader({
             />
             <Button
               aria-label="确认重命名"
-              className="size-6 shrink-0 text-zinc-50 hover:bg-zinc-700"
+              className="size-6 shrink-0 text-foreground hover:bg-accent"
               onClick={commit}
               onMouseDown={(e) => e.preventDefault()}
               size="icon-sm"
@@ -104,7 +105,7 @@ export function ChatPanelHeader({
             </Button>
             <Button
               aria-label="取消重命名"
-              className="size-6 shrink-0 text-zinc-50 hover:bg-zinc-700"
+              className="size-6 shrink-0 text-foreground hover:bg-accent"
               onClick={() => setEditing(false)}
               onMouseDown={(e) => e.preventDefault()}
               size="icon-sm"
@@ -115,15 +116,15 @@ export function ChatPanelHeader({
           </>
         ) : (
           <>
-            <span className="min-w-0 flex-1 truncate text-xs text-zinc-400" title={title}>
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={title}>
               {title}
             </span>
-            <span className="shrink-0 rounded bg-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-violet-300">
+            <span className="shrink-0 rounded bg-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-300">
               AI
             </span>
             <Button
               aria-label="重命名会话"
-              className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+              className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
               disabled={!canRename}
               onClick={() => {
                 setDraft(sessionTitle ?? "");
@@ -142,7 +143,7 @@ export function ChatPanelHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     aria-label="会话历史"
-                    className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+                    className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
                     size="icon-sm"
                     variant="ghost"
                     title="会话历史"
@@ -157,7 +158,7 @@ export function ChatPanelHeader({
             ) : (
               <Button
                 aria-label="会话历史"
-                className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+                className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
                 disabled
                 size="icon-sm"
                 variant="ghost"
@@ -166,9 +167,10 @@ export function ChatPanelHeader({
                 <ClockIcon />
               </Button>
             )}
+            <ThemeToggle className="size-6 text-muted-foreground hover:text-foreground" />
             <Button
               aria-label="收起聊天面板"
-              className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+              className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={onCollapse}
               size="icon-sm"
               variant="ghost"

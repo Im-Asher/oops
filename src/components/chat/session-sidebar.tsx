@@ -79,10 +79,10 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1 rounded-md bg-zinc-800/60 px-1.5 py-1">
+      <div className="flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-1">
         <Input
           aria-label="会话标题"
-          className="h-7 border-zinc-700 bg-zinc-900 px-2 text-sm text-zinc-50"
+          className="h-7 border-border bg-popover px-2 text-sm text-foreground"
           onBlur={commit}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -94,7 +94,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
         />
         <Button
           aria-label="确认重命名"
-          className="size-6 shrink-0 text-zinc-50 hover:bg-zinc-700"
+          className="size-6 shrink-0 text-foreground hover:bg-accent"
           onClick={commit}
           onMouseDown={(e) => e.preventDefault()}
           size="icon-sm"
@@ -104,7 +104,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
         </Button>
         <Button
           aria-label="取消重命名"
-          className="size-6 shrink-0 text-zinc-50 hover:bg-zinc-700"
+          className="size-6 shrink-0 text-foreground hover:bg-accent"
           onClick={() => setEditing(false)}
           onMouseDown={(e) => e.preventDefault()}
           size="icon-sm"
@@ -118,8 +118,8 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
 
   if (confirming) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-md bg-zinc-800/60 px-2 py-1">
-        <span className="truncate text-xs text-zinc-300">删除「{label}」？</span>
+      <div className="flex items-center justify-between gap-2 rounded-md bg-muted/60 px-2 py-1">
+        <span className="truncate text-xs text-foreground/80">删除「{label}」？</span>
         <div className="flex shrink-0 gap-1">
           <Button
             aria-label="确认删除会话"
@@ -132,7 +132,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
           </Button>
           <Button
             aria-label="取消删除"
-            className="h-6 px-2 text-xs text-zinc-300 hover:bg-zinc-700"
+            className="h-6 px-2 text-xs text-foreground/80 hover:bg-accent"
             onClick={() => setConfirming(false)}
             size="sm"
             variant="ghost"
@@ -147,7 +147,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
   return (
     <div
       className={`group flex items-center rounded-md ${
-        active ? "bg-zinc-800" : "hover:bg-zinc-800/60"
+        active ? "bg-muted" : "hover:bg-accent/60"
       }`}
     >
       <button
@@ -158,7 +158,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
         <span aria-hidden className="shrink-0 text-xs">
           {agentIcon ?? "🤖"}
         </span>
-        <span className={`truncate text-sm ${active ? "text-zinc-50" : "text-zinc-300"}`}>
+        <span className={`truncate text-sm ${active ? "text-foreground" : "text-foreground/80"}`}>
           {label}
         </span>
       </button>
@@ -167,7 +167,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
       >
         <Button
           aria-label={`重命名 ${label}`}
-          className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+          className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => {
             setDraft(session.title ?? "");
             setEditing(true);
@@ -179,7 +179,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
         </Button>
         <Button
           aria-label={`删除 ${label}`}
-          className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+          className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => setConfirming(true)}
           size="icon-sm"
           variant="ghost"
@@ -215,10 +215,10 @@ export function SessionSidebar({
       : sessions;
 
   return (
-    <aside className="flex h-full w-full shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
+    <aside className="flex h-full w-full shrink-0 flex-col border-r border-border bg-background">
       <div className="flex items-center gap-1 p-2">
         <Button
-          className="flex-1 justify-start gap-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-800"
+          className="flex-1 justify-start gap-2 bg-popover text-foreground hover:bg-accent"
           onClick={onNewChat}
           variant="secondary"
         >
@@ -227,7 +227,7 @@ export function SessionSidebar({
         </Button>
         <Button
           aria-label="关闭会话抽屉"
-          className="min-h-11 min-w-11 text-zinc-50 hover:bg-zinc-800"
+          className="min-h-11 min-w-11 text-foreground hover:bg-accent"
           onClick={onCollapse}
           size="icon-sm"
           variant="ghost"
@@ -239,11 +239,11 @@ export function SessionSidebar({
       <div className="relative px-2 pb-2">
         <SearchIcon
           aria-hidden
-          className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500"
+          className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/80"
         />
         <Input
           aria-label="搜索会话"
-          className="h-8 border-zinc-800 bg-zinc-900 pl-7 text-sm text-zinc-50 placeholder:text-zinc-500"
+          className="h-8 border-border bg-popover pl-7 text-sm text-foreground placeholder:text-muted-foreground/80"
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder="搜索会话…"
           value={query}
@@ -253,7 +253,7 @@ export function SessionSidebar({
       <nav aria-label="会话列表" className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
         {groupSessions(visible).map((group) => (
           <div key={group.label}>
-            <p className="px-2 pb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+            <p className="px-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -272,17 +272,17 @@ export function SessionSidebar({
           </div>
         ))}
         {sessions.length === 0 && (
-          <p className="px-2 py-6 text-center text-sm text-zinc-500">
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground/80">
             还没有会话，点击「新会话」开始。
           </p>
         )}
         {sessions.length > 0 && visible.length === 0 && (
-          <p className="px-2 py-6 text-center text-sm text-zinc-500">没有匹配的会话。</p>
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground/80">没有匹配的会话。</p>
         )}
       </nav>
 
       {errorMessage && (
-        <p className="border-t border-zinc-800 px-3 py-2 text-xs text-red-400" role="alert">
+        <p className="border-t border-border px-3 py-2 text-xs text-red-400" role="alert">
           {errorMessage}
         </p>
       )}

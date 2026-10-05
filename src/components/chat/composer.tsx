@@ -77,13 +77,13 @@ export function Composer({
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-[#141416] p-2 transition-colors focus-within:border-zinc-600">
+    <div className="rounded-xl border border-border bg-card p-2 transition-colors focus-within:border-ring">
       {presets?.length ? (
         <div className="flex flex-col gap-1.5 px-1 pb-2" data-testid="preset-cards">
-          <p className="text-xs text-zinc-500">试试这样描述：</p>
+          <p className="text-xs text-muted-foreground/80">试试这样描述：</p>
           {presets.map((text) => (
             <button
-              className="flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-left text-xs text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
+              className="flex items-start gap-2 rounded-lg border border-border bg-popover/60 px-3 py-2 text-left text-xs text-foreground/80 hover:border-ring hover:bg-accent"
               key={text}
               onClick={() => pickPreset(text)}
               type="button"
@@ -96,11 +96,11 @@ export function Composer({
       ) : null}
       {reference ? (
         <div className="flex items-center gap-1.5 px-1 pb-1.5">
-          <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-300">
+          <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300">
             引用：{reference.name}
             <button
               aria-label={`移除引用 ${reference.name}`}
-              className="ml-0.5 text-violet-300/80 hover:text-violet-200"
+              className="ml-0.5 text-violet-600/80 dark:text-violet-600 dark:text-violet-300/80 hover:text-violet-700 dark:hover:text-violet-700 dark:text-violet-200"
               onClick={onRemoveReference}
               type="button"
             >
@@ -112,7 +112,7 @@ export function Composer({
       <Textarea
         aria-label="消息输入"
         ref={textareaRef}
-        className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-zinc-50 shadow-none placeholder:text-zinc-500 focus-visible:ring-0"
+        className="field-sizing-content max-h-40 min-h-10 resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0"
         disabled={busy || !hasSession}
         onBlur={() => {
           composingRef.current = false;
@@ -146,7 +146,7 @@ export function Composer({
         <div className="flex items-center gap-0.5">
           <Button
             aria-label={onAttach ? "上传参考图" : "先创建会话后可上传参考图"}
-            className="size-8 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            className="size-8 text-muted-foreground hover:bg-accent hover:text-foreground/85"
             disabled={!onAttach}
             onClick={onAttach}
             size="icon-sm"
@@ -158,12 +158,12 @@ export function Composer({
           <Select onValueChange={onAgentChange} value={agentId}>
             <SelectTrigger
               aria-label="选择 Agent"
-              className="w-auto gap-1.5 border-0 bg-transparent px-2 text-xs text-zinc-300 shadow-none hover:bg-zinc-800"
+              className="w-auto gap-1.5 border-0 bg-transparent px-2 text-xs text-foreground/80 shadow-none hover:bg-accent"
               size="sm"
             >
               <SelectValue placeholder="选择 Agent" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 text-zinc-50">
+            <SelectContent className="bg-popover text-foreground">
               {agents.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   <span className="flex items-center gap-2">
@@ -179,7 +179,7 @@ export function Composer({
           // 生成中：发送钮变为停止钮（点击中断本轮流，服务端真停并部分落库）
           <Button
             aria-label="停止生成"
-            className="size-8 rounded-full bg-zinc-700 hover:bg-zinc-600"
+            className="size-8 rounded-full bg-accent hover:bg-accent/80"
             onClick={onStop}
             size="icon-sm"
             title="停止生成"
@@ -195,7 +195,7 @@ export function Composer({
             size="icon-sm"
           >
             {busy ? (
-              <span className="block size-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+              <span className="block size-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
             ) : (
               <ArrowUpIcon />
             )}

@@ -56,7 +56,7 @@ function CanvasItemView({
 }) {
   return (
     <div
-      className={`absolute overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900 ${
+      className={`absolute overflow-hidden rounded-lg border border-border/80 bg-popover ${
         selected ? "ring-2 ring-violet-400" : ""
       } ${item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
       data-item-id={item.id}
@@ -66,7 +66,7 @@ function CanvasItemView({
       {item.agentName || item.agentIcon ? (
         // 署名徽标：角落小徽章，pointer-events-none 不影响拖拽/选中，反向缩放恒定屏幕尺寸
         <span
-          className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex max-w-[85%] items-center gap-1 rounded-full bg-zinc-950/70 px-1.5 py-0.5 text-[10px] leading-3 text-zinc-200 backdrop-blur"
+          className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex max-w-[85%] items-center gap-1 rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] leading-3 text-foreground/85 backdrop-blur"
           style={{ transform: `scale(${inverseScale})`, transformOrigin: "top left" }}
         >
           {item.agentIcon ? <span aria-hidden>{item.agentIcon}</span> : null}
@@ -98,16 +98,16 @@ function CanvasItemView({
         />
       ) : item.status === "generating" ? (
         <div className="flex size-full flex-col items-center justify-center gap-2 border-dashed p-3 text-center">
-          <LoaderCircleIcon className="size-5 animate-spin text-zinc-400" />
-          <p className="text-xs text-zinc-300">生成中…</p>
-          {item.prompt ? <p className="line-clamp-2 text-xs text-zinc-500">{item.prompt}</p> : null}
+          <LoaderCircleIcon className="size-5 animate-spin text-muted-foreground" />
+          <p className="text-xs text-foreground/80">生成中…</p>
+          {item.prompt ? <p className="line-clamp-2 text-xs text-muted-foreground/80">{item.prompt}</p> : null}
         </div>
       ) : (
         <div className="flex size-full flex-col items-center justify-center gap-2 border-red-900/60 p-3 text-center">
           <TriangleAlertIcon className="size-5 text-red-400" />
           <p className="text-xs text-red-200">生成失败</p>
           {item.errorMessage ? (
-            <p className="line-clamp-2 text-xs text-zinc-500">{item.errorMessage}</p>
+            <p className="line-clamp-2 text-xs text-muted-foreground/80">{item.errorMessage}</p>
           ) : null}
           {onRetry ? (
             <Button
@@ -389,7 +389,7 @@ export function CanvasStage({
 
   return (
     <div
-      className={`absolute inset-0 touch-none overflow-hidden bg-[#0B0B0D] ${
+      className={`absolute inset-0 touch-none overflow-hidden bg-background ${
         dragging ? "cursor-grabbing" : ""
       }`}
       style={{
@@ -459,11 +459,11 @@ export function CanvasStage({
 
       {cropping ? (
         <div
-          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 shadow-lg shadow-black/30"
+          className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-popover px-2 py-1 shadow-lg shadow-black/30"
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Button
-            className="min-h-11 px-3 text-xs text-zinc-50 hover:bg-zinc-800"
+            className="min-h-11 px-3 text-xs text-foreground hover:bg-accent"
             onClick={cancelCropping}
             size="sm"
             variant="ghost"
