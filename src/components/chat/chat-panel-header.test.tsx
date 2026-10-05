@@ -64,7 +64,7 @@ describe("ChatPanelHeader 任务化头部", () => {
   });
 
   it("无会话时重命名禁用；未接下拉时时钟禁用", () => {
-    renderHeader({ canRename: false, sessionTitle: undefined, onOpenHistory: undefined });
+    renderHeader({ canRename: false, sessionTitle: undefined, historyContent: undefined });
     expect(
       (screen.getByRole("button", { name: "重命名会话" }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -73,10 +73,10 @@ describe("ChatPanelHeader 任务化头部", () => {
     );
   });
 
-  it("接入时钟下拉回调后可点击触发 onOpenHistory", async () => {
-    const onOpenHistory = vi.fn();
-    renderHeader({ onOpenHistory });
+  it("接入下拉内容后点击时钟触发 onHistoryOpenChange(true)", async () => {
+    const onHistoryOpenChange = vi.fn();
+    renderHeader({ historyContent: <div>会话列表</div>, onHistoryOpenChange });
     await userEvent.click(screen.getByRole("button", { name: "会话历史" }));
-    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+    expect(onHistoryOpenChange).toHaveBeenCalledWith(true);
   });
 });

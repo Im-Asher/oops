@@ -4,6 +4,7 @@ import { ChatPanelHeader } from "@/components/chat/chat-panel-header";
 import { Composer, type ComposerReference } from "@/components/chat/composer";
 import { MessageList } from "@/components/chat/message-list";
 import type { AgentInfo, UIMessage } from "@/types/chat";
+import type { ReactNode } from "react";
 
 interface ChatPanelProps {
   agents: AgentInfo[];
@@ -20,8 +21,10 @@ interface ChatPanelProps {
   hasSession: boolean;
   /** 重命名当前会话（乐观更新与失败回滚由页面层负责）。 */
   onRename?: (title: string) => void;
-  /** 头部时钟下拉：打开会话列表。 */
-  onOpenHistory?: () => void;
+  /** 头部时钟下拉（受控）：内容由页面组装（会话列表 + 用户区）。 */
+  historyOpen?: boolean;
+  onHistoryOpenChange?: (open: boolean) => void;
+  historyContent?: ReactNode;
   /** 收起聊天面板（画布左上出现重开入口）。 */
   onCollapse?: () => void;
   messages: UIMessage[];
@@ -55,7 +58,9 @@ export function ChatPanel({
   sessionTitle,
   hasSession,
   onRename,
-  onOpenHistory,
+  historyOpen,
+  onHistoryOpenChange,
+  historyContent,
   onCollapse,
   messages,
   selectedAssetId,
@@ -76,8 +81,10 @@ export function ChatPanel({
         agentIcon={agentIcon}
         agentName={agentName}
         canRename={hasSession && !!onRename}
+        historyContent={historyContent}
+        historyOpen={historyOpen}
         onCollapse={onCollapse}
-        onOpenHistory={onOpenHistory}
+        onHistoryOpenChange={onHistoryOpenChange}
         onRename={(title) => onRename?.(title)}
         sessionTitle={sessionTitle}
       />

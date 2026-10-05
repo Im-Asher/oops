@@ -3,7 +3,7 @@
 import { CanvasStage } from "@/components/canvas/canvas-stage";
 import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { SessionDrawer } from "@/components/workbench/session-drawer";
+import { SessionSidebar } from "@/components/chat/session-sidebar";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import { DownloadIcon, MessageSquareIcon } from "lucide-react";
 import {
@@ -44,10 +44,11 @@ export default function ChatPage() {
   const [exportError, setExportError] = useState<string | null>(null);
   // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、会话抽屉。
   const [chatOpen, setChatOpen] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // 头部时钟下拉（会话列表 + 用户区）：受控开关与搜索词。
+  const [historyOpen, setHistoryOpen] = useState(false);
   // 输入框外部聚焦信号：新建会话后带回聊天框（nonce 变化触发聚焦一次）。
   const [composerFocusNonce, setComposerFocusNonce] = useState(0);
-  const [drawerQuery, setDrawerQuery] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
   // 重命名/删除等会话操作的失败提示（抽屉内联展示）。
   const [actionError, setActionError] = useState<string | null>(null);
   // 会话工作区本机持久化：保存状态机（顶栏如实显示）+ 已完成恢复的会话标记。
@@ -328,8 +329,8 @@ export default function ChatPage() {
       setReveal(null);
       setCurrentId(data.id);
       setAgentId(data.agentId ?? agentId);
-      // 新建会话转到聊天框：关抽屉、展开聊天面板并聚焦输入框。
-      setDrawerOpen(false);
+      // 新建会话转到聊天框：关下拉、展开聊天面板并聚焦输入框。
+      setHistoryOpen(false);
       setChatOpen(true);
       setComposerFocusNonce((n) => n + 1);
     }
@@ -776,6 +777,28 @@ export default function ChatPage() {
           onRename={(title) => {
             if (currentId) void renameSession(currentId, title);
           }}
+          historyContent={
+            <div className="flex h-[420px] flex-col overflow-hidden">
+              <SessionSidebar
+                agents={agents}
+                currentId={currentId}
+                errorMessage={actionError}
+                onDeleteSession={(id) => void deleteSession(id)}
+                onCollapse={() => setHistoryOpen(false)}
+                onNewChat={() => void newChat()}
+                onQueryChange={setHistoryQuery}
+                onRenameSession={(id, title) => void renameSession(id, title)}
+                onSelectSession={(id) => {
+                  setHistoryOpen(false);
+                  void selectSession(id);
+                }}
+                query={historyQuery}
+                sessions={sessions}
+              />
+            </div>
+          }
+          historyOpen={historyOpen}
+          onHistoryOpenChange={setHistoryOpen}
           {...(currentId ? { onAttach: () => fileInputRef.current?.click() } : {})}
           input={currentSlot?.draft ?? ""}
           messages={messages}
@@ -790,20 +813,6 @@ export default function ChatPage() {
         />
       </div>
 
-      <SessionDrawer
-        agents={agents}
-        currentId={currentId}
-        errorMessage={actionError}
-        onClose={() => setDrawerOpen(false)}
-        onDeleteSession={(id) => void deleteSession(id)}
-        onNewChat={() => void newChat()}
-        onQueryChange={setDrawerQuery}
-        onRenameSession={(id, title) => void renameSession(id, title)}
-        onSelectSession={(id) => void selectSession(id)}
-        open={drawerOpen}
-        query={drawerQuery}
-        sessions={sessions}
-      />
     </main>
   );
 }

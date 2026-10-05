@@ -1,6 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   CheckIcon,
@@ -9,7 +14,7 @@ import {
   PencilIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 interface ChatPanelHeaderProps {
   /** 当前会话绑定 Agent 的头像 emoji 与名称。 */
@@ -20,8 +25,11 @@ interface ChatPanelHeaderProps {
   /** 是否可重命名（无会话时禁用）。 */
   canRename: boolean;
   onRename: (title: string) => void;
-  /** 时钟下拉：打开会话列表（未接下拉时按钮禁用）。 */
-  onOpenHistory?: () => void;
+  /** 时钟下拉（受控）：提供 historyContent 时渲染，否则时钟按钮禁用。 */
+  historyOpen?: boolean;
+  onHistoryOpenChange?: (open: boolean) => void;
+  /** 下拉内容（会话列表 + 用户区，由页面组装）。 */
+  historyContent?: ReactNode;
   onCollapse?: () => void;
 }
 
@@ -36,7 +44,9 @@ export function ChatPanelHeader({
   sessionTitle,
   canRename,
   onRename,
-  onOpenHistory,
+  historyOpen,
+  onHistoryOpenChange,
+  historyContent,
   onCollapse,
 }: ChatPanelHeaderProps) {
   const [editing, setEditing] = useState(false);
@@ -124,17 +134,38 @@ export function ChatPanelHeader({
             >
               <PencilIcon />
             </Button>
-            <Button
-              aria-label="会话历史"
-              className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
-              disabled={!onOpenHistory}
-              onClick={onOpenHistory}
-              size="icon-sm"
-              variant="ghost"
-              title="会话历史"
-            >
-              <ClockIcon />
-            </Button>
+            {historyContent ? (
+              <DropdownMenu
+                onOpenChange={onHistoryOpenChange}
+                open={historyOpen}
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    aria-label="会话历史"
+                    className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+                    size="icon-sm"
+                    variant="ghost"
+                    title="会话历史"
+                  >
+                    <ClockIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-80 p-0" sideOffset={8}>
+                  {historyContent}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                aria-label="会话历史"
+                className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
+                disabled
+                size="icon-sm"
+                variant="ghost"
+                title="会话历史"
+              >
+                <ClockIcon />
+              </Button>
+            )}
             <Button
               aria-label="收起聊天面板"
               className="size-6 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-50"
