@@ -333,3 +333,14 @@ oops/
 - **多实例部署**：存储已为 MinIO（S3 兼容）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
 - **Agent 市场**：AgentRegistry 已是配置驱动，可平移到 DB 存储开放自定义。
 - **局部重绘/抠图**：作为新工具加入 ToolRegistry，Agent 按需引用。
+
+## 10. 构建版本徽标
+
+首页侧栏展示构建版本（`src/lib/version.ts`）：构建时注入的 `NEXT_PUBLIC_APP_VERSION`
+优先，缺失时回退 `package.json` 的 `version`，不注入也能正常构建与展示（无需数据库配置）。
+构建/运行环境需同时注入该变量以保持 SSR 与客户端一致（详见 `src/lib/version.ts` 注释）。
+可选在构建命令中覆盖，例如从 git tag 派生：
+
+```bash
+NEXT_PUBLIC_APP_VERSION=$(git describe --tags --always) pnpm build
+```
