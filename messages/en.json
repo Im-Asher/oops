@@ -294,6 +294,12 @@
     }
   },
   "design": {
+    "page": {
+      "back": "Back",
+      "canvasSize": "{width} × {height} px",
+      "draftSaving": "Saving…",
+      "draftSaved": "Draft saved"
+    },
     "dialog": {
       "title": "New design",
       "description": "Choose a size preset or set a custom canvas size",

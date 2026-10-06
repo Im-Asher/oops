@@ -294,6 +294,12 @@
     }
   },
   "design": {
+    "page": {
+      "back": "返回",
+      "canvasSize": "{width} × {height} px",
+      "draftSaving": "保存中…",
+      "draftSaved": "草稿已保存"
+    },
     "dialog": {
       "title": "新建设计",
       "description": "选择尺寸预设或自定义画布大小",
