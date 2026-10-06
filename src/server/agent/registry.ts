@@ -7,7 +7,7 @@ export interface AgentDefinition {
   description: string;
   /** 前端头像徽标用 emoji（声明即所得，避免维护名称到图标的映射）。 */
   icon: string;
-  /** 空会话灵感卡示例需求文案（面向最终用户、可直接使用）。 */
+  /** 空会话灵感卡示例需求的词典 key（chat.presets.<agentId>.<key>），API 层按 locale 解析为文案。 */
   presets: string[];
   /** 允许该 Agent 调用的工具名（按名授权）。 */
   tools: string[];

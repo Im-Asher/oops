@@ -193,6 +193,18 @@
     "reasoning": {
       "streaming": "思考中…",
       "label": "思考过程"
+    },
+    "presets": {
+      "atmosphere-designer": {
+        "autumnWood": "生成一张秋天树林里木桌旁的场景氛围图，暖色调逆光",
+        "loungeScene": "为家居品牌生成一张客厅场景图，米色沙发配绿植，午后阳光",
+        "beachPicnic": "生成一张海边日落时分的野餐场景图，电影感构图"
+      },
+      "product-photographer": {
+        "thermosWhiteMain": "为这款保温杯拍一张纯白背景主图，突出杯身的金属质感",
+        "coffeeScene": "木质桌面上的咖啡杯场景摆拍，清晨自然光，温暖氛围",
+        "creamMain": "为这款面霜生成一张电商主图，浅粉背景配柔和阴影，突出瓶身细节"
+      }
     }
   },
   "auth": {

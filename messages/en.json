@@ -193,6 +193,18 @@
     "reasoning": {
       "streaming": "Thinking…",
       "label": "Reasoning"
+    },
+    "presets": {
+      "atmosphere-designer": {
+        "autumnWood": "Generate a cozy autumn scene with a wooden table in the forest, warm backlit tones",
+        "loungeScene": "Create a living-room lifestyle image for a home decor brand: beige sofa, green plants, soft afternoon light",
+        "beachPicnic": "Generate a beach picnic at sunset with a cinematic composition"
+      },
+      "product-photographer": {
+        "thermosWhiteMain": "Shoot a clean white-background hero shot of this thermos, highlighting its metallic finish",
+        "coffeeScene": "Style a coffee cup on a wooden desk in morning light for a warm, natural look",
+        "creamMain": "Create an e-commerce hero image of this face cream on a soft pink background with gentle shadows, emphasizing the bottle details"
+      }
     }
   },
   "auth": {
