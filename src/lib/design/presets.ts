@@ -4,8 +4,23 @@
  */
 import type { StorageLike } from "@/lib/canvas/workspace-storage";
 
+/** 预设 id 联合类型：与词典 design.presets.<id>.name 的 key 一一对应。 */
+export type DesignPresetId =
+  | "poster-mobile"
+  | "poster-square"
+  | "poster-landscape"
+  | "video-vertical"
+  | "main-image"
+  | "detail-page"
+  | "livestream-cover"
+  | "shop-banner"
+  | "xhs-cover"
+  | "xhs-image"
+  | "moments"
+  | "weibo";
+
 export interface DesignPreset {
-  id: string;
+  id: DesignPresetId;
   width: number;
   height: number;
 }

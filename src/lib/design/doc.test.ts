@@ -103,7 +103,7 @@ describe("parseDesignDoc 严格解析", () => {
   it("elements 非数组或含任一非法元素 → 整体拒绝", () => {
     expect(parseDesignDoc({ ...validDoc(), elements: "nope" })).toBeNull();
     const missingType = validDoc();
-    delete (missingType.elements[1] as Record<string, unknown>).type;
+    delete (missingType.elements[1] as unknown as Record<string, unknown>).type;
     expect(parseDesignDoc(missingType)).toBeNull();
     expect(parseDesignDoc({ ...validDoc(), elements: [{ type: "video" }] })).toBeNull();
   });

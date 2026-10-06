@@ -112,9 +112,9 @@ describe("designReducer 元素增删改", () => {
       patches: [{ id: "el", patch: { content: "新", color: "#ff0000" } }],
       history: true,
     });
-    expect(state.doc.elements[0].content).toBe("新");
+    expect((state.doc.elements[0] as TextElement).content).toBe("新");
     state = designReducer(state, { type: "undo" });
-    expect(state.doc.elements[0].content).toBe("旧");
+    expect((state.doc.elements[0] as TextElement).content).toBe("旧");
   });
 
   it("deleteSelected 移除元素并清空选中，入历史", () => {

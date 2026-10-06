@@ -4,7 +4,6 @@
  */
 import {
   newElementId,
-  type DesignElement,
   type ImageElement,
   type ShapeElement,
   type TextElement,

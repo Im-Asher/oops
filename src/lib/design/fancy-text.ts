@@ -3,7 +3,7 @@
  * 默认文案来自词典（design.fancy.<id>.<key>），由面板组件按 locale 解析后传入 build。
  * 元素在局部坐标系布局（约从 0,0 起），插入时由 centerFragmentAt 落到视口中心。
  */
-import { newElementId, type DesignElement, type ShapeElement, type TextElement } from "@/lib/design/doc";
+import { type DesignElement, type ShapeElement, type TextElement } from "@/lib/design/doc";
 import { shapeElement, textElement } from "@/lib/design/elements";
 
 export interface FancyTextPreset {
