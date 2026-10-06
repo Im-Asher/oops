@@ -27,7 +27,43 @@
     "fileErrorOverflow": "Up to 5 attachments — {count} not added",
     "fileErrorSeparator": "; "
   },
-  "canvas": {},
+  "canvas": {
+    "emptyState": {
+      "title": "The canvas is empty",
+      "description": "Describe the image you want in the chat — results appear right on the canvas. You can also upload reference images with the attach button next to the input."
+    },
+    "editToolbar": {
+      "cropMode": "Crop mode",
+      "filterPanel": "Filter panel",
+      "resetEdits": "Reset edits"
+    },
+    "viewToolbar": {
+      "zoomOut": "Zoom out",
+      "fitReset": "Reset to fit canvas",
+      "zoomIn": "Zoom in",
+      "fitAll": "Fit all",
+      "fitAllAria": "Fit all artworks"
+    },
+    "filterPanel": {
+      "label": "Filter panel",
+      "title": "Filters",
+      "close": "Close filter panel",
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturate": "Saturation",
+      "presets": "Presets",
+      "preset": {
+        "none": "Original",
+        "vivid": "Vivid",
+        "soft": "Soft",
+        "warm": "Warm",
+        "cool": "Cool",
+        "mono": "Mono"
+      },
+      "unsupportedHint": "This browser cannot apply filters on export (ctx.filter). Preview is unaffected; use Chrome or Edge to export with filters.",
+      "reset": "Reset"
+    }
+  },
   "chat": {
     "panelLabel": "Chat panel",
     "untitledSession": "Untitled session",

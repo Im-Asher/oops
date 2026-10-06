@@ -28,38 +28,35 @@ export function filtersToCssOrNone(filters: Filters): string | undefined {
   return isDefaultFilters(filters) ? undefined : filtersToCss(filters);
 }
 
+// 预设 id 收窄为字面量联合：UI 层按 id 查词典渲染标签，lib 数据不携带 UI 文案。
+export type FilterPresetId = "none" | "vivid" | "soft" | "warm" | "cool" | "mono";
+
 export interface FilterPreset {
-  id: string;
-  label: string;
+  id: FilterPresetId;
   filters: Filters;
 }
 
-/** 设计稿 §3.4 的六组预设。 */
+/** 设计稿 §3.4 的六组预设。标签文案在词典 canvas.filterPanel.preset.<id>。 */
 export const FILTER_PRESETS: FilterPreset[] = [
-  { id: "none", label: "原图", filters: { ...DEFAULT_FILTERS } },
+  { id: "none", filters: { ...DEFAULT_FILTERS } },
   {
     id: "vivid",
-    label: "鲜明",
     filters: { brightness: 105, contrast: 115, saturate: 135, sepia: 0, hueRotate: 0 },
   },
   {
     id: "soft",
-    label: "柔和",
     filters: { brightness: 110, contrast: 90, saturate: 85, sepia: 0, hueRotate: 0 },
   },
   {
     id: "warm",
-    label: "暖调",
     filters: { brightness: 105, contrast: 100, saturate: 120, sepia: 15, hueRotate: 0 },
   },
   {
     id: "cool",
-    label: "冷调",
     filters: { brightness: 100, contrast: 105, saturate: 95, sepia: 0, hueRotate: -8 },
   },
   {
     id: "mono",
-    label: "黑白",
     filters: { brightness: 100, contrast: 110, saturate: 0, sepia: 0, hueRotate: 0 },
   },
 ];

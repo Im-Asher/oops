@@ -32,14 +32,14 @@ describe("filtersToCss", () => {
 });
 
 describe("FILTER_PRESETS", () => {
-  it("含设计稿要求的六组预设", () => {
-    expect(FILTER_PRESETS.map((p) => p.label)).toEqual([
-      "原图",
-      "鲜明",
-      "柔和",
-      "暖调",
-      "冷调",
-      "黑白",
+  it("含设计稿要求的六组预设（标签词典化后按 id 断言）", () => {
+    expect(FILTER_PRESETS.map((p) => p.id)).toEqual([
+      "none",
+      "vivid",
+      "soft",
+      "warm",
+      "cool",
+      "mono",
     ]);
   });
 

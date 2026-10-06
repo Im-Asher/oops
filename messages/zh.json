@@ -27,7 +27,43 @@
     "fileErrorOverflow": "最多 5 个附件，超出 {count} 个未添加",
     "fileErrorSeparator": "；"
   },
-  "canvas": {},
+  "canvas": {
+    "emptyState": {
+      "title": "画布还是空的",
+      "description": "在聊天里描述你想要的图片，生成结果会直接出现在画布上；也可通过输入框旁的附件按钮上传参考图"
+    },
+    "editToolbar": {
+      "cropMode": "裁剪模式",
+      "filterPanel": "滤镜面板",
+      "resetEdits": "重置编辑"
+    },
+    "viewToolbar": {
+      "zoomOut": "缩小",
+      "fitReset": "重置为适应画布",
+      "zoomIn": "放大",
+      "fitAll": "适应全部",
+      "fitAllAria": "适应全部作品"
+    },
+    "filterPanel": {
+      "label": "滤镜面板",
+      "title": "滤镜",
+      "close": "关闭滤镜面板",
+      "brightness": "亮度",
+      "contrast": "对比度",
+      "saturate": "饱和度",
+      "presets": "预设",
+      "preset": {
+        "none": "原图",
+        "vivid": "鲜明",
+        "soft": "柔和",
+        "warm": "暖调",
+        "cool": "冷调",
+        "mono": "黑白"
+      },
+      "unsupportedHint": "当前浏览器不支持导出时套用滤镜（ctx.filter），预览正常；导出请改用 Chrome / Edge。",
+      "reset": "重置"
+    }
+  },
   "chat": {
     "panelLabel": "聊天面板",
     "untitledSession": "未命名会话",
