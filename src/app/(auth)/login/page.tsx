@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useState } from "react";
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -28,12 +30,13 @@ export default function LoginPage() {
         router.refresh();
         return;
       }
+      // 服务端 message 现阶段仍为中文；按 code 本地化在任务 2.8 统一接入
       const body = (await res.json().catch(() => null)) as {
         error?: { message?: string };
       } | null;
-      setError(body?.error?.message ?? "登录失败，请稍后再试");
+      setError(body?.error?.message ?? t("login.submitFailed"));
     } catch {
-      setError("网络异常，请稍后再试");
+      setError(t("networkError"));
     } finally {
       setPending(false);
     }
@@ -46,7 +49,7 @@ export default function LoginPage() {
     >
       <div className="space-y-2">
         <label htmlFor="username" className="text-sm font-medium text-foreground">
-          用户名
+          {t("username")}
         </label>
         <Input
           id="username"
@@ -59,7 +62,7 @@ export default function LoginPage() {
       </div>
       <div className="space-y-2">
         <label htmlFor="password" className="text-sm font-medium text-foreground">
-          密码
+          {t("password")}
         </label>
         <Input
           id="password"
@@ -72,12 +75,12 @@ export default function LoginPage() {
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "登录中…" : "登录"}
+        {pending ? t("login.submitting") : t("login.submit")}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        首次使用？
+        {t("login.firstTime")}
         <Link href="/register" className="text-foreground underline-offset-4 hover:underline">
-          用邀请码注册
+          {t("login.registerLink")}
         </Link>
       </p>
     </form>
