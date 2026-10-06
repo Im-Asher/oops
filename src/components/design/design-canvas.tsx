@@ -13,7 +13,7 @@ import { type DesignAction, type DesignState } from "@/lib/design/design-reducer
 import { DesignElementView } from "@/components/design/design-element-view";
 import { ViewToolbar } from "@/components/canvas/view-toolbar";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const ZOOM_STEP = 1.2;
 /** fitView 的 padding 语义是像素边距（视口两侧各留）。 */
