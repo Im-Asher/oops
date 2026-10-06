@@ -62,6 +62,16 @@
       },
       "unsupportedHint": "This browser cannot apply filters on export (ctx.filter). Preview is unaffected; use Chrome or Edge to export with filters.",
       "reset": "Reset"
+    },
+    "stage": {
+      "label": "Canvas — zoom, pan and drag artworks",
+      "itemAlt": "Canvas artwork",
+      "generating": "Generating…",
+      "failed": "Generation failed",
+      "retry": "Retry",
+      "retryAria": "Retry generation",
+      "cancel": "Cancel",
+      "confirmCrop": "Confirm crop"
     }
   },
   "chat": {

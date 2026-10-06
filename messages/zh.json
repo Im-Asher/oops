@@ -62,6 +62,16 @@
       },
       "unsupportedHint": "当前浏览器不支持导出时套用滤镜（ctx.filter），预览正常；导出请改用 Chrome / Edge。",
       "reset": "重置"
+    },
+    "stage": {
+      "label": "画布，可缩放、平移与拖动作品",
+      "itemAlt": "画布作品",
+      "generating": "生成中…",
+      "failed": "生成失败",
+      "retry": "重试",
+      "retryAria": "重试生成",
+      "cancel": "取消",
+      "confirmCrop": "确认裁剪"
     }
   },
   "chat": {
