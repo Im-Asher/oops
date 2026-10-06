@@ -80,7 +80,7 @@ export default function LoginPage() {
         {pending ? t("login.submitting") : t("login.submit")}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        {t("login.firstTime")}
+        {t("login.firstTime")}{" "}
         <Link href="/register" className="text-foreground underline-offset-4 hover:underline">
           {t("login.registerLink")}
         </Link>

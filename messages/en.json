@@ -1,11 +1,11 @@
 {
   "common": {
     "metadata": {
-      "title": "oops · AI 电商图像工作台",
-      "description": "描述需求，生成商品详情图、海报与场景图"
+      "title": "oops · AI e-commerce image workbench",
+      "description": "Describe what you need to generate product detail images, posters and scene images"
     },
     "localeToggle": {
-      "label": "切换语言"
+      "label": "Switch language"
     },
     "theme": {
       "toLight": "Switch to light mode",

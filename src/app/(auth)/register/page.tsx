@@ -141,7 +141,7 @@ export default function RegisterPage() {
         {pending ? t("register.submitting") : t("register.submit")}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        {t("register.haveAccount")}
+        {t("register.haveAccount")}{" "}
         <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
           {t("login.submit")}
         </Link>
