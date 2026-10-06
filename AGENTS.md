@@ -63,6 +63,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Database       | PostgreSQL via Drizzle ORM                          |
 | Rendering      | `playwright-core` + headless Chromium               |
 | Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
+| i18n           | next-intl（无 URL 路由的 cookie 模式）— `messages/zh.json` + `en.json`，typed messages |
 | Package mgr    | pnpm 11                                             |
 
 ## Project structure
@@ -75,6 +76,7 @@ src/
 │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
 │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
 ├── components/     # React components (client)
+├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
 ├── lib/            # Shared utilities (client-safe, 含 config)
 └── types/          # Shared TypeScript types
 ```
@@ -125,6 +127,23 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
   the ToolRegistry with zod schemas for inputs. Tools return structured
   results; errors are returned as structured error payloads (the agent
   explains them in natural language) — never throw raw errors upward.
+- **i18n (next-intl, cookie locale — no URL routing):** every new user-visible
+  UI string (layer A) MUST go through the dictionaries: `messages/zh.json` is
+  the source of truth and `messages/en.json` mirrors its key structure exactly
+  (a key-alignment unit test enforces this); update both **in the same
+  change**. Keys are type-checked via `IntlMessages` (typo = typecheck error).
+  Text layering — layer B (LLM conversation text: agent prompts, tool errors,
+  provider rejections) never enters the dictionaries; prompts carry a
+  language-following instruction so the agent replies in the user's language.
+  Server error responses keep a Chinese `message` plus a stable `code`;
+  clients render dictionary copy by `code` and fall back to `message` for
+  unregistered codes. Inspiration-card presets are dictionary keys
+  (`chat.presets.<agentId>.<key>`) resolved per request locale in
+  `GET /api/agents` (en presets are English-written prompts, not literal
+  translations). Bare-CJK strings in client UI code are lint-blocked
+  (`no-restricted-syntax`, error level) — exemptions: comments, test files,
+  `route.ts` handlers (server messages stay Chinese by design) and
+  `src/server/**`.
 - **React:** function components only; `"use client"` only where needed;
   prefer server components. AI Elements components are the base for all chat
   UI — do not hand-roll message/attachment/tool UI.
