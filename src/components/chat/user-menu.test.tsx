@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithI18n } from "@/test/render-with-i18n";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UserMenuContent } from "./user-menu";
@@ -17,7 +18,7 @@ afterEach(() => {
 
 /** UserMenuContent 须渲染在 DropdownMenu 根内（时钟下拉/UserMenu 均满足），测试用受控根模拟。 */
 function renderContent() {
-  return render(
+  return renderWithI18n(
     <DropdownMenu open>
       <DropdownMenuContent className="w-52">
         <UserMenuContent />

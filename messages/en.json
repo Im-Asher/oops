@@ -40,6 +40,9 @@
     "sessionHistory": "Session history",
     "collapsePanel": "Collapse chat panel",
     "collapse": "Collapse",
+    "thinking": "Thinking",
+    "fileLink": "File",
+    "emptyPrompt": "Pick an agent and describe the product or scene image you want.",
     "composer": {
       "attachLanding": "Add attachments",
       "attachReference": "Upload reference image",
@@ -62,6 +65,35 @@
       "activeTitle": "Selected on canvas",
       "viewTitle": "View on canvas",
       "generated": "Generated image {position}"
+    },
+    "sidebar": {
+      "groupToday": "Today",
+      "groupWeek": "Last 7 days",
+      "groupEarlier": "Earlier",
+      "newChat": "New chat",
+      "closeDrawer": "Close session drawer",
+      "searchLabel": "Search sessions",
+      "searchPlaceholder": "Search sessions…",
+      "listLabel": "Session list",
+      "emptyAll": "No sessions yet — click New chat to start.",
+      "emptyFiltered": "No matching sessions.",
+      "deleteConfirm": "Delete \"{name}\"?",
+      "confirmDelete": "Confirm session deletion",
+      "delete": "Delete",
+      "cancelDelete": "Cancel deletion",
+      "cancel": "Cancel",
+      "renameNamed": "Rename {name}",
+      "deleteNamed": "Delete {name}"
+    },
+    "userMenu": {
+      "label": "User menu",
+      "profile": "Profile",
+      "logout": "Log out",
+      "loggingOut": "Logging out…"
+    },
+    "reasoning": {
+      "streaming": "Thinking…",
+      "label": "Reasoning"
     }
   },
   "auth": {

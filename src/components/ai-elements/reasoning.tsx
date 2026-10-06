@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   createContext,
   useContext,
@@ -73,6 +74,7 @@ export const ReasoningTrigger = ({
   children,
   ...props
 }: ReasoningTriggerProps) => {
+  const t = useTranslations("chat.reasoning");
   const { isStreaming, isOpen } = useReasoning();
   return (
     <CollapsibleTrigger
@@ -85,7 +87,7 @@ export const ReasoningTrigger = ({
       {children ?? (
         <>
           <BrainIcon className="size-3.5" />
-          <span>{isStreaming ? "思考中…" : "思考过程"}</span>
+          <span>{isStreaming ? t("streaming") : t("label")}</span>
           <ChevronDownIcon
             className={cn(
               "size-3 transition-transform",

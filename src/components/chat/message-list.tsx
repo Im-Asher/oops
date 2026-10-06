@@ -12,6 +12,7 @@ import {
 import { ResultChip } from "@/components/chat/result-chip";
 import type { UIMessage } from "@/types/chat";
 import { BrainIcon, LoaderCircleIcon, UserIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
 interface MessageListProps {
@@ -64,8 +65,9 @@ function mergeTextParts(parts: UIMessage["parts"]): UIMessage["parts"] {
 
 /** 等待首个可见内容（文字/思考/状态行）时的占位动画，不依赖服务端事件。 */
 function ThinkingPlaceholder() {
+  const t = useTranslations("chat");
   return (
-    <span aria-label="思考中" className="inline-flex items-center gap-1 py-1.5">
+    <span aria-label={t("thinking")} className="inline-flex items-center gap-1 py-1.5">
       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
@@ -92,6 +94,7 @@ export function MessageList({
   agentIcon,
   onSelectAsset,
 }: MessageListProps) {
+  const t = useTranslations("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,7 +153,7 @@ export function MessageList({
                     case "file":
                       return (
                         <a className="underline" href={p.url} key={i}>
-                          文件
+                          {t("fileLink")}
                         </a>
                       );
                     case "thinking":
@@ -171,7 +174,7 @@ export function MessageList({
         );
       })}
       {messages.length === 0 && (
-        <p className="text-sm text-muted-foreground">选择 Agent 并描述你想要的商品/场景图。</p>
+        <p className="text-sm text-muted-foreground">{t("emptyPrompt")}</p>
       )}
     </div>
   );

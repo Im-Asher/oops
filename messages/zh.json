@@ -40,6 +40,9 @@
     "sessionHistory": "会话历史",
     "collapsePanel": "收起聊天面板",
     "collapse": "收起",
+    "thinking": "思考中",
+    "fileLink": "文件",
+    "emptyPrompt": "选择 Agent 并描述你想要的商品/场景图。",
     "composer": {
       "attachLanding": "添加附件",
       "attachReference": "上传参考图",
@@ -62,6 +65,35 @@
       "activeTitle": "已在画布选中",
       "viewTitle": "在画布中查看",
       "generated": "已生成图片 {position}"
+    },
+    "sidebar": {
+      "groupToday": "今天",
+      "groupWeek": "近 7 天",
+      "groupEarlier": "更早",
+      "newChat": "新会话",
+      "closeDrawer": "关闭会话抽屉",
+      "searchLabel": "搜索会话",
+      "searchPlaceholder": "搜索会话…",
+      "listLabel": "会话列表",
+      "emptyAll": "还没有会话，点击「新会话」开始。",
+      "emptyFiltered": "没有匹配的会话。",
+      "deleteConfirm": "删除「{name}」？",
+      "confirmDelete": "确认删除会话",
+      "delete": "删除",
+      "cancelDelete": "取消删除",
+      "cancel": "取消",
+      "renameNamed": "重命名 {name}",
+      "deleteNamed": "删除 {name}"
+    },
+    "userMenu": {
+      "label": "用户菜单",
+      "profile": "个人信息",
+      "logout": "退出登录",
+      "loggingOut": "退出中…"
+    },
+    "reasoning": {
+      "streaming": "思考中…",
+      "label": "思考过程"
     }
   },
   "auth": {

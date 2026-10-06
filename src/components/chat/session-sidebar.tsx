@@ -11,6 +11,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 interface SessionSidebarProps {
@@ -30,16 +31,19 @@ interface SessionSidebarProps {
   errorMessage?: string | null;
 }
 
-/** 按 updatedAt 分组：今天 / 近 7 天 / 更早（纯展示分组，列表本身已按时间倒序）。 */
-function groupSessions(sessions: SessionInfo[]): Array<{ label: string; items: SessionInfo[] }> {
+/** 按 updatedAt 分组：今天 / 近 7 天 / 更早（纯展示分组，列表本身已按时间倒序）。
+ * 模块级纯函数不持有词典，返回分组 key，由调用方按 locale 渲染标签。 */
+function groupSessions(
+  sessions: SessionInfo[],
+): Array<{ key: "today" | "week" | "earlier"; items: SessionInfo[] }> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const todayMs = startOfToday.getTime();
   const weekMs = todayMs - 6 * 24 * 60 * 60 * 1000;
   const groups = [
-    { label: "今天", items: [] as SessionInfo[] },
-    { label: "近 7 天", items: [] as SessionInfo[] },
-    { label: "更早", items: [] as SessionInfo[] },
+    { key: "today" as const, items: [] as SessionInfo[] },
+    { key: "week" as const, items: [] as SessionInfo[] },
+    { key: "earlier" as const, items: [] as SessionInfo[] },
   ];
   for (const s of sessions) {
     const t = s.updatedAt ? new Date(s.updatedAt).getTime() : 0;
@@ -61,11 +65,12 @@ interface SessionItemProps {
 
 /** 单个会话项：hover 出重命名/删除；行内编辑与轻量二次确认（无弹窗依赖）。 */
 function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete }: SessionItemProps) {
+  const t = useTranslations("chat");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [confirming, setConfirming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const label = session.title || "未命名会话";
+  const label = session.title || t("untitledSession");
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -81,7 +86,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
     return (
       <div className="flex items-center gap-1 rounded-md bg-muted/60 px-1.5 py-1">
         <Input
-          aria-label="会话标题"
+          aria-label={t("sessionTitleLabel")}
           className="h-7 border-border bg-popover px-2 text-sm text-foreground"
           onBlur={commit}
           onChange={(e) => setDraft(e.target.value)}
@@ -93,7 +98,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
           value={draft}
         />
         <Button
-          aria-label="确认重命名"
+          aria-label={t("confirmRename")}
           className="size-6 shrink-0 text-foreground hover:bg-accent"
           onClick={commit}
           onMouseDown={(e) => e.preventDefault()}
@@ -103,7 +108,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
           <CheckIcon />
         </Button>
         <Button
-          aria-label="取消重命名"
+          aria-label={t("cancelRename")}
           className="size-6 shrink-0 text-foreground hover:bg-accent"
           onClick={() => setEditing(false)}
           onMouseDown={(e) => e.preventDefault()}
@@ -119,25 +124,27 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
   if (confirming) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-md bg-muted/60 px-2 py-1">
-        <span className="truncate text-xs text-foreground/80">删除「{label}」？</span>
+        <span className="truncate text-xs text-foreground/80">
+          {t("sidebar.deleteConfirm", { name: label })}
+        </span>
         <div className="flex shrink-0 gap-1">
           <Button
-            aria-label="确认删除会话"
+            aria-label={t("sidebar.confirmDelete")}
             className="h-6 px-2 text-xs"
             onClick={onDelete}
             size="sm"
             variant="destructive"
           >
-            删除
+            {t("sidebar.delete")}
           </Button>
           <Button
-            aria-label="取消删除"
+            aria-label={t("sidebar.cancelDelete")}
             className="h-6 px-2 text-xs text-foreground/80 hover:bg-accent"
             onClick={() => setConfirming(false)}
             size="sm"
             variant="ghost"
           >
-            取消
+            {t("sidebar.cancel")}
           </Button>
         </div>
       </div>
@@ -166,7 +173,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
         className={`shrink-0 gap-0.5 pr-1 ${active ? "flex" : "hidden group-focus-within:flex group-hover:flex"}`}
       >
         <Button
-          aria-label={`重命名 ${label}`}
+          aria-label={t("sidebar.renameNamed", { name: label })}
           className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => {
             setDraft(session.title ?? "");
@@ -178,7 +185,7 @@ function SessionItem({ session, agentIcon, active, onSelect, onRename, onDelete 
           <PencilIcon />
         </Button>
         <Button
-          aria-label={`删除 ${label}`}
+          aria-label={t("sidebar.deleteNamed", { name: label })}
           className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => setConfirming(true)}
           size="icon-sm"
@@ -208,11 +215,19 @@ export function SessionSidebar({
   onQueryChange,
   errorMessage,
 }: SessionSidebarProps) {
+  const t = useTranslations("chat");
   const keyword = query.trim().toLowerCase();
   const visible =
     keyword.length > 0
       ? sessions.filter((s) => (s.title ?? "").toLowerCase().includes(keyword))
       : sessions;
+
+  // 分组标签按分组 key 查词典（模块级 groupSessions 不持有 locale）。
+  const groupLabels = {
+    today: t("sidebar.groupToday"),
+    week: t("sidebar.groupWeek"),
+    earlier: t("sidebar.groupEarlier"),
+  };
 
   return (
     <aside className="flex h-full w-full shrink-0 flex-col border-r border-border bg-background">
@@ -223,10 +238,10 @@ export function SessionSidebar({
           variant="secondary"
         >
           <PlusIcon />
-          新会话
+          {t("sidebar.newChat")}
         </Button>
         <Button
-          aria-label="关闭会话抽屉"
+          aria-label={t("sidebar.closeDrawer")}
           className="min-h-11 min-w-11 text-foreground hover:bg-accent"
           onClick={onCollapse}
           size="icon-sm"
@@ -242,19 +257,19 @@ export function SessionSidebar({
           className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/80"
         />
         <Input
-          aria-label="搜索会话"
+          aria-label={t("sidebar.searchLabel")}
           className="h-8 border-border bg-popover pl-7 text-sm text-foreground placeholder:text-muted-foreground/80"
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="搜索会话…"
+          placeholder={t("sidebar.searchPlaceholder")}
           value={query}
         />
       </div>
 
-      <nav aria-label="会话列表" className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
+      <nav aria-label={t("sidebar.listLabel")} className="flex-1 space-y-3 overflow-y-auto px-2 pb-2">
         {groupSessions(visible).map((group) => (
-          <div key={group.label}>
+          <div key={group.key}>
             <p className="px-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">
-              {group.label}
+              {groupLabels[group.key]}
             </p>
             <div className="space-y-0.5">
               {group.items.map((s) => (
@@ -273,11 +288,13 @@ export function SessionSidebar({
         ))}
         {sessions.length === 0 && (
           <p className="px-2 py-6 text-center text-sm text-muted-foreground/80">
-            还没有会话，点击「新会话」开始。
+            {t("sidebar.emptyAll")}
           </p>
         )}
         {sessions.length > 0 && visible.length === 0 && (
-          <p className="px-2 py-6 text-center text-sm text-muted-foreground/80">没有匹配的会话。</p>
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground/80">
+            {t("sidebar.emptyFiltered")}
+          </p>
         )}
       </nav>
 
