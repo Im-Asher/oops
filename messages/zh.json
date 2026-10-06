@@ -292,5 +292,37 @@
       "changing": "修改中…",
       "change": "修改密码"
     }
+  },
+  "design": {
+    "dialog": {
+      "title": "新建设计",
+      "description": "选择尺寸预设或自定义画布大小",
+      "categoryAll": "全部",
+      "groupCommon": "常用尺寸",
+      "groupEcom": "电商物料",
+      "groupSocial": "社交媒体",
+      "recent": "最近使用",
+      "recentEmpty": "还没有使用记录",
+      "customSize": "自定义尺寸",
+      "width": "宽",
+      "height": "高",
+      "unit": "px",
+      "lockRatio": "锁定比例",
+      "create": "创建"
+    },
+    "presets": {
+      "poster-mobile": { "name": "手机海报" },
+      "poster-square": { "name": "方形海报" },
+      "poster-landscape": { "name": "横版海报" },
+      "video-vertical": { "name": "竖版视频封面" },
+      "main-image": { "name": "电商主图" },
+      "detail-page": { "name": "电商详情页" },
+      "livestream-cover": { "name": "直播封面" },
+      "shop-banner": { "name": "店铺横幅" },
+      "xhs-cover": { "name": "小红书封面" },
+      "xhs-image": { "name": "小红书图文" },
+      "moments": { "name": "朋友圈海报" },
+      "weibo": { "name": "微博配图" }
+    }
   }
 }

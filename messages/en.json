@@ -292,5 +292,37 @@
       "changing": "Changing…",
       "change": "Change password"
     }
+  },
+  "design": {
+    "dialog": {
+      "title": "New design",
+      "description": "Choose a size preset or set a custom canvas size",
+      "categoryAll": "All",
+      "groupCommon": "Common sizes",
+      "groupEcom": "E-commerce",
+      "groupSocial": "Social media",
+      "recent": "Recent",
+      "recentEmpty": "No history yet",
+      "customSize": "Custom size",
+      "width": "Width",
+      "height": "Height",
+      "unit": "px",
+      "lockRatio": "Lock ratio",
+      "create": "Create"
+    },
+    "presets": {
+      "poster-mobile": { "name": "Mobile poster" },
+      "poster-square": { "name": "Square poster" },
+      "poster-landscape": { "name": "Landscape poster" },
+      "video-vertical": { "name": "Vertical video cover" },
+      "main-image": { "name": "Product main image" },
+      "detail-page": { "name": "Product detail page" },
+      "livestream-cover": { "name": "Livestream cover" },
+      "shop-banner": { "name": "Shop banner" },
+      "xhs-cover": { "name": "RedNote cover" },
+      "xhs-image": { "name": "RedNote post" },
+      "moments": { "name": "Moments poster" },
+      "weibo": { "name": "Weibo image" }
+    }
   }
 }
