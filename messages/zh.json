@@ -28,7 +28,42 @@
     "fileErrorSeparator": "；"
   },
   "canvas": {},
-  "chat": {},
+  "chat": {
+    "panelLabel": "聊天面板",
+    "untitledSession": "未命名会话",
+    "noSessionSelected": "未选择会话",
+    "selectAgent": "选择 Agent",
+    "sessionTitleLabel": "会话标题",
+    "confirmRename": "确认重命名",
+    "cancelRename": "取消重命名",
+    "renameSession": "重命名会话",
+    "sessionHistory": "会话历史",
+    "collapsePanel": "收起聊天面板",
+    "collapse": "收起",
+    "composer": {
+      "attachLanding": "添加附件",
+      "attachReference": "上传参考图",
+      "attachNeedSession": "先创建会话后可上传参考图",
+      "presetsTitle": "试试这样描述：",
+      "referenceLabel": "引用：{name}",
+      "removeReference": "移除引用 {name}",
+      "pendingFile": "附件：{name}",
+      "removePendingFile": "移除附件 {name}",
+      "inputLabel": "消息输入",
+      "placeholder": "描述你的设计需求…",
+      "placeholderNeedSession": "先创建会话",
+      "selectAgent": "选择 Agent",
+      "stop": "停止生成",
+      "send": "发送"
+    },
+    "resultChip": {
+      "activeLabel": "第 {position} 张图，已在画布选中",
+      "locateLabel": "在画布中定位第 {position} 张图",
+      "activeTitle": "已在画布选中",
+      "viewTitle": "在画布中查看",
+      "generated": "已生成图片 {position}"
+    }
+  },
   "auth": {
     "metadata": {
       "description": "登录或用邀请码注册，开始生成能直接上架的电商图片"

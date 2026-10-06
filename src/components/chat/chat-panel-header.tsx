@@ -16,6 +16,7 @@ import {
   PencilIcon,
   XIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 interface ChatPanelHeaderProps {
@@ -54,7 +55,8 @@ export function ChatPanelHeader({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const title = sessionTitle || (canRename ? "未命名会话" : "未选择会话");
+  const t = useTranslations("chat");
+  const title = sessionTitle || (canRename ? t("untitledSession") : t("noSessionSelected"));
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -76,14 +78,14 @@ export function ChatPanelHeader({
           {agentIcon ?? "🤖"}
         </span>
         <span className="truncate text-sm font-medium text-foreground">
-          {agentName ?? "选择 Agent"}
+          {agentName ?? t("selectAgent")}
         </span>
       </div>
       <div className="mt-1.5 flex items-center gap-1.5">
         {editing ? (
           <>
             <Input
-              aria-label="会话标题"
+              aria-label={t("sessionTitleLabel")}
               className="h-7 border-border bg-popover px-2 text-sm text-foreground"
               onBlur={commit}
               onChange={(e) => setDraft(e.target.value)}
@@ -95,7 +97,7 @@ export function ChatPanelHeader({
               value={draft}
             />
             <Button
-              aria-label="确认重命名"
+              aria-label={t("confirmRename")}
               className="size-6 shrink-0 text-foreground hover:bg-accent"
               onClick={commit}
               onMouseDown={(e) => e.preventDefault()}
@@ -105,7 +107,7 @@ export function ChatPanelHeader({
               <CheckIcon />
             </Button>
             <Button
-              aria-label="取消重命名"
+              aria-label={t("cancelRename")}
               className="size-6 shrink-0 text-foreground hover:bg-accent"
               onClick={() => setEditing(false)}
               onMouseDown={(e) => e.preventDefault()}
@@ -124,7 +126,7 @@ export function ChatPanelHeader({
               AI
             </span>
             <Button
-              aria-label="重命名会话"
+              aria-label={t("renameSession")}
               className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
               disabled={!canRename}
               onClick={() => {
@@ -143,11 +145,11 @@ export function ChatPanelHeader({
               >
                 <DropdownMenuTrigger asChild>
                   <Button
-                    aria-label="会话历史"
+                    aria-label={t("sessionHistory")}
                     className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
                     size="icon-sm"
                     variant="ghost"
-                    title="会话历史"
+                    title={t("sessionHistory")}
                   >
                     <ClockIcon />
                   </Button>
@@ -158,12 +160,12 @@ export function ChatPanelHeader({
               </DropdownMenu>
             ) : (
               <Button
-                aria-label="会话历史"
+                aria-label={t("sessionHistory")}
                 className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
                 disabled
                 size="icon-sm"
                 variant="ghost"
-                title="会话历史"
+                title={t("sessionHistory")}
               >
                 <ClockIcon />
               </Button>
@@ -171,12 +173,12 @@ export function ChatPanelHeader({
             <ThemeToggle className="size-6 text-muted-foreground hover:text-foreground" />
             <LocaleToggle className="size-6 text-muted-foreground hover:text-foreground" />
             <Button
-              aria-label="收起聊天面板"
+              aria-label={t("collapsePanel")}
               className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={onCollapse}
               size="icon-sm"
               variant="ghost"
-              title="收起"
+              title={t("collapse")}
             >
               <PanelRightCloseIcon />
             </Button>

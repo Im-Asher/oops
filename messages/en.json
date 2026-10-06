@@ -28,7 +28,42 @@
     "fileErrorSeparator": "; "
   },
   "canvas": {},
-  "chat": {},
+  "chat": {
+    "panelLabel": "Chat panel",
+    "untitledSession": "Untitled session",
+    "noSessionSelected": "No session selected",
+    "selectAgent": "Select agent",
+    "sessionTitleLabel": "Session title",
+    "confirmRename": "Confirm rename",
+    "cancelRename": "Cancel rename",
+    "renameSession": "Rename session",
+    "sessionHistory": "Session history",
+    "collapsePanel": "Collapse chat panel",
+    "collapse": "Collapse",
+    "composer": {
+      "attachLanding": "Add attachments",
+      "attachReference": "Upload reference image",
+      "attachNeedSession": "Create a session first to upload reference images",
+      "presetsTitle": "Try describing it like this:",
+      "referenceLabel": "Reference: {name}",
+      "removeReference": "Remove reference {name}",
+      "pendingFile": "Attachment: {name}",
+      "removePendingFile": "Remove attachment {name}",
+      "inputLabel": "Message input",
+      "placeholder": "Describe what you want to create…",
+      "placeholderNeedSession": "Create a session first",
+      "selectAgent": "Select agent",
+      "stop": "Stop generating",
+      "send": "Send"
+    },
+    "resultChip": {
+      "activeLabel": "Image {position}, selected on canvas",
+      "locateLabel": "Locate image {position} on canvas",
+      "activeTitle": "Selected on canvas",
+      "viewTitle": "View on canvas",
+      "generated": "Generated image {position}"
+    }
+  },
   "auth": {
     "metadata": {
       "description": "Log in or sign up with an invite code to generate e-commerce images ready for listing"

@@ -4,6 +4,7 @@ import { ChatPanelHeader } from "@/components/chat/chat-panel-header";
 import { Composer, type ComposerReference } from "@/components/chat/composer";
 import { MessageList } from "@/components/chat/message-list";
 import type { AgentInfo, UIMessage } from "@/types/chat";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 interface ChatPanelProps {
@@ -78,8 +79,9 @@ export function ChatPanel({
   onAttach,
   statusLine,
 }: ChatPanelProps) {
+  const t = useTranslations("chat");
   return (
-    <section aria-label="聊天面板" className="flex h-full w-full min-w-0 flex-col bg-card">
+    <section aria-label={t("panelLabel")} className="flex h-full w-full min-w-0 flex-col bg-card">
       <ChatPanelHeader
         agentIcon={agentIcon}
         agentName={agentName}
