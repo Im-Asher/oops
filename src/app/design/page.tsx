@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useReducer, useRef, useState } from "react";
+import { DesignCanvas } from "@/components/design/design-canvas";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
 import { createEmptyDoc, type DesignDoc } from "@/lib/design/doc";
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
@@ -96,13 +97,9 @@ function DesignPageInner() {
         </span>
       </header>
 
-      {/* 画布视口占位：缩放编辑区由 4.2 design-canvas 接入 */}
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-        <div
-          className="border border-border bg-card shadow-sm"
-          data-testid="design-canvas-placeholder"
-          style={{ width: state.doc.width, height: state.doc.height }}
-        />
+      {/* 画布编辑区：缩放视口 + 元素渲染 + 选择拖动 */}
+      <div className="relative min-h-0 flex-1">
+        <DesignCanvas dispatch={dispatch} state={state} />
       </div>
     </main>
   );

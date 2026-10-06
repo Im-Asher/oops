@@ -300,6 +300,9 @@
       "draftSaving": "Saving…",
       "draftSaved": "Draft saved"
     },
+    "canvas": {
+      "label": "Design canvas"
+    },
     "dialog": {
       "title": "New design",
       "description": "Choose a size preset or set a custom canvas size",

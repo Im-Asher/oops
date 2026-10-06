@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import DesignPage from "./page";

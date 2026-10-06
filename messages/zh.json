@@ -300,6 +300,9 @@
       "draftSaving": "保存中…",
       "draftSaved": "草稿已保存"
     },
+    "canvas": {
+      "label": "设计画布"
+    },
     "dialog": {
       "title": "新建设计",
       "description": "选择尺寸预设或自定义画布大小",
