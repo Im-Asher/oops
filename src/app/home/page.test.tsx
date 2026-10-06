@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { takePendingHandoffFiles } from "@/lib/chat/home-handoff";
@@ -61,12 +61,16 @@ function imageFile(name: string): File {
 }
 
 describe("首页落地页", () => {
-  it("侧栏：AI 画布可用、创建设计与其余导航项置灰禁用", async () => {
+  it("侧栏：AI 画布与创建设计可用（弹窗触发）、其余导航项置灰禁用", async () => {
     renderWithI18n(<HomePage />);
     const canvasLink = await screen.findByText("AI 画布");
     expect(canvasLink.closest("a")?.getAttribute("href")).toBe("/canvas");
     const designBtn = screen.getByText("创建设计") as HTMLButtonElement;
-    expect(designBtn.disabled).toBe(true);
+    expect(designBtn.disabled).toBe(false);
+    await userEvent.click(designBtn);
+    expect(await screen.findByText("新建设计")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     for (const label of ["作品集", "素材库", "消息中心", "设置"]) {
       expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
     }

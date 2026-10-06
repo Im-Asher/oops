@@ -1,6 +1,7 @@
 "use client";
 
 import { Composer } from "@/components/chat/composer";
+import { PresetDialog } from "@/components/design/preset-dialog";
 import { LocaleToggle } from "@/components/locale-toggle";
 import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
@@ -27,20 +28,22 @@ interface HomePendingFile {
   file: File;
 }
 
-/** 侧栏导航项：可用项为链接，禁用项仅展示（本版未实现的能力）。 */
+/** 侧栏导航项：链接项与 onAction 触发项可用，禁用项仅展示（本版未实现的能力）。 */
 function NavItem({
   icon: Icon,
   label,
   href,
   active,
+  onAction,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   href?: string;
   active?: boolean;
+  onAction?: () => void;
 }) {
   const t = useTranslations("home");
-  const disabled = !href;
+  const disabled = !href && !onAction;
   const className = `flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${
     active
       ? "bg-muted text-foreground"
@@ -56,12 +59,23 @@ function NavItem({
       </button>
     );
   }
-  return (
-    <Link className={className} href={href}>
-      <Icon className="size-4 shrink-0" />
-      {label}
-    </Link>
-  );
+  if (onAction) {
+    return (
+      <button className={className} onClick={onAction} type="button">
+        <Icon className="size-4 shrink-0" />
+        {label}
+      </button>
+    );
+  }
+  if (href) {
+    return (
+      <Link className={className} href={href}>
+        <Icon className="size-4 shrink-0" />
+        {label}
+      </Link>
+    );
+  }
+  return null;
 }
 
 /**
@@ -80,6 +94,8 @@ export default function HomePage() {
   const [fileError, setFileError] = useState<string | null>(null);
   // 直发乐观态：按钮转圈 + 输入卡弱化 + 路由锁（跳转期间不可再触发）。
   const [submitting, setSubmitting] = useState(false);
+  // 创建设计：尺寸前置设置弹窗（人工海报编辑器入口）。
+  const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextFileIdRef = useRef(0);
 
@@ -136,7 +152,7 @@ export default function HomePage() {
 
   return (
     <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
-      {/* 左侧栏：首页 / 创建分组（AI画布可用，创建设计置灰）/ 其他导航项置灰 / 底部用户入口 */}
+      {/* 左侧栏：首页 / 创建分组（AI画布、创建设计弹窗可用）/ 其他导航项置灰 / 底部用户入口 */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-4">
         <div className="flex items-center gap-2 px-3 pb-4">
           <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
@@ -152,7 +168,11 @@ export default function HomePage() {
           <NavItem active href="/home" icon={LayoutDashboardIcon} label={t("navHome")} />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupCreate")}</p>
           <NavItem href="/canvas" icon={SparklesIcon} label={t("navCanvas")} />
-          <NavItem icon={PaletteIcon} label={t("navCreateDesign")} />
+          <NavItem
+            icon={PaletteIcon}
+            label={t("navCreateDesign")}
+            onAction={() => setDesignDialogOpen(true)}
+          />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupLibrary")}</p>
           <NavItem icon={ImageIcon} label={t("navPortfolio")} />
           <NavItem icon={ImagesIcon} label={t("navAssets")} />
@@ -220,6 +240,8 @@ export default function HomePage() {
           </section>
         </div>
       </div>
+
+      <PresetDialog onOpenChange={setDesignDialogOpen} open={designDialogOpen} />
     </main>
   );
 }

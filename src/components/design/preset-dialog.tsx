@@ -8,7 +8,7 @@
 import { Link2Icon, Link2OffIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -63,6 +63,40 @@ function PresetCard({ preset, name, onPick }: { preset: DesignPreset; name: stri
   );
 }
 
+/** 最近使用列表：随弹窗打开挂载，懒初始化读取 localStorage（避免 effect 内 setState）。 */
+function RecentList({
+  emptyLabel,
+  unitLabel,
+  onPick,
+}: {
+  emptyLabel: string;
+  unitLabel: string;
+  onPick: (size: DesignSize) => void;
+}) {
+  const [recent] = useState(() => loadRecentSizes());
+  if (recent.length === 0) {
+    return <p className="py-8 text-center text-sm text-muted-foreground">{emptyLabel}</p>;
+  }
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {recent.map((size) => (
+        <button
+          className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
+          data-testid={`design-recent-${size.width}x${size.height}`}
+          key={`${size.width}x${size.height}`}
+          onClick={() => onPick(size)}
+          type="button"
+        >
+          <span className="text-sm text-foreground">
+            {size.width} × {size.height}
+          </span>
+          <span className="text-xs text-muted-foreground">{unitLabel}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function PresetDialog({
   open,
   onOpenChange,
@@ -77,11 +111,6 @@ export function PresetDialog({
   const [widthText, setWidthText] = useState("");
   const [heightText, setHeightText] = useState("");
   const [locked, setLocked] = useState(false);
-  const [recent, setRecent] = useState<DesignSize[]>([]);
-
-  useEffect(() => {
-    if (open) setRecent(loadRecentSizes());
-  }, [open]);
 
   const customValid = parsePositiveInt(widthText) !== null && parsePositiveInt(heightText) !== null;
   // 锁定比例的比值：开锁瞬间由当前合法值捕获，锁定期内固定（否则同步会自强化）。
@@ -93,7 +122,7 @@ export function PresetDialog({
   }, [category]);
 
   function create(size: DesignSize, record: boolean) {
-    if (record) setRecent(recordRecentSize({ width: size.width, height: size.height }));
+    if (record) recordRecentSize({ width: size.width, height: size.height });
     onOpenChange(false);
     router.push(`/design?w=${size.width}&h=${size.height}`);
   }
@@ -218,26 +247,11 @@ export function PresetDialog({
           {/* 预设 / 最近使用 */}
           <div className="mt-4 max-h-72 overflow-y-auto pr-1">
             {category === "recent" ? (
-              recent.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t("recentEmpty")}</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {recent.map((size) => (
-                    <button
-                      className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
-                      data-testid={`design-recent-${size.width}x${size.height}`}
-                      key={`${size.width}x${size.height}`}
-                      onClick={() => create(size, true)}
-                      type="button"
-                    >
-                      <span className="text-sm text-foreground">
-                        {size.width} × {size.height}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{t("unit")}</span>
-                    </button>
-                  ))}
-                </div>
-              )
+              <RecentList
+                emptyLabel={t("recentEmpty")}
+                onPick={(size) => create(size, true)}
+                unitLabel={t("unit")}
+              />
             ) : (
               groups.map((group) => (
                 <section className="mb-4 last:mb-0" key={group.id}>
