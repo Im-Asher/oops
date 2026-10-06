@@ -4,6 +4,24 @@
       "title": "oops · AI 电商图像工作台",
       "description": "描述需求，生成商品详情图、海报与场景图"
     },
+    "apiErrors": {
+      "unauthenticated": "请先登录",
+      "rateLimited": "尝试太频繁了，请稍后再试",
+      "badJson": "请求体需为 JSON",
+      "badForm": "请求体须为 multipart/form-data",
+      "noFile": "缺少 file 字段",
+      "noSession": "参考图上传需要 sessionId",
+      "notFound": "会话不存在",
+      "invalidCredentials": "用户名或密码不正确",
+      "usernameTaken": "用户名已存在",
+      "inviteCodeInvalid": "邀请码无效或已被使用",
+      "wrongPassword": "当前密码不正确",
+      "assetCleanupFailed": "会话资产清理失败，请稍后重试",
+      "invalidAgent": "Agent 不存在",
+      "invalidReference": "引用的图片不存在或无权使用",
+      "tooLarge": "文件过大",
+      "unsupportedType": "不支持的文件类型"
+    },
     "localeToggle": {
       "label": "切换语言"
     }

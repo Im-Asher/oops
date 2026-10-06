@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiErrorMessage } from "@/lib/api-error";
 import { resolveDisplayName } from "@/lib/nickname";
 import { cn } from "cn";
 import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
@@ -87,6 +88,7 @@ function PasswordField({
 /** 个人信息页：身份头卡 + 基本信息卡（资料维护）+ 安全信息卡（改密），lg 起双栏。proxy 保护非公开路径，此处仅做 401 兜底跳转。 */
 export default function ProfilePage() {
   const t = useTranslations("profile");
+  const tApi = useTranslations("common.apiErrors");
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [copied, setCopied] = useState(false);
@@ -152,12 +154,14 @@ export default function ProfilePage() {
         router.replace("/login");
         return;
       }
-      const body = await res.json().catch(() => null);
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
       if (!res.ok) {
         setSaveFeedback({
           kind: "error",
-          // 服务端 message 现阶段仍为中文；按 code 本地化在任务 2.8 统一接入
-          message: body?.error?.message ?? t("saveFailed"),
+          // code 已登记 → 词典文案；未登记（如 zod 动态消息）→ server message 兜底
+          message: apiErrorMessage(body?.error, tApi, t("saveFailed")),
         });
         return;
       }
@@ -191,11 +195,13 @@ export default function ProfilePage() {
         router.replace("/login");
         return;
       }
-      const body = await res.json().catch(() => null);
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
       if (!res.ok) {
         setPasswordFeedback({
           kind: "error",
-          message: body?.error?.message ?? t("password.changeFailed"),
+          message: apiErrorMessage(body?.error, tApi, t("password.changeFailed")),
         });
         return;
       }

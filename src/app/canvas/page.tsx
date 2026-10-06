@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionSidebar } from "@/components/chat/session-sidebar";
 import { UserMenuContent } from "@/components/chat/user-menu";
+import { apiErrorMessage } from "@/lib/api-error";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import { DownloadIcon, MessageSquareIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -46,6 +47,7 @@ const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false };
 
 function ChatPageInner() {
   const t = useTranslations("canvas");
+  const tApi = useTranslations("common.apiErrors");
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -194,15 +196,20 @@ function ChatPageInner() {
       const res = await fetch("/upload", { method: "POST", body: form });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as
-          | { error?: { message?: string } }
+          | { error?: { code?: string; message?: string } }
           | null;
+        // code 已登记 → 词典文案；未登记（上传插值消息等）→ server message 兜底
         throw new Error(
-          err?.error?.message ?? t("page.referenceUploadFailedWithStatus", { status: res.status }),
+          apiErrorMessage(
+            err?.error,
+            tApi,
+            t("page.referenceUploadFailedWithStatus", { status: res.status }),
+          ),
         );
       }
       return (await res.json()) as { assetId: string; url: string };
     },
-    [t],
+    [t, tApi],
   );
   // 参考图上传：上传后落画布并选中即引用（手动路径，错误以 chip 下方提示呈现）。
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -327,8 +334,8 @@ function ChatPageInner() {
       if (!res.ok) {
         const err = (await res
           .json()
-          .catch(() => null)) as { error?: { message?: string } } | null;
-        throw new Error(err?.error?.message ?? t("page.exportFailedWithStatus", { status: res.status }));
+          .catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+        throw new Error(apiErrorMessage(err?.error, tApi, t("page.exportFailedWithStatus", { status: res.status })));
       }
       await loadMessages(currentId);
       handleResetEdits();
@@ -337,7 +344,7 @@ function ChatPageInner() {
     } finally {
       setExporting(false);
     }
-  }, [canvas, currentId, loadMessages, handleResetEdits, dirty, t]);
+  }, [canvas, currentId, loadMessages, handleResetEdits, dirty, t, tApi]);
 
   useEffect(() => {
     fetch("/api/agents")

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "cn";
+import { apiErrorMessage } from "@/lib/api-error";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,6 +11,7 @@ import { useState } from "react";
 
 export default function RegisterPage() {
   const t = useTranslations("auth");
+  const tApi = useTranslations("common.apiErrors");
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
@@ -45,11 +47,11 @@ export default function RegisterPage() {
         router.refresh();
         return;
       }
-      // 服务端 message 现阶段仍为中文；按 code 本地化在任务 2.8 统一接入
+      // code 已登记 → 词典文案；未登记（如 zod 动态校验消息）→ server message 兜底
       const body = (await res.json().catch(() => null)) as {
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
       } | null;
-      setError(body?.error?.message ?? t("register.submitFailed"));
+      setError(apiErrorMessage(body?.error, tApi, t("register.submitFailed")));
     } catch {
       setError(t("networkError"));
     } finally {

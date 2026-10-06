@@ -6,6 +6,24 @@
     },
     "localeToggle": {
       "label": "切换语言"
+    },
+    "apiErrors": {
+      "unauthenticated": "Please log in first",
+      "rateLimited": "Too many attempts. Please wait a moment and try again.",
+      "badJson": "Request body must be JSON",
+      "badForm": "Request body must be multipart/form-data",
+      "noFile": "Missing the file field",
+      "noSession": "Reference upload requires a sessionId",
+      "notFound": "Session not found",
+      "invalidCredentials": "Incorrect username or password",
+      "usernameTaken": "Username already taken",
+      "inviteCodeInvalid": "Invalid or already-used invite code",
+      "wrongPassword": "Current password is incorrect",
+      "assetCleanupFailed": "Session asset cleanup failed. Please try again later.",
+      "invalidAgent": "Agent not found",
+      "invalidReference": "The referenced image does not exist or may not be used",
+      "tooLarge": "File too large",
+      "unsupportedType": "Unsupported file type"
     }
   },
   "home": {
