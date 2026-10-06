@@ -4,6 +4,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 设计编辑器艺术字体：得意黑（public/fonts 单文件自托管）；
+   霞鹜文楷切片由 layout.tsx 引入 lxgw-wenkai-webfont/style.css */
+@font-face {
+  font-family: "Smiley Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/SmileySans-Oblique.woff2") format("woff2");
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

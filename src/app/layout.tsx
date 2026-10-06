@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { Locale } from "@/i18n/messages";
 import { ThemeProvider } from "@/components/theme-provider";
+import "lxgw-wenkai-webfont/style.css";
 import "./globals.css";
 
 const geistSans = Geist({
