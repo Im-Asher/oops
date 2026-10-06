@@ -72,6 +72,41 @@
       "retryAria": "Retry generation",
       "cancel": "Cancel",
       "confirmCrop": "Confirm crop"
+    },
+    "page": {
+      "toolStatus": {
+        "generateImage": "Generating image…",
+        "running": "Running {name}…"
+      },
+      "referenceUploadFailed": "Reference upload failed",
+      "referenceUploadFailedWithStatus": "Reference upload failed ({status})",
+      "exportFailed": "Export failed",
+      "exportFailedWithStatus": "Export failed ({status})",
+      "directSend": {
+        "creatingSession": "Creating session…",
+        "uploadingAttachments": "Uploading attachments ({done}/{total})…",
+        "attachmentsFailed": "{failed} attachment(s) failed to upload; sending stopped. Your draft is restored — re-add the attachments and send again.",
+        "sending": "Sending…",
+        "failedDraftRestored": "Direct send failed; your draft is restored in the input box",
+        "sessionCreateFailedRestored": "Failed to create session; your draft is restored — edit and resend",
+        "sessionCreateFailedQueued": "Failed to create session; your text is kept — click New chat to retry"
+      },
+      "renameFailed": "Rename failed, please retry",
+      "deleteFailed": "Delete failed (asset cleanup incomplete), please retry",
+      "agentSwitchFailed": "Agent switch failed, please retry",
+      "errorLine": "[Error] {message}",
+      "stoppedLine": "[Stopped]",
+      "connectionLost": "Connection lost, please retry",
+      "connectionLostCanvas": "Connection lost; generation not completed",
+      "regenerate": "Regenerate: {prompt}",
+      "regenerateLast": "Regenerate the last image",
+      "canvasImageName": "Canvas image",
+      "saving": "Saving…",
+      "savedLocal": "Saved (locally)",
+      "exporting": "Exporting…",
+      "export": "Export",
+      "revealResult": "New result — click to view",
+      "openChat": "Open chat"
     }
   },
   "chat": {

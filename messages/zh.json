@@ -72,6 +72,41 @@
       "retryAria": "重试生成",
       "cancel": "取消",
       "confirmCrop": "确认裁剪"
+    },
+    "page": {
+      "toolStatus": {
+        "generateImage": "正在生成图片…",
+        "running": "正在执行 {name}…"
+      },
+      "referenceUploadFailed": "参考图上传失败",
+      "referenceUploadFailedWithStatus": "参考图上传失败（{status}）",
+      "exportFailed": "导出失败",
+      "exportFailedWithStatus": "导出失败（{status}）",
+      "directSend": {
+        "creatingSession": "正在创建会话…",
+        "uploadingAttachments": "正在上传附件（{done}/{total}）…",
+        "attachmentsFailed": "{failed} 个附件上传失败，已停止发送；草稿已回填，可重新添加附件后手动发送",
+        "sending": "正在发送…",
+        "failedDraftRestored": "直发失败，草稿已回填输入框",
+        "sessionCreateFailedRestored": "会话创建失败，草稿已回填输入框，可修改后重发",
+        "sessionCreateFailedQueued": "会话创建失败，文案已保留，可点击「新会话」重试"
+      },
+      "renameFailed": "重命名失败，请重试",
+      "deleteFailed": "删除失败（资产清理未完成），请重试",
+      "agentSwitchFailed": "Agent 切换失败，请重试",
+      "errorLine": "[错误] {message}",
+      "stoppedLine": "[已停止生成]",
+      "connectionLost": "连接中断，请重试",
+      "connectionLostCanvas": "连接中断，生成未完成",
+      "regenerate": "重新生成：{prompt}",
+      "regenerateLast": "重新生成上次的图片",
+      "canvasImageName": "画布图片",
+      "saving": "保存中…",
+      "savedLocal": "已保存（本机）",
+      "exporting": "导出中…",
+      "export": "导出",
+      "revealResult": "有新结果，点击查看",
+      "openChat": "打开聊天"
     }
   },
   "chat": {
