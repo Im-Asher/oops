@@ -55,5 +55,42 @@
       "sampleProductAlt": "Red apple on white background product shot"
     }
   },
-  "profile": {}
+  "profile": {
+    "title": "Profile",
+    "identityLabel": "Account identity",
+    "copyOopsId": "Copy oops ID",
+    "loading": "Loading…",
+    "basicTitle": "Basic info",
+    "basicDescription": "Set your display name, gender and bio",
+    "displayName": "Display name",
+    "displayNameHint": "Clear and save to restore the default name",
+    "gender": {
+      "label": "Gender",
+      "secret": "Prefer not to say",
+      "male": "Male",
+      "female": "Female"
+    },
+    "bio": "Bio",
+    "bioPlaceholder": "Optional, clear to remove",
+    "saving": "Saving…",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed, please try again later",
+    "networkError": "Network error, please try again",
+    "securityTitle": "Security",
+    "securityDescription": "After changing your password, all other devices will be signed out",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordHint": "At least 8 characters",
+    "password": {
+      "hide": "Hide password",
+      "show": "Show password",
+      "mismatch": "New passwords do not match",
+      "changeFailed": "Change failed, please try again later",
+      "changedAllSignedOut": "Password changed. All other devices have been signed out",
+      "changing": "Changing…",
+      "change": "Change password"
+    }
+  }
 }

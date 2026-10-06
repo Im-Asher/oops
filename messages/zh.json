@@ -55,5 +55,42 @@
       "sampleProductAlt": "白底红苹果产品图"
     }
   },
-  "profile": {}
+  "profile": {
+    "title": "个人信息",
+    "identityLabel": "账号身份",
+    "copyOopsId": "复制 oops ID",
+    "loading": "加载中…",
+    "basicTitle": "基本信息",
+    "basicDescription": "设置你的昵称、性别与个性签名",
+    "displayName": "昵称",
+    "displayNameHint": "清空保存即恢复默认昵称",
+    "gender": {
+      "label": "性别",
+      "secret": "保密",
+      "male": "男",
+      "female": "女"
+    },
+    "bio": "个性签名",
+    "bioPlaceholder": "选填，清空即移除",
+    "saving": "保存中…",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败，请稍后再试",
+    "networkError": "网络异常，请稍后再试",
+    "securityTitle": "安全信息",
+    "securityDescription": "修改密码后，其他设备的登录将全部下线",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "passwordHint": "至少 8 位",
+    "password": {
+      "hide": "隐藏密码",
+      "show": "显示密码",
+      "mismatch": "两次输入的新密码不一致",
+      "changeFailed": "修改失败，请稍后再试",
+      "changedAllSignedOut": "密码已修改，其他设备的登录已全部下线",
+      "changing": "修改中…",
+      "change": "修改密码"
+    }
+  }
 }
