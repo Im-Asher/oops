@@ -8,7 +8,25 @@
       "label": "切换语言"
     }
   },
-  "home": {},
+  "home": {
+    "comingSoon": "敬请期待",
+    "buildVersion": "构建版本 {version}",
+    "mainNav": "主导航",
+    "navHome": "首页",
+    "groupCreate": "创建",
+    "navCanvas": "AI 画布",
+    "navCreateDesign": "创建设计",
+    "groupLibrary": "库",
+    "navPortfolio": "作品集",
+    "navAssets": "素材库",
+    "navMessages": "消息中心",
+    "navSettings": "设置",
+    "headline": "用一句话，生成电商好图",
+    "subheadline": "描述你的商品与场景，AI 画布替你完成主图、详情与氛围图。",
+    "fileErrorNonImage": "仅支持图片，{count} 个文件未添加",
+    "fileErrorOverflow": "最多 5 个附件，超出 {count} 个未添加",
+    "fileErrorSeparator": "；"
+  },
   "canvas": {},
   "chat": {},
   "auth": {

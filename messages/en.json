@@ -8,7 +8,25 @@
       "label": "切换语言"
     }
   },
-  "home": {},
+  "home": {
+    "comingSoon": "Coming soon",
+    "buildVersion": "Build {version}",
+    "mainNav": "Main navigation",
+    "navHome": "Home",
+    "groupCreate": "Create",
+    "navCanvas": "AI canvas",
+    "navCreateDesign": "Create design",
+    "groupLibrary": "Library",
+    "navPortfolio": "Portfolio",
+    "navAssets": "Assets",
+    "navMessages": "Messages",
+    "navSettings": "Settings",
+    "headline": "E-commerce visuals from a single sentence",
+    "subheadline": "Describe your product and scene — the AI canvas handles hero shots, detail pages and atmosphere images.",
+    "fileErrorNonImage": "Images only — {count} file(s) not added",
+    "fileErrorOverflow": "Up to 5 attachments — {count} not added",
+    "fileErrorSeparator": "; "
+  },
   "canvas": {},
   "chat": {},
   "auth": {

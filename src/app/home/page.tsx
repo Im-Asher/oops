@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { setPendingHandoffFiles } from "@/lib/chat/home-handoff";
 import { APP_VERSION } from "@/lib/version";
@@ -38,6 +39,7 @@ function NavItem({
   href?: string;
   active?: boolean;
 }) {
+  const t = useTranslations("home");
   const disabled = !href;
   const className = `flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${
     active
@@ -48,7 +50,7 @@ function NavItem({
   }`;
   if (disabled) {
     return (
-      <button aria-disabled className={className} disabled title="敬请期待" type="button">
+      <button aria-disabled className={className} disabled title={t("comingSoon")} type="button">
         <Icon className="size-4 shrink-0" />
         {label}
       </button>
@@ -68,6 +70,7 @@ function NavItem({
  * 由画布侧新建会话并自动发送（含附件为参考图）。
  */
 export default function HomePage() {
+  const t = useTranslations("home");
   const router = useRouter();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [draft, setDraft] = useState("");
@@ -112,9 +115,9 @@ export default function HomePage() {
     const overflow = images.length - accepted.length;
     if (nonImage > 0 || overflow > 0) {
       const parts: string[] = [];
-      if (nonImage > 0) parts.push(`仅支持图片，${nonImage} 个文件未添加`);
-      if (overflow > 0) parts.push(`最多 5 个附件，超出 ${overflow} 个未添加`);
-      setFileError(parts.join("；"));
+      if (nonImage > 0) parts.push(t("fileErrorNonImage", { count: nonImage }));
+      if (overflow > 0) parts.push(t("fileErrorOverflow", { count: overflow }));
+      setFileError(parts.join(t("fileErrorSeparator")));
     } else {
       setFileError(null);
     }
@@ -140,23 +143,23 @@ export default function HomePage() {
           <span
             className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
             data-testid="app-version-badge"
-            title={`构建版本 ${APP_VERSION}`}
+            title={t("buildVersion", { version: APP_VERSION })}
           >
             v{APP_VERSION}
           </span>
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label="主导航">
-          <NavItem active href="/home" icon={LayoutDashboardIcon} label="首页" />
-          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">创建</p>
-          <NavItem href="/canvas" icon={SparklesIcon} label="AI 画布" />
-          <NavItem icon={PaletteIcon} label="创建设计" />
-          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">库</p>
-          <NavItem icon={ImageIcon} label="作品集" />
-          <NavItem icon={ImagesIcon} label="素材库" />
-          <NavItem icon={MessageSquareIcon} label="消息中心" />
+        <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label={t("mainNav")}>
+          <NavItem active href="/home" icon={LayoutDashboardIcon} label={t("navHome")} />
+          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupCreate")}</p>
+          <NavItem href="/canvas" icon={SparklesIcon} label={t("navCanvas")} />
+          <NavItem icon={PaletteIcon} label={t("navCreateDesign")} />
+          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupLibrary")}</p>
+          <NavItem icon={ImageIcon} label={t("navPortfolio")} />
+          <NavItem icon={ImagesIcon} label={t("navAssets")} />
+          <NavItem icon={MessageSquareIcon} label={t("navMessages")} />
         </nav>
         <div className="flex items-center gap-1 border-t border-border pt-3">
-          <NavItem icon={SettingsIcon} label="设置" />
+          <NavItem icon={SettingsIcon} label={t("navSettings")} />
           <div className="ml-auto flex items-center gap-0.5 pr-1">
             <ThemeToggle />
             <LocaleToggle />
@@ -169,10 +172,8 @@ export default function HomePage() {
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
           <section className="flex flex-col items-center gap-3 text-center">
-            <h1 className="text-3xl font-semibold text-foreground">用一句话，生成电商好图</h1>
-            <p className="text-sm text-muted-foreground">
-              描述你的商品与场景，AI 画布替你完成主图、详情与氛围图。
-            </p>
+            <h1 className="text-3xl font-semibold text-foreground">{t("headline")}</h1>
+            <p className="text-sm text-muted-foreground">{t("subheadline")}</p>
           </section>
 
           <section>
