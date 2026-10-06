@@ -23,7 +23,7 @@ afterEach(() => {
 function docWith(): DesignDoc {
   const doc = createEmptyDoc(800, 600);
   doc.elements = [
-    textElement({ content: "标题", x: 40, y: 40, w: 200, h: 48 }),
+    textElement({ content: "标题", fontSize: 24, x: 40, y: 40, w: 200, h: 48 }),
     shapeElement({ kind: "ellipse", fill: "#ff0000", x: 300, y: 300, w: 80, h: 80 }),
   ];
   return doc;
@@ -44,6 +44,8 @@ function mountCanvas(doc: DesignDoc = docWith()) {
   return {
     getState: () => state,
     elements: () => screen.getAllByTestId("design-canvas-surface")[0].querySelectorAll("[data-design-element]"),
+    handle: (id: string) =>
+      screen.getAllByTestId("design-canvas-surface")[0].querySelector(`[data-handle="${id}"]`) as HTMLElement,
     surface: () => screen.getByTestId("design-canvas-surface"),
   };
 }
@@ -97,5 +99,70 @@ describe("设计画布", () => {
     fireEvent.pointerUp(elements()[0], { pointerId: 1 });
     fireEvent.keyDown(screen.getByRole("application"), { key: "Delete" });
     expect(getState().doc.elements).toHaveLength(1);
+  });
+});
+
+describe("设计画布选择框手柄", () => {
+  /** 单选正方形文本元素（300,300 100×100 fontSize 20），返回挂载句柄。 */
+  function mountSquare() {
+    const doc = createEmptyDoc(800, 600);
+    doc.elements = [textElement({ content: "A", fontSize: 20, x: 300, y: 300, w: 100, h: 100 })];
+    const m = mountCanvas(doc);
+    fireEvent.pointerDown(m.elements()[0], { button: 0, clientX: 350, clientY: 350, pointerId: 1 });
+    return m;
+  }
+
+  it("单选渲染 8 向手柄与旋转柄；多选收敛为合并选择框", () => {
+    const { elements, getState, surface } = mountCanvas();
+    fireEvent.pointerDown(elements()[0], { button: 0, clientX: 50, clientY: 50, pointerId: 1 });
+    expect(screen.getByTestId("design-handles")).toBeTruthy();
+    expect(surface().querySelector('[data-handle="se"]')).toBeTruthy();
+    expect(surface().querySelector('[data-handle="rotate"]')).toBeTruthy();
+    expect(screen.queryByTestId("design-selection-box")).toBeNull();
+    fireEvent.pointerDown(elements()[1], { button: 0, clientX: 0, clientY: 0, pointerId: 2, shiftKey: true });
+    expect(getState().selection).toHaveLength(2);
+    expect(screen.queryByTestId("design-handles")).toBeNull();
+    expect(screen.getByTestId("design-selection-box")).toBeTruthy();
+  });
+
+  it("拖角手柄等比缩放：w/h/fontSize 同比放大，对面角锚定；一次撤销回滚", () => {
+    const { getState, handle } = mountSquare();
+    // se 手柄位于 (400,400)：沿对角拖到 (500,500) → 比例 ×2
+    fireEvent.pointerDown(handle("se"), { button: 0, clientX: 400, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(handle("se"), { clientX: 500, clientY: 500, pointerId: 1 });
+    const el = getState().doc.elements[0];
+    expect(el.w).toBeCloseTo(200);
+    expect(el.h).toBeCloseTo(200);
+    expect(el.type === "text" ? el.fontSize : 0).toBeCloseTo(40);
+    expect(el.x).toBeCloseTo(300); // nw 锚点固定
+    expect(el.y).toBeCloseTo(300);
+    fireEvent.pointerUp(handle("se"), { pointerId: 1 });
+    const undone = designReducer(getState(), { type: "undo" });
+    expect(undone.doc.elements[0].w).toBe(100);
+    expect(undone.doc.elements[0].h).toBe(100);
+  });
+
+  it("拖边手柄单轴缩放：仅 w 变化，h/fontSize 不变", () => {
+    const { getState, handle } = mountSquare();
+    // e 手柄位于 (400,350)：向右拖 100 → w ×2
+    fireEvent.pointerDown(handle("e"), { button: 0, clientX: 400, clientY: 350, pointerId: 1 });
+    fireEvent.pointerMove(handle("e"), { clientX: 500, clientY: 350, pointerId: 1 });
+    const el = getState().doc.elements[0];
+    expect(el.w).toBeCloseTo(200);
+    expect(el.h).toBe(100);
+    expect(el.type === "text" ? el.fontSize : 0).toBe(20);
+    expect(el.x).toBeCloseTo(300); // 左边固定
+    fireEvent.pointerUp(handle("e"), { pointerId: 1 });
+  });
+
+  it("拖旋转手柄：以中心 atan2 计算角度增量", () => {
+    const { getState, handle } = mountSquare();
+    // pointer 在 (350,250)（元素正上方）→ 移到 (450,350)（正右方）：-90° → 0°
+    fireEvent.pointerDown(handle("rotate"), { button: 0, clientX: 350, clientY: 250, pointerId: 1 });
+    fireEvent.pointerMove(handle("rotate"), { clientX: 450, clientY: 350, pointerId: 1 });
+    expect(getState().doc.elements[0].rotation).toBeCloseTo(90, 0);
+    fireEvent.pointerUp(handle("rotate"), { pointerId: 1 });
+    const undone = designReducer(getState(), { type: "undo" });
+    expect(undone.doc.elements[0].rotation).toBe(0);
   });
 });
