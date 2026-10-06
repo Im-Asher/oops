@@ -1,6 +1,7 @@
 "use client";
 
 import { Composer } from "@/components/chat/composer";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
 import {
@@ -158,6 +159,7 @@ export default function HomePage() {
           <NavItem icon={SettingsIcon} label="设置" />
           <div className="ml-auto flex items-center gap-0.5 pr-1">
             <ThemeToggle />
+            <LocaleToggle />
             <UserMenu />
           </div>
         </div>

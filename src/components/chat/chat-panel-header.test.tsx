@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import { ChatPanelHeader } from "./chat-panel-header";
+
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+}));
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -19,7 +25,7 @@ function renderHeader(overrides: Partial<Parameters<typeof ChatPanelHeader>[0]> 
     onCollapse: vi.fn(),
     ...overrides,
   };
-  render(<ChatPanelHeader {...props} />);
+  renderWithI18n(<ChatPanelHeader {...props} />);
   return props;
 }
 
@@ -29,6 +35,8 @@ describe("ChatPanelHeader 任务化头部", () => {
     expect(screen.getByText("产品摄影师")).toBeTruthy();
     expect(screen.getByText("保温杯主图")).toBeTruthy();
     expect(screen.getByText("AI")).toBeTruthy();
+    // 语言切换入口与主题切换并列（双入口之一）
+    expect(screen.getByRole("button", { name: "切换语言" })).toBeTruthy();
   });
 
   it("点击收起按钮触发 onCollapse", async () => {

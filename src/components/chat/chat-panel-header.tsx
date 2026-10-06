@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { ThemeToggle } from "@/components/theme-provider";
 import {
   DropdownMenu,
@@ -168,6 +169,7 @@ export function ChatPanelHeader({
               </Button>
             )}
             <ThemeToggle className="size-6 text-muted-foreground hover:text-foreground" />
+            <LocaleToggle className="size-6 text-muted-foreground hover:text-foreground" />
             <Button
               aria-label="收起聊天面板"
               className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"
