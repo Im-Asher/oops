@@ -24,6 +24,10 @@
     },
     "localeToggle": {
       "label": "切换语言"
+    },
+    "theme": {
+      "toLight": "切换为亮色模式",
+      "toDark": "切换为暗色模式"
     }
   },
   "home": {

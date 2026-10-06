@@ -7,6 +7,10 @@
     "localeToggle": {
       "label": "切换语言"
     },
+    "theme": {
+      "toLight": "Switch to light mode",
+      "toDark": "Switch to dark mode"
+    },
     "apiErrors": {
       "unauthenticated": "Please log in first",
       "rateLimited": "Too many attempts. Please wait a moment and try again.",

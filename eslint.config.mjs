@@ -41,6 +41,33 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // 禁裸中文（add-i18n 4.1 防回流）：客户端 UI 文案必须经 next-intl 词典。
+  // 注释不在 AST 字符串节点天然豁免；测试断言、route handler（服务端结构化错误
+  // message 按 D5b 保持中文，客户端按 code 渲染）不在规则范围。src/server/ 本就不匹配。
+  {
+    files: ["src/components/**/*.{ts,tsx}", "src/app/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.*", "**/route.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/[\\u4e00-\\u9fff]/]",
+          message:
+            "UI 文案禁止裸中文：必须经 next-intl 词典（messages/zh.json + en.json），见 AGENTS.md i18n 约定",
+        },
+        {
+          selector: "TemplateElement[value.raw=/[\\u4e00-\\u9fff]/]",
+          message:
+            "UI 文案禁止裸中文：必须经 next-intl 词典（messages/zh.json + en.json），见 AGENTS.md i18n 约定",
+        },
+        {
+          selector: "JSXText[value=/[\\u4e00-\\u9fff]/]",
+          message:
+            "UI 文案禁止裸中文：必须经 next-intl 词典（messages/zh.json + en.json），见 AGENTS.md i18n 约定",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

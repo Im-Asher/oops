@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   createContext,
   useCallback,
@@ -77,14 +78,16 @@ export function useTheme(): ThemeContextValue {
 /** 明暗切换按钮：暗色显示太阳（点击转亮），亮色显示月亮。 */
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
+  const t = useTranslations("common");
   const dark = theme === "dark";
+  const label = dark ? t("theme.toLight") : t("theme.toDark");
   return (
     <Button
-      aria-label={dark ? "切换为亮色模式" : "切换为暗色模式"}
+      aria-label={label}
       className={className}
       onClick={toggleTheme}
       size="icon-sm"
-      title={dark ? "切换为亮色模式" : "切换为暗色模式"}
+      title={label}
       variant="ghost"
     >
       {dark ? <SunIcon /> : <MoonIcon />}

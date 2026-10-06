@@ -2,6 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import { ThemeProvider, ThemeToggle, useTheme } from "./theme-provider";
 
 afterEach(() => {
@@ -44,7 +45,7 @@ describe("ThemeToggle", () => {
   it("点击切换 html class 与 localStorage", async () => {
     const user = userEvent.setup();
     document.documentElement.classList.add("dark");
-    render(
+    renderWithI18n(
       <ThemeProvider>
         <ThemeToggle />
       </ThemeProvider>,
