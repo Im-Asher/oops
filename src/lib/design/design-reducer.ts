@@ -53,7 +53,7 @@ export type DesignAction =
   | { type: "patchElements"; patches: ElementPatchEntry[]; history?: boolean }
   | { type: "deleteSelected" }
   | { type: "reorder"; mode: ReorderMode }
-  | { type: "setCanvas"; patch: Partial<Pick<DesignDoc, "width" | "height" | "background">> }
+  | { type: "setCanvas"; patch: Partial<Pick<DesignDoc, "width" | "height" | "background">>; history?: boolean }
   | { type: "undo" }
   | { type: "redo" };
 
@@ -171,11 +171,8 @@ export function designReducer(state: DesignState, action: DesignAction): DesignS
       return { ...state, ...pushHistory(state), doc: { ...state.doc, elements } };
     }
     case "setCanvas": {
-      return {
-        ...state,
-        ...pushHistory(state),
-        doc: { ...state.doc, ...action.patch },
-      };
+      const doc = { ...state.doc, ...action.patch };
+      return action.history === false ? { ...state, doc } : { ...state, ...pushHistory(state), doc };
     }
     case "undo": {
       if (state.past.length === 0) return state;

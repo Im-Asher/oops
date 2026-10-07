@@ -14,6 +14,7 @@ import { DesignCanvas } from "@/components/design/design-canvas";
 import { DesignLeftRail, type DesignRailPanel } from "@/components/design/design-left-rail";
 import { DesignMaterialsPanel } from "@/components/design/design-materials-panel";
 import { DesignTemplatePanel } from "@/components/design/design-template-panel";
+import { DesignRightPanel } from "@/components/design/design-right-panel";
 import { DesignTextPanel } from "@/components/design/design-text-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
 import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from "@/lib/design/doc";
@@ -197,6 +198,7 @@ function DesignPageInner() {
         <div className="relative min-h-0 flex-1" ref={canvasAreaRef}>
           <DesignCanvas dispatch={dispatch} state={state} />
         </div>
+        <DesignRightPanel dispatch={dispatch} state={state} />
       </div>
     </main>
   );

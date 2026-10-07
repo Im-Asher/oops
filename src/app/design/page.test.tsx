@@ -162,11 +162,11 @@ describe("设计页顶栏撤销/重做", () => {
 });
 
 describe("设计页左栏 rail 与模版面板", () => {
-  it("rail 三入口渲染：模版/文字可用，素材先行禁用；模版面板默认展开含缩略图", () => {
+  it("rail 三入口渲染：模版/文字/素材均可用；模版面板默认展开含缩略图", () => {
     renderWithI18n(<DesignPage />);
     expect(screen.getByTestId("design-rail-templates").hasAttribute("disabled")).toBe(false);
     expect((screen.getByTestId("design-rail-text") as HTMLButtonElement).disabled).toBe(false);
-    expect((screen.getByTestId("design-rail-materials") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("design-rail-materials") as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByTestId("design-panel")).toBeTruthy();
     // 缩略图由模版 JSON 实时渲染：卡片内出现模版元素节点
     const thumb = screen.getByTestId("design-template-ecom-main");
