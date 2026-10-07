@@ -296,6 +296,8 @@
   "design": {
     "page": {
       "back": "返回",
+      "undo": "撤销",
+      "redo": "重做",
       "canvasSize": "{width} × {height} px",
       "draftSaving": "保存中…",
       "draftSaved": "草稿已保存"

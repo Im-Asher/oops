@@ -5,7 +5,7 @@
  * 文档初始化：URL 携带 w/h = 从首页弹窗新建（清旧草稿）；无参 = 恢复本机
  * 草稿，再回落 800×800 空白。doc 变化经 500ms debounce 落 localStorage。
  */
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, Redo2Icon, Undo2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -79,7 +79,7 @@ function DesignPageInner() {
 
   return (
     <main className="fixed inset-0 flex flex-col bg-background text-foreground">
-      {/* 顶栏：返回 / 画布尺寸 / 草稿状态（撤销重做与下载由 4.5/6.1 接入） */}
+      {/* 顶栏：返回 / 撤销重做 / 画布尺寸 / 草稿状态（下载由 6.1 接入） */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
         <Link
           className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
@@ -89,6 +89,31 @@ function DesignPageInner() {
           <ArrowLeftIcon className="size-4" />
           {t("back")}
         </Link>
+        {/* 撤销/重做：可用性直接由历史栈驱动（past/future 空即禁用）。 */}
+        <div className="flex items-center">
+          <button
+            aria-label={t("undo")}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            data-testid="design-undo"
+            disabled={state.past.length === 0}
+            onClick={() => dispatch({ type: "undo" })}
+            title={t("undo")}
+            type="button"
+          >
+            <Undo2Icon className="size-4" />
+          </button>
+          <button
+            aria-label={t("redo")}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            data-testid="design-redo"
+            disabled={state.future.length === 0}
+            onClick={() => dispatch({ type: "redo" })}
+            title={t("redo")}
+            type="button"
+          >
+            <Redo2Icon className="size-4" />
+          </button>
+        </div>
         <span className="text-sm text-muted-foreground" data-testid="design-canvas-size">
           {t("canvasSize", { width: state.doc.width, height: state.doc.height })}
         </span>

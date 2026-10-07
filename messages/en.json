@@ -296,6 +296,8 @@
   "design": {
     "page": {
       "back": "Back",
+      "undo": "Undo",
+      "redo": "Redo",
       "canvasSize": "{width} × {height} px",
       "draftSaving": "Saving…",
       "draftSaved": "Draft saved"
