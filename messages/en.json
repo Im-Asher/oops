@@ -318,6 +318,21 @@
         "xhs-cover": "Social Cover"
       }
     },
+    "materialsPanel": {
+      "title": "Materials",
+      "names": {
+        "badge-starburst": "Burst badge",
+        "badge-percent": "Percent badge",
+        "tag-price": "Price tag",
+        "ribbon-banner": "Ribbon banner",
+        "arrow-doodle": "Doodle arrow",
+        "wave-deco": "Wave deco",
+        "bubble-chat": "Chat bubble",
+        "crown": "Crown",
+        "lightning": "Lightning",
+        "star": "Star"
+      }
+    },
     "textPanel": {
       "presetsTitle": "Text presets",
       "fontsTitle": "Artistic fonts",

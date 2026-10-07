@@ -318,6 +318,21 @@
         "xhs-cover": "种草封面"
       }
     },
+    "materialsPanel": {
+      "title": "素材",
+      "names": {
+        "badge-starburst": "爆炸贴",
+        "badge-percent": "折扣贴",
+        "tag-price": "价格吊牌",
+        "ribbon-banner": "横幅缎带",
+        "arrow-doodle": "手绘箭头",
+        "wave-deco": "波浪装饰",
+        "bubble-chat": "对话气泡",
+        "crown": "皇冠",
+        "lightning": "闪电",
+        "star": "星星"
+      }
+    },
     "textPanel": {
       "presetsTitle": "文字预设",
       "fontsTitle": "艺术字体",

@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useReducer, useRef, useState } from "react";
 import { DesignCanvas } from "@/components/design/design-canvas";
 import { DesignLeftRail, type DesignRailPanel } from "@/components/design/design-left-rail";
+import { DesignMaterialsPanel } from "@/components/design/design-materials-panel";
 import { DesignTemplatePanel } from "@/components/design/design-template-panel";
 import { DesignTextPanel } from "@/components/design/design-text-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
@@ -19,6 +20,7 @@ import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
 import { centerFragmentAt, scaleTemplateElements, viewportCenterToCanvas } from "@/lib/design/insert";
 import { ensureFontLoaded, type DesignFont } from "@/lib/design/fonts";
+import { materialElement, type DesignMaterial } from "@/lib/design/materials";
 import type { FancyTextPreset } from "@/lib/design/fancy-text";
 import type { DesignTemplate } from "@/lib/design/templates";
 import { fontSampleElement, textPresetElement, type TextPreset } from "@/lib/design/text-presets";
@@ -121,6 +123,10 @@ function DesignPageInner() {
     });
   };
 
+  const handleSelectMaterial = (material: DesignMaterial) => {
+    insertAtViewportCenter([materialElement(material, state.doc.width)]);
+  };
+
   // 花字松散插入：文案按词典解析后整组入画布，select 多选整组（可整体拖动、单元素可再选）。
   const handleSelectFancy = (preset: FancyTextPreset) => {
     const contents = preset.contentKeys.map((key) => tFancy(key));
@@ -178,6 +184,7 @@ function DesignPageInner() {
         {activePanel !== null && (
           <aside className="w-60 shrink-0 overflow-y-auto border-r border-border p-3" data-testid="design-panel">
             {activePanel === "templates" && <DesignTemplatePanel onSelect={handleSelectTemplate} />}
+            {activePanel === "materials" && <DesignMaterialsPanel onSelect={handleSelectMaterial} />}
             {activePanel === "text" && (
               <DesignTextPanel
                 onSelectFancy={handleSelectFancy}

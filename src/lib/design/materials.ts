@@ -3,8 +3,21 @@
  * 草稿与导出无需 dataURL）。数量可少，机制与正式素材库一致。
  * 模块必须保持 client 安全（模版/素材面板引用），node 依赖只进测试。
  */
+import { newElementId, type ImageElement } from "@/lib/design/doc";
+export type DesignMaterialId =
+  | "badge-starburst"
+  | "badge-percent"
+  | "tag-price"
+  | "ribbon-banner"
+  | "arrow-doodle"
+  | "wave-deco"
+  | "bubble-chat"
+  | "crown"
+  | "lightning"
+  | "star";
+
 export interface DesignMaterial {
-  id: string;
+  id: DesignMaterialId;
   /** 同源静态路径。 */
   src: string;
   /** viewBox 固有宽高（插入时按画布宽度比例缩放）。 */
@@ -29,4 +42,25 @@ export const DESIGN_MATERIALS: DesignMaterial[] = [
 
 export function findMaterial(id: string): DesignMaterial | null {
   return DESIGN_MATERIALS.find((material) => material.id === id) ?? null;
+}
+
+/** 基准画布宽：素材固有尺寸按 800 宽画布设计，插入时随画布宽等比缩放。 */
+const MATERIAL_BASE_WIDTH = 800;
+
+/** 素材 → 单图片元素片段（x/y 置 0，由插入层负责视口中心对齐）。 */
+export function materialElement(material: DesignMaterial, canvasWidth: number): ImageElement {
+  const scale = canvasWidth / MATERIAL_BASE_WIDTH;
+  return {
+    id: newElementId(),
+    type: "image",
+    x: 0,
+    y: 0,
+    w: material.width * scale,
+    h: material.height * scale,
+    rotation: 0,
+    opacity: 1,
+    src: material.src,
+    fit: "contain",
+    radius: 0,
+  };
 }
