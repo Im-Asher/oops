@@ -121,17 +121,18 @@ function ShapeInner({ el }: { el: ShapeElement }) {
 
 export function DesignElementView({
   element,
-  selected,
+  selected = false,
   editing = false,
   onPointerDown,
   onElementDoubleClick,
   onEditCommit,
 }: {
   element: DesignElement;
-  selected: boolean;
+  selected?: boolean;
   /** 行内编辑态（仅文本元素有意义）。 */
   editing?: boolean;
-  onPointerDown: (event: React.PointerEvent<HTMLDivElement>, element: DesignElement) => void;
+  /** 不传 = 纯展示（模版缩略图复用，无选中/拖动交互）。 */
+  onPointerDown?: (event: React.PointerEvent<HTMLDivElement>, element: DesignElement) => void;
   onElementDoubleClick?: (element: DesignElement) => void;
   onEditCommit?: (element: DesignElement, content: string) => void;
 }) {
@@ -145,11 +146,15 @@ export function DesignElementView({
         event.stopPropagation();
         onElementDoubleClick?.(element);
       }}
-      onPointerDown={(event) => {
-        // 阻断冒泡：否则背景 handler 清空选中并把拖动覆盖为平移
-        event.stopPropagation();
-        onPointerDown(event, element);
-      }}
+      onPointerDown={
+        onPointerDown
+          ? (event) => {
+              // 阻断冒泡：否则背景 handler 清空选中并把拖动覆盖为平移
+              event.stopPropagation();
+              onPointerDown(event, element);
+            }
+          : undefined
+      }
       style={{
         height: element.h,
         left: element.x,

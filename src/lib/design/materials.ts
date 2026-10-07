@@ -1,10 +1,8 @@
 /**
  * 设计素材目录：public/design-materials/ 下内置 SVG（同源静态资源，
  * 草稿与导出无需 dataURL）。数量可少，机制与正式素材库一致。
+ * 模块必须保持 client 安全（模版/素材面板引用），node 依赖只进测试。
  */
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-
 export interface DesignMaterial {
   id: string;
   /** 同源静态路径。 */
@@ -31,11 +29,4 @@ export const DESIGN_MATERIALS: DesignMaterial[] = [
 
 export function findMaterial(id: string): DesignMaterial | null {
   return DESIGN_MATERIALS.find((material) => material.id === id) ?? null;
-}
-
-/** 目录完整性：所有素材文件真实存在（测试守卫，防止悬空引用）。 */
-export function allMaterialFilesExist(publicDir: string): boolean {
-  return DESIGN_MATERIALS.every((material) =>
-    existsSync(join(publicDir, material.src.replace(`/${MATERIALS_DIR}/`, `${MATERIALS_DIR}/`))),
-  );
 }

@@ -48,6 +48,11 @@ function elementEl(id: string): HTMLElement {
   return document.querySelector(`[data-design-element="${id}"]`) as HTMLElement;
 }
 
+/** 画布元素计数：限定画布 surface，避免把模版面板缩略图里的元素算进来。 */
+function canvasElementCount(): number {
+  return document.querySelectorAll('[data-testid="design-canvas-surface"] [data-design-element]').length;
+}
+
 function pos(id: string): { x: string; y: string } {
   const el = elementEl(id);
   return { x: el.style.left, y: el.style.top };
@@ -153,3 +158,57 @@ describe("设计页顶栏撤销/重做", () => {
     expect(elementEl("e2")).not.toBeNull();
   });
 });
+
+describe("设计页左栏 rail 与模版面板", () => {
+  it("rail 三入口渲染：模版可用，文字/素材先行禁用；模版面板默认展开含缩略图", () => {
+    renderWithI18n(<DesignPage />);
+    expect(screen.getByTestId("design-rail-templates").hasAttribute("disabled")).toBe(false);
+    expect((screen.getByTestId("design-rail-text") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("design-rail-materials") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("design-panel")).toBeTruthy();
+    // 缩略图由模版 JSON 实时渲染：卡片内出现模版元素节点
+    const thumb = screen.getByTestId("design-template-ecom-main");
+    expect(thumb.querySelectorAll("[data-design-element]").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("design-template-xhs-cover")).toBeTruthy();
+  });
+
+  it("点击模版：等比加载进画布（进历史），撤销回空画布", () => {
+    renderWithI18n(<DesignPage />);
+    expect(canvasElementCount()).toBe(0);
+
+    fireEvent.click(screen.getByTestId("design-template-ecom-main"));
+    const count = canvasElementCount();
+    expect(count).toBeGreaterThan(0);
+
+    // 加载进历史：撤销 → 空画布，重做 → 恢复
+    const undo = screen.getByTestId("design-undo") as HTMLButtonElement;
+    expect(undo.disabled).toBe(false);
+    fireEvent.click(undo);
+    expect(canvasElementCount()).toBe(0);
+    fireEvent.click(screen.getByTestId("design-redo"));
+    expect(canvasElementCount()).toBe(count);
+  });
+
+  it("重复加载同一模版：元素 id 重新生成，不产生 key/id 冲突", () => {
+    renderWithI18n(<DesignPage />);
+    fireEvent.click(screen.getByTestId("design-template-ecom-main"));
+    const first = canvasElementCount();
+    fireEvent.click(screen.getByTestId("design-template-ecom-main"));
+    const second = canvasElementCount();
+    expect(second).toBe(first);
+    const ids = Array.from(
+      document.querySelectorAll('[data-testid="design-canvas-surface"] [data-design-element]'),
+    ).map((el) => el.getAttribute("data-design-element"));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("再点当前激活 rail 入口：收起面板", () => {
+    renderWithI18n(<DesignPage />);
+    expect(screen.getByTestId("design-panel")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("design-rail-templates"));
+    expect(screen.queryByTestId("design-panel")).toBeNull();
+    fireEvent.click(screen.getByTestId("design-rail-templates"));
+    expect(screen.getByTestId("design-panel")).toBeTruthy();
+  });
+});
+

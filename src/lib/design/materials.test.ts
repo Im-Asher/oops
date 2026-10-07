@@ -1,12 +1,15 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { allMaterialFilesExist, DESIGN_MATERIALS, findMaterial } from "@/lib/design/materials";
+import { DESIGN_MATERIALS, findMaterial } from "@/lib/design/materials";
 
 describe("素材目录", () => {
-  const publicDir = join(process.cwd(), "public");
+  // 目录完整性：所有素材文件真实存在（守卫在测试侧，模块保持 client 安全）。
+  const allMaterialFilesExist = () =>
+    DESIGN_MATERIALS.every((material) => existsSync(join(process.cwd(), "public", material.src)));
 
   it("所有素材文件真实存在于 public/design-materials/", () => {
-    expect(allMaterialFilesExist(publicDir)).toBe(true);
+    expect(allMaterialFilesExist()).toBe(true);
   });
 
   it("素材 id 唯一且固有尺寸合法", () => {

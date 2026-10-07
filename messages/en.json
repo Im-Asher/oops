@@ -305,6 +305,19 @@
     "canvas": {
       "label": "Design canvas"
     },
+    "rail": {
+      "label": "Design tools",
+      "templates": "Templates",
+      "text": "Text",
+      "materials": "Materials"
+    },
+    "templatePanel": {
+      "title": "Templates",
+      "names": {
+        "ecom-main": "E-commerce Main",
+        "xhs-cover": "Social Cover"
+      }
+    },
     "dialog": {
       "title": "New design",
       "description": "Choose a size preset or set a custom canvas size",

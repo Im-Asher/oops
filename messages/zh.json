@@ -305,6 +305,19 @@
     "canvas": {
       "label": "设计画布"
     },
+    "rail": {
+      "label": "设计功能栏",
+      "templates": "模版",
+      "text": "文字",
+      "materials": "素材"
+    },
+    "templatePanel": {
+      "title": "模版",
+      "names": {
+        "ecom-main": "电商主图",
+        "xhs-cover": "种草封面"
+      }
+    },
     "dialog": {
       "title": "新建设计",
       "description": "选择尺寸预设或自定义画布大小",

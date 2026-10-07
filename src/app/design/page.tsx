@@ -11,9 +11,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useReducer, useRef, useState } from "react";
 import { DesignCanvas } from "@/components/design/design-canvas";
+import { DesignLeftRail, type DesignRailPanel } from "@/components/design/design-left-rail";
+import { DesignTemplatePanel } from "@/components/design/design-template-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
-import { createEmptyDoc, type DesignDoc } from "@/lib/design/doc";
+import { createEmptyDoc, newElementId, type DesignDoc } from "@/lib/design/doc";
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
+import { scaleTemplateElements } from "@/lib/design/insert";
+import type { DesignTemplate } from "@/lib/design/templates";
 
 const MAX_SIZE = 10000;
 const DEFAULT_SIZE = 800;
@@ -53,6 +57,8 @@ function DesignPageInner() {
   const params = useSearchParams();
   const [state, dispatch] = useReducer(designReducer, params, initState);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  // 左栏面板展开态（UI 态不入历史）；默认展开模版面板。
+  const [activePanel, setActivePanel] = useState<DesignRailPanel | null>("templates");
   const docRef = useRef(state.doc);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -76,6 +82,16 @@ function DesignPageInner() {
     },
     [],
   );
+
+  /** 点击模版：等比缩放到画布宽度 + 重新生成 id（目录数据复用加载不冲突），整包替换进历史。 */
+  const handleSelectTemplate = (template: DesignTemplate) => {
+    dispatch({
+      type: "loadTemplate",
+      elements: scaleTemplateElements(template.doc.elements, template.baseWidth, state.doc.width).map(
+        (el) => ({ ...el, id: newElementId() }),
+      ),
+    });
+  };
 
   return (
     <main className="fixed inset-0 flex flex-col bg-background text-foreground">
@@ -122,9 +138,17 @@ function DesignPageInner() {
         </span>
       </header>
 
-      {/* 画布编辑区：缩放视口 + 元素渲染 + 选择拖动 */}
-      <div className="relative min-h-0 flex-1">
-        <DesignCanvas dispatch={dispatch} state={state} />
+      {/* 左栏 rail + 面板 + 中央画布（右侧属性面板由 5.5 接入） */}
+      <div className="flex min-h-0 flex-1">
+        <DesignLeftRail active={activePanel} onSelect={setActivePanel} />
+        {activePanel === "templates" && (
+          <aside className="w-60 shrink-0 overflow-y-auto border-r border-border p-3" data-testid="design-panel">
+            <DesignTemplatePanel onSelect={handleSelectTemplate} />
+          </aside>
+        )}
+        <div className="relative min-h-0 flex-1">
+          <DesignCanvas dispatch={dispatch} state={state} />
+        </div>
       </div>
     </main>
   );

@@ -7,7 +7,8 @@ import { buildEcomMainTemplate } from "@/lib/design/templates/ecom-main";
 import { buildXhsCoverTemplate } from "@/lib/design/templates/xhs-cover";
 
 export interface DesignTemplate {
-  id: string;
+  /** 词典名键（design.templatePanel.names.<id>）与缩略 testid 共用；新模版需同步词典。 */
+  id: "ecom-main" | "xhs-cover";
   baseWidth: number;
   doc: DesignDoc;
 }
