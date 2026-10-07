@@ -4,8 +4,9 @@
  * 设计画布（spec design-editor「画布与元素渲染」「选择与变换」）：
  * 固定尺寸画布矩形在可缩放视口中呈现；元素点选/拖动（多选整体移动），
  * 背景拖拽平移、滚轮/按钮/键盘缩放与适应画布；单选手柄等比（角）/
- * 单轴（边）缩放与旋转，多选渲染合并选择框。历史语义：拖动开始
- * beginHistory 快照，过程内 patch 不入历史 → 一次撤销回到拖动前。
+ * 单轴（边）缩放与旋转，多选渲染合并选择框；双击文本行内编辑
+ * （blur/Esc 提交）。历史语义：拖动/编辑开始快照（beginHistory），
+ * 过程内 patch 不入历史 → 一次撤销回到操作前。
  * 坐标换算复用 lib/canvas/coords 纯函数，本组件只做事件采集与派发。
  */
 import { fitView, panView, zoomAtPoint } from "@/lib/canvas/coords";
@@ -15,7 +16,7 @@ import { DesignElementView } from "@/components/design/design-element-view";
 import { type HandleId, DesignHandles } from "@/components/design/design-handles";
 import { ViewToolbar } from "@/components/canvas/view-toolbar";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const ZOOM_STEP = 1.2;
 /** fitView 的 padding 语义是像素边距（视口两侧各留）。 */
@@ -112,8 +113,13 @@ export function DesignCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef(state.view);
   const dragRef = useRef<DragSession | null>(null);
+  /** 行内编辑中的文本元素 id（UI 态，不入 reducer/历史）。 */
+  const [editingIdRaw, setEditingId] = useState<string | null>(null);
   const { doc, selection, view } = state;
   const selectedSet = new Set(selection);
+  // 派生：编辑目标被删除/模版替换后自然失效（渲染期收敛，避免 effect 内 setState）。
+  const editingId =
+    editingIdRaw != null && doc.elements.some((el) => el.id === editingIdRaw) ? editingIdRaw : null;
 
   useEffect(() => {
     viewRef.current = view;
@@ -207,6 +213,8 @@ export function DesignCanvas({
 
   const handleElementPointerDown = (event: React.PointerEvent<HTMLDivElement>, element: DesignElement) => {
     if (event.button !== 0) return;
+    // 编辑中：不启动移动会话也不重复快照（点击只调整光标，blur 提交内容）。
+    if (editingId === element.id) return;
     if (event.shiftKey) {
       dispatch({ type: "toggleSelect", id: element.id });
       return;
@@ -288,6 +296,21 @@ export function DesignCanvas({
     dragRef.current = drag;
     dispatch({ type: "beginHistory" });
     event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  /** 双击文本进入行内编辑（多选收敛为该元素单选）。 */
+  const handleElementDoubleClick = (element: DesignElement) => {
+    if (element.type !== "text") return;
+    dispatch({ type: "select", ids: [element.id] });
+    setEditingId(element.id);
+  };
+
+  /** 行内编辑提交（blur/Esc）：内容变化才 patch；历史粒度复用双击前 pointerdown 的快照。 */
+  const handleEditCommit = (element: DesignElement, content: string) => {
+    setEditingId(null);
+    const current = doc.elements.find((el) => el.id === element.id);
+    if (!current || current.type !== "text" || current.content === content) return;
+    dispatch({ type: "patchElements", history: false, patches: [{ id: element.id, patch: { content } }] });
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -400,9 +423,12 @@ export function DesignCanvas({
       >
         {doc.elements.map((element) => (
           <DesignElementView
+            editing={editingId === element.id}
             element={element}
             key={element.id}
             // 多选时高亮收敛到合并选择框，各元素不再单独描边。
+            onEditCommit={handleEditCommit}
+            onElementDoubleClick={handleElementDoubleClick}
             onPointerDown={handleElementPointerDown}
             selected={selectedSet.has(element.id) && selection.length === 1}
           />

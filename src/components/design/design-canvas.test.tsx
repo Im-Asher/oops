@@ -166,3 +166,74 @@ describe("设计画布选择框手柄", () => {
     expect(undone.doc.elements[0].rotation).toBe(0);
   });
 });
+
+describe("文本行内编辑", () => {
+  /** 进入 e1 的编辑态（先 pointerdown 产生编辑提交依赖的历史快照，再双击）。 */
+  function enterEdit(m: Pick<ReturnType<typeof mountCanvas>, "elements">) {
+    const el = m.elements()[0] as HTMLElement;
+    fireEvent.pointerDown(el, { button: 0, clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerUp(el, { pointerId: 1 });
+    const span = el.querySelector("span") as HTMLElement;
+    fireEvent.doubleClick(span);
+    return span;
+  }
+
+  it("双击文本进入编辑态（contentEditable + 聚焦）", () => {
+    const { elements } = mountCanvas();
+    const span = enterEdit({ elements });
+    expect(span.getAttribute("contenteditable")).toBe("true");
+    expect(document.activeElement).toBe(span);
+  });
+
+  it("blur 提交内容；一次撤销回到改字前（单条历史）", () => {
+    const m = mountCanvas();
+    const span = enterEdit(m);
+    span.textContent = "新标题";
+    fireEvent.blur(span);
+    expect((m.getState().doc.elements[0] as { content: string }).content).toBe("新标题");
+    const undone = designReducer(m.getState(), { type: "undo" });
+    expect((undone.doc.elements[0] as { content: string }).content).toBe("标题");
+  });
+
+  it("Esc 提交并退出编辑态", () => {
+    const m = mountCanvas();
+    const span = enterEdit(m);
+    span.textContent = "Esc 提交";
+    fireEvent.keyDown(span, { key: "Escape" });
+    expect((m.getState().doc.elements[0] as { content: string }).content).toBe("Esc 提交");
+    // contentEditable 为枚举属性：退出编辑渲染为 "false" 而非移除。
+    expect(span.getAttribute("contenteditable")).toBe("false");
+  });
+
+  it("编辑中按键不冒泡到画布快捷键（Backspace 不删除元素）", () => {
+    const m = mountCanvas();
+    const span = enterEdit(m);
+    fireEvent.keyDown(span, { key: "Backspace" });
+    expect(m.getState().doc.elements).toHaveLength(2);
+  });
+
+  it("编辑中拖动该元素不产生移动（退出编辑前锁定移动会话）", () => {
+    const m = mountCanvas();
+    const span = enterEdit(m);
+    const el = m.elements()[0] as HTMLElement;
+    fireEvent.pointerDown(el, { button: 0, clientX: 50, clientY: 50, pointerId: 2 });
+    fireEvent.pointerMove(el, { clientX: 150, clientY: 150, pointerId: 2 });
+    expect(m.getState().doc.elements[0].x).toBe(40);
+    fireEvent.blur(span);
+  });
+
+  it("双击形状元素不进入编辑", () => {
+    const { elements } = mountCanvas();
+    const shape = elements()[1] as HTMLElement;
+    fireEvent.pointerDown(shape, { button: 0, clientX: 340, clientY: 340, pointerId: 1 });
+    fireEvent.doubleClick(shape);
+    expect(shape.querySelector("[contenteditable='true']")).toBeNull();
+  });
+
+  it("内容未变化时 blur 不产生历史快照", () => {
+    const m = mountCanvas();
+    const span = enterEdit(m);
+    fireEvent.blur(span);
+    expect(m.getState().past).toHaveLength(1); // 仅 pointerdown 的一次快照
+  });
+});

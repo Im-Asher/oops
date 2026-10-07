@@ -3,11 +3,54 @@
 /**
  * 设计元素渲染（text/image/shape 三类，spec design-editor「画布与元素渲染」）。
  * 外层负责几何（x/y/w/h/旋转/透明度/选中描边），内层按类型铺内容；
+ * 文本支持行内编辑：双击进入（contentEditable），blur/Esc 提交为一次
+ * 内容 patch（历史粒度由画布层控制），编辑期间 DOM 文本不走 React 受控。
  * 模版缩略图直接以更小视口复用同一渲染（零额外实现）。
  */
 import type { DesignElement, ImageElement, ShapeElement, TextElement } from "@/lib/design/doc";
+import { useEffect, useRef } from "react";
 
-function TextInner({ el }: { el: TextElement }) {
+/** 读编辑态纯文本：innerText 保留 <br> 换行，退化 textContent；去掉编辑产生的尾部换行。 */
+function readEditableText(node: HTMLElement): string {
+  const text = typeof node.innerText === "string" ? node.innerText : (node.textContent ?? "");
+  return text.replace(/\n+$/, "");
+}
+
+function TextInner({
+  el,
+  editing,
+  onEditCommit,
+}: {
+  el: TextElement;
+  editing: boolean;
+  onEditCommit?: (element: TextElement, content: string) => void;
+}) {
+  const spanRef = useRef<HTMLSpanElement>(null);
+
+  // 进入编辑：聚焦并全选，便于直接替换内容。
+  useEffect(() => {
+    if (!editing) return;
+    const node = spanRef.current;
+    if (!node) return;
+    node.focus();
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    } catch {
+      // 无选区 API 的环境（部分 jsdom 场景）只 focus 即可。
+    }
+  }, [editing]);
+
+  const commit = () => {
+    if (!editing) return;
+    const node = spanRef.current;
+    if (!node) return;
+    onEditCommit?.(el, readEditableText(node));
+  };
+
   return (
     <div
       className="flex size-full flex-col"
@@ -18,9 +61,23 @@ function TextInner({ el }: { el: TextElement }) {
       }}
     >
       <span
-        className="w-full"
+        className="w-full outline-none"
+        contentEditable={editing}
+        onBlur={editing ? commit : undefined}
+        onKeyDown={(event) => {
+          if (!editing) return;
+          // 编辑中的按键不冒泡到画布快捷键（Delete 删除 / Esc 清选 / +−0 缩放）。
+          event.stopPropagation();
+          if (event.key === "Escape") {
+            event.preventDefault();
+            commit();
+          }
+        }}
+        ref={spanRef}
+        spellCheck={false}
         style={{
           color: el.color,
+          cursor: editing ? "text" : undefined,
           fontFamily: el.fontFamily,
           fontSize: el.fontSize,
           fontWeight: el.fontWeight,
@@ -29,6 +86,7 @@ function TextInner({ el }: { el: TextElement }) {
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}
+        suppressContentEditableWarning
       >
         {el.content}
       </span>
@@ -64,11 +122,18 @@ function ShapeInner({ el }: { el: ShapeElement }) {
 export function DesignElementView({
   element,
   selected,
+  editing = false,
   onPointerDown,
+  onElementDoubleClick,
+  onEditCommit,
 }: {
   element: DesignElement;
   selected: boolean;
+  /** 行内编辑态（仅文本元素有意义）。 */
+  editing?: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>, element: DesignElement) => void;
+  onElementDoubleClick?: (element: DesignElement) => void;
+  onEditCommit?: (element: DesignElement, content: string) => void;
 }) {
   return (
     <div
@@ -76,6 +141,10 @@ export function DesignElementView({
         element.type === "image" ? "overflow-hidden" : ""
       }`}
       data-design-element={element.id}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onElementDoubleClick?.(element);
+      }}
       onPointerDown={(event) => {
         // 阻断冒泡：否则背景 handler 清空选中并把拖动覆盖为平移
         event.stopPropagation();
@@ -91,7 +160,7 @@ export function DesignElementView({
       }}
     >
       {element.type === "text" ? (
-        <TextInner el={element} />
+        <TextInner el={element} editing={editing} onEditCommit={onEditCommit} />
       ) : element.type === "image" ? (
         <ImageInner el={element} />
       ) : (
