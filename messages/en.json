@@ -318,6 +318,29 @@
         "xhs-cover": "Social Cover"
       }
     },
+    "textPanel": {
+      "presetsTitle": "Text presets",
+      "fontsTitle": "Artistic fonts",
+      "fontSample": "Summer Drop",
+      "presets": {
+        "title": {
+          "name": "Title",
+          "sample": "Fresh Summer Launch"
+        },
+        "subtitle": {
+          "name": "Subtitle",
+          "sample": "Light texture · Lasting scent"
+        },
+        "body": {
+          "name": "Body",
+          "sample": "Describe your product here"
+        }
+      },
+      "fonts": {
+        "smiley-sans": "Smiley Sans",
+        "lxgw-wenkai": "LXGW WenKai"
+      }
+    },
     "dialog": {
       "title": "New design",
       "description": "Choose a size preset or set a custom canvas size",

@@ -13,11 +13,14 @@ import { Suspense, useEffect, useReducer, useRef, useState } from "react";
 import { DesignCanvas } from "@/components/design/design-canvas";
 import { DesignLeftRail, type DesignRailPanel } from "@/components/design/design-left-rail";
 import { DesignTemplatePanel } from "@/components/design/design-template-panel";
+import { DesignTextPanel } from "@/components/design/design-text-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
-import { createEmptyDoc, newElementId, type DesignDoc } from "@/lib/design/doc";
+import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from "@/lib/design/doc";
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
-import { scaleTemplateElements } from "@/lib/design/insert";
+import { centerFragmentAt, scaleTemplateElements, viewportCenterToCanvas } from "@/lib/design/insert";
+import { ensureFontLoaded, type DesignFont } from "@/lib/design/fonts";
 import type { DesignTemplate } from "@/lib/design/templates";
+import { fontSampleElement, textPresetElement, type TextPreset } from "@/lib/design/text-presets";
 
 const MAX_SIZE = 10000;
 const DEFAULT_SIZE = 800;
@@ -54,6 +57,7 @@ export default function DesignPage() {
 
 function DesignPageInner() {
   const t = useTranslations("design.page");
+  const tText = useTranslations("design.textPanel");
   const params = useSearchParams();
   const [state, dispatch] = useReducer(designReducer, params, initState);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -61,6 +65,8 @@ function DesignPageInner() {
   const [activePanel, setActivePanel] = useState<DesignRailPanel | null>("templates");
   const docRef = useRef(state.doc);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 画布容器：视口中心插入的取矩形基准（与 DesignCanvas 视口同一区域）。 */
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
 
   // 草稿自动保存：doc 引用变化才排程（首渲染不保存），debounce 合并连续编辑。
   useEffect(() => {
@@ -90,6 +96,27 @@ function DesignPageInner() {
       elements: scaleTemplateElements(template.doc.elements, template.baseWidth, state.doc.width).map(
         (el) => ({ ...el, id: newElementId() }),
       ),
+    });
+  };
+
+  /** 视口中心插入单元素：包围盒中心对齐视口中心，插入后选中（一次撤销粒度）。 */
+  const insertAtViewportCenter = (element: DesignElement) => {
+    const rect = canvasAreaRef.current?.getBoundingClientRect();
+    const viewport = { width: rect?.width ?? 0, height: rect?.height ?? 0 };
+    const center = viewportCenterToCanvas(viewport, state.view);
+    const [placed] = centerFragmentAt([element], center);
+    if (!placed) return;
+    dispatch({ type: "addElements", elements: [placed], select: true });
+  };
+
+  const handleSelectTextPreset = (preset: TextPreset) => {
+    insertAtViewportCenter(textPresetElement(preset, tText(`presets.${preset.id}.sample`)));
+  };
+
+  // 插入前预热字重（失败静默：font-display swap 兜底），就绪后落画布立即正确渲染。
+  const handleSelectFont = (font: DesignFont) => {
+    void ensureFontLoaded(font).then(() => {
+      insertAtViewportCenter(fontSampleElement(font, tText("fontSample")));
     });
   };
 
@@ -141,12 +168,15 @@ function DesignPageInner() {
       {/* 左栏 rail + 面板 + 中央画布（右侧属性面板由 5.5 接入） */}
       <div className="flex min-h-0 flex-1">
         <DesignLeftRail active={activePanel} onSelect={setActivePanel} />
-        {activePanel === "templates" && (
+        {activePanel !== null && (
           <aside className="w-60 shrink-0 overflow-y-auto border-r border-border p-3" data-testid="design-panel">
-            <DesignTemplatePanel onSelect={handleSelectTemplate} />
+            {activePanel === "templates" && <DesignTemplatePanel onSelect={handleSelectTemplate} />}
+            {activePanel === "text" && (
+              <DesignTextPanel onSelectFont={handleSelectFont} onSelectPreset={handleSelectTextPreset} />
+            )}
           </aside>
         )}
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1" ref={canvasAreaRef}>
           <DesignCanvas dispatch={dispatch} state={state} />
         </div>
       </div>

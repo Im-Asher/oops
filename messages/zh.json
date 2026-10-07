@@ -318,6 +318,29 @@
         "xhs-cover": "种草封面"
       }
     },
+    "textPanel": {
+      "presetsTitle": "文字预设",
+      "fontsTitle": "艺术字体",
+      "fontSample": "夏日上新",
+      "presets": {
+        "title": {
+          "name": "标题",
+          "sample": "夏日清爽上新"
+        },
+        "subtitle": {
+          "name": "副标题",
+          "sample": "轻盈质地 · 持久留香"
+        },
+        "body": {
+          "name": "正文",
+          "sample": "输入正文描述产品卖点"
+        }
+      },
+      "fonts": {
+        "smiley-sans": "得意黑",
+        "lxgw-wenkai": "霞鹜文楷"
+      }
+    },
     "dialog": {
       "title": "新建设计",
       "description": "选择尺寸预设或自定义画布大小",

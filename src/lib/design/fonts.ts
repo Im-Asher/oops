@@ -4,8 +4,11 @@
  * 字体文件：得意黑 public/fonts 单文件；霞鹜文楷 layout 引入的 npm 切片包（按需加载）。
  */
 
+/** 字体 id 联合：与词典 design.textPanel.fonts.<id> 的 key 一一对应。 */
+export type DesignFontId = "smiley-sans" | "lxgw-wenkai";
+
 export interface DesignFont {
-  id: string;
+  id: DesignFontId;
   /** CSS font-family 值，须与 @font-face 声明一致。 */
   family: string;
   /** 预览与元素渲染用字重。 */

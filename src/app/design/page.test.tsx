@@ -3,12 +3,14 @@
  * 设计页壳测试：URL/草稿初始化与返回链接（4.1）+
  * 顶栏撤销/重做（4.5）：禁用态由历史栈驱动，多步回退链经真实 UI
  * 事件（拖动 → 顶栏按钮）往返验证；reducer 层 undo/redo 语义已在
- * design-reducer.test.ts 覆盖，此处只测接入。
+ * design-reducer.test.ts 覆盖，此处只测接入。+
+ * 左栏 rail/模版面板（5.1）与文字面板（5.2）：插入与字体隔离。
  */
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DesignElement } from "@/lib/design/doc";
 import { shapeElement, textElement } from "@/lib/design/elements";
+import { DEFAULT_FONT_FAMILY } from "@/lib/design/fonts";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import DesignPage from "./page";
 
@@ -160,10 +162,10 @@ describe("设计页顶栏撤销/重做", () => {
 });
 
 describe("设计页左栏 rail 与模版面板", () => {
-  it("rail 三入口渲染：模版可用，文字/素材先行禁用；模版面板默认展开含缩略图", () => {
+  it("rail 三入口渲染：模版/文字可用，素材先行禁用；模版面板默认展开含缩略图", () => {
     renderWithI18n(<DesignPage />);
     expect(screen.getByTestId("design-rail-templates").hasAttribute("disabled")).toBe(false);
-    expect((screen.getByTestId("design-rail-text") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("design-rail-text") as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByTestId("design-rail-materials") as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("design-panel")).toBeTruthy();
     // 缩略图由模版 JSON 实时渲染：卡片内出现模版元素节点
@@ -209,6 +211,75 @@ describe("设计页左栏 rail 与模版面板", () => {
     expect(screen.queryByTestId("design-panel")).toBeNull();
     fireEvent.click(screen.getByTestId("design-rail-templates"));
     expect(screen.getByTestId("design-panel")).toBeTruthy();
+  });
+});
+
+describe("设计页文字面板", () => {
+  /** 画布内全部元素节点（缩略图不计入）。 */
+  function canvasElements(): HTMLElement[] {
+    return Array.from(
+      document.querySelectorAll('[data-testid="design-canvas-surface"] [data-design-element]'),
+    ) as HTMLElement[];
+  }
+
+  function openTextPanel() {
+    fireEvent.click(screen.getByTestId("design-rail-text"));
+    expect(screen.getByTestId("design-text-preset-title")).toBeTruthy();
+  }
+
+  it("rail 切换到文字面板：三预设与字体列表渲染，预览以对应样式/字体渲染", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    for (const id of ["title", "subtitle", "body"]) {
+      expect(screen.getByTestId(`design-text-preset-${id}`)).toBeTruthy();
+    }
+    expect(screen.getByTestId("design-font-smiley-sans")).toBeTruthy();
+    expect(screen.getByTestId("design-font-lxgw-wenkai")).toBeTruthy();
+    // 字体预览以该字体渲染（spec「预览列表以对应字体渲染」）；CSSOM 序列化引号为双引号
+    const smiley = screen.getByTestId("design-font-smiley-sans").querySelector("span") as HTMLElement;
+    expect(smiley.style.fontFamily).toContain("Smiley Sans");
+    // 预设预览以预设字重渲染
+    const titlePreview = screen.getByTestId("design-text-preset-title").querySelector("span") as HTMLElement;
+    expect(titlePreview.style.fontWeight).toBe("700");
+  });
+
+  it("点击标题预设：画布视口中心插入标题文本（进历史，可撤销）", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    expect(canvasElements().length).toBe(0);
+
+    fireEvent.click(screen.getByTestId("design-text-preset-title"));
+    const elements = canvasElements();
+    expect(elements.length).toBe(1);
+    expect(elements[0].textContent).toBe("夏日清爽上新");
+    // 字号/字重渲染在容器内的文本 span 上
+    const span = elements[0].querySelector("span") as HTMLElement;
+    expect(span.style.fontSize).toBe("48px");
+    expect(span.style.fontWeight).toBe("700");
+    expect((screen.getByTestId("design-undo") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("design-undo"));
+    expect(canvasElements().length).toBe(0);
+  });
+
+  it("插入艺术字体文本：既有元素字体不变（spec「字体不影响已有元素」）", async () => {
+    seedDraft([
+      textElement({ id: "tpl-text", content: "模版标题", x: 40, y: 40, w: 300, h: 80, fontSize: 40 }),
+    ]);
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+
+    fireEvent.click(screen.getByTestId("design-text-preset-title"));
+    fireEvent.click(screen.getByTestId("design-font-smiley-sans"));
+    await waitFor(() => expect(canvasElements().length).toBe(2));
+
+    const spanStyle = (el: HTMLElement) =>
+      (el.querySelector("span") as HTMLElement | null)?.style.fontFamily ?? "";
+    const withSmiley = canvasElements().filter((el) => spanStyle(el).includes("Smiley"));
+    expect(withSmiley.length).toBe(1);
+    expect(spanStyle(withSmiley[0])).toContain("Smiley Sans");
+    const untouched = canvasElements().find((el) => el.getAttribute("data-design-element") === "tpl-text");
+    expect(spanStyle(untouched as HTMLElement)).toBe(DEFAULT_FONT_FAMILY);
   });
 });
 

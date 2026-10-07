@@ -3,7 +3,7 @@
 /**
  * 左侧功能栏 rail（spec design-editor「设计页布局」）：
  * 模版/文字/素材三个面板入口，点击切换展开（再点当前项收起）。
- * 5.1 仅接入模版面板；文字/素材入口先行禁用，由 5.2/5.4 启用。
+ * 模版/文字已接入；素材入口先行禁用，由 5.4 启用。
  */
 import { LayoutTemplateIcon, ShapesIcon, TypeIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -12,7 +12,7 @@ export type DesignRailPanel = "templates" | "text" | "materials";
 
 const ENTRIES: { id: DesignRailPanel; icon: typeof LayoutTemplateIcon; disabled: boolean }[] = [
   { disabled: false, icon: LayoutTemplateIcon, id: "templates" },
-  { disabled: true, icon: TypeIcon, id: "text" },
+  { disabled: false, icon: TypeIcon, id: "text" },
   { disabled: true, icon: ShapesIcon, id: "materials" },
 ];
 
