@@ -300,7 +300,9 @@
       "redo": "重做",
       "canvasSize": "{width} × {height} px",
       "draftSaving": "保存中…",
-      "draftSaved": "草稿已保存"
+      "draftSaved": "草稿已保存",
+      "download": "下载 PNG",
+      "downloadError": "导出失败，请重试"
     },
     "rightPanel": {
       "canvasTitle": "画布",

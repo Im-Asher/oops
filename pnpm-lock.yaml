@@ -29,6 +29,9 @@ importers:
       '@streamdown/mermaid':
         specifier: ^1.0.2
         version: 1.0.2(react@19.2.8)
+      '@zumer/snapdom':
+        specifier: ^3.3.0
+        version: 3.3.0
       ai:
         specifier: ^7.0.118
         version: 7.0.118(zod@4.6.5)
@@ -2918,6 +2921,9 @@ packages:
 
   '@workflow/serde@4.1.0':
     resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
+
+  '@zumer/snapdom@3.3.0':
+    resolution: {integrity: sha512-DR4HnXp5vlLDymmAE5z/QWzxtsc+wrpjo/QXvj5R377wKarwpCQO2LzUuQjWhJaMDNAyCjvxJB4EN8Zgs8Ri9w==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -9153,6 +9159,8 @@ snapshots:
   '@vitest/spy@5.0.2': {}
 
   '@workflow/serde@4.1.0': {}
+
+  '@zumer/snapdom@3.3.0': {}
 
   accepts@2.0.0:
     dependencies:

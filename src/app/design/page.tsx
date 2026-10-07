@@ -5,7 +5,7 @@
  * 文档初始化：URL 携带 w/h = 从首页弹窗新建（清旧草稿）；无参 = 恢复本机
  * 草稿，再回落 800×800 空白。doc 变化经 500ms debounce 落 localStorage。
  */
-import { ArrowLeftIcon, Redo2Icon, Undo2Icon } from "lucide-react";
+import { ArrowLeftIcon, DownloadIcon, Redo2Icon, Undo2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +17,7 @@ import { DesignTemplatePanel } from "@/components/design/design-template-panel";
 import { DesignRightPanel } from "@/components/design/design-right-panel";
 import { DesignTextPanel } from "@/components/design/design-text-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
+import { downloadBlob, exportDesignToBlob } from "@/lib/design/export-design";
 import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from "@/lib/design/doc";
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
 import { centerFragmentAt, scaleTemplateElements, viewportCenterToCanvas } from "@/lib/design/insert";
@@ -72,6 +73,9 @@ function DesignPageInner() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 画布容器：视口中心插入的取矩形基准（与 DesignCanvas 视口同一区域）。 */
   const canvasAreaRef = useRef<HTMLDivElement>(null);
+  /** 画布 surface：导出截图目标（布局尺寸 = doc 尺寸，视口缩放不影响输出）。 */
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [exportError, setExportError] = useState(false);
 
   // 草稿自动保存：doc 引用变化才排程（首渲染不保存），debounce 合并连续编辑。
   useEffect(() => {
@@ -93,6 +97,20 @@ function DesignPageInner() {
     },
     [],
   );
+
+  // 导出：清选中排除手柄后再截图（一次撤销语义不受影响），失败就地提示。
+  const handleDownload = async () => {
+    const node = surfaceRef.current;
+    if (!node) return;
+    setExportError(false);
+    dispatch({ type: "clearSelection" });
+    try {
+      const blob = await exportDesignToBlob(node, { width: state.doc.width, height: state.doc.height });
+      downloadBlob(blob, `design-${state.doc.width}x${state.doc.height}.png`);
+    } catch {
+      setExportError(true);
+    }
+  };
 
   /** 点击模版：等比缩放到画布宽度 + 重新生成 id（目录数据复用加载不冲突），整包替换进历史。 */
   const handleSelectTemplate = (template: DesignTemplate) => {
@@ -177,6 +195,22 @@ function DesignPageInner() {
         <span className="ml-auto text-xs text-muted-foreground" data-testid="design-save-status">
           {saveStatus === "saving" ? t("draftSaving") : saveStatus === "saved" ? t("draftSaved") : ""}
         </span>
+        {exportError && (
+          <span className="text-xs text-destructive" data-testid="design-export-error">
+            {t("downloadError")}
+          </span>
+        )}
+        <button
+          aria-label={t("download")}
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          data-testid="design-download"
+          onClick={handleDownload}
+          title={t("download")}
+          type="button"
+        >
+          <DownloadIcon className="size-4" />
+          {t("download")}
+        </button>
       </header>
 
       {/* 左栏 rail + 面板 + 中央画布（右侧属性面板由 5.5 接入） */}
@@ -196,7 +230,7 @@ function DesignPageInner() {
           </aside>
         )}
         <div className="relative min-h-0 flex-1" ref={canvasAreaRef}>
-          <DesignCanvas dispatch={dispatch} state={state} />
+          <DesignCanvas dispatch={dispatch} state={state} surfaceRef={surfaceRef} />
         </div>
         <DesignRightPanel dispatch={dispatch} state={state} />
       </div>

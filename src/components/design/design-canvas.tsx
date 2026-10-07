@@ -105,9 +105,12 @@ function MergedSelectionBox({ elements }: { elements: DesignElement[] }) {
 export function DesignCanvas({
   state,
   dispatch,
+  surfaceRef,
 }: {
   state: DesignState;
   dispatch: React.Dispatch<DesignAction>;
+  /** 画布 surface 外部引用：导出（6.1）截图目标节点。 */
+  surfaceRef?: React.Ref<HTMLDivElement>;
 }) {
   const t = useTranslations("design.canvas");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -411,6 +414,7 @@ export function DesignCanvas({
       <div
         className="absolute left-0 top-0 shadow-lg shadow-black/10"
         data-testid="design-canvas-surface"
+        ref={surfaceRef}
         style={{
           background: doc.background,
           height: doc.height,

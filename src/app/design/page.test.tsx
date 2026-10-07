@@ -4,7 +4,8 @@
  * 顶栏撤销/重做（4.5）：禁用态由历史栈驱动，多步回退链经真实 UI
  * 事件（拖动 → 顶栏按钮）往返验证；reducer 层 undo/redo 语义已在
  * design-reducer.test.ts 覆盖，此处只测接入。+
- * 左栏 rail/模版面板（5.1）与文字面板（5.2）：插入与字体隔离。
+ * 左栏 rail/模版面板（5.1）与文字面板（5.2）：插入与字体隔离。+
+ * 导出下载（6.1）：mock snapdom 封装，测清选中/文件名/失败就地提示。
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +14,13 @@ import { shapeElement, textElement } from "@/lib/design/elements";
 import { DEFAULT_FONT_FAMILY } from "@/lib/design/fonts";
 import { renderWithI18n } from "@/test/render-with-i18n";
 import DesignPage from "./page";
+
+// 导出走浏览器截图（jsdom 不具备），mock 封装层只测 page 接线。
+vi.mock("@/lib/design/export-design", () => ({
+  exportDesignToBlob: vi.fn(),
+  downloadBlob: vi.fn(),
+}));
+import { downloadBlob, exportDesignToBlob } from "@/lib/design/export-design";
 
 const searchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
@@ -352,5 +360,34 @@ describe("设计页花字", () => {
     expect(parseFloat(pos(id1).x) - parseFloat(before1.x)).toBeCloseTo(100);
     expect(parseFloat(pos(id1).y) - parseFloat(before1.y)).toBeCloseTo(20);
     expect(pos(id2)).toEqual(before2);
+  });
+});
+
+describe("设计页导出下载", () => {
+  it("点击下载：先清选中（排除手柄），以画布尺寸文件名导出 PNG", async () => {
+    vi.mocked(exportDesignToBlob).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+    seedDraft([
+      textElement({ id: "t1", content: "标题", x: 40, y: 40, w: 300, h: 80, fontSize: 40 }),
+    ]);
+    renderWithI18n(<DesignPage />);
+    fireEvent.pointerDown(elementEl("t1"), { button: 0, clientX: 5, clientY: 5, pointerId: 9 });
+    expect(screen.getByTestId("design-handles")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("design-download"));
+    await waitFor(() => expect(vi.mocked(downloadBlob)).toHaveBeenCalledTimes(1));
+    const call = vi.mocked(exportDesignToBlob).mock.calls[0][0] as HTMLElement;
+    expect(call.getAttribute("data-testid")).toBe("design-canvas-surface");
+    expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("design-800x800.png");
+    // 手柄已随清选中消失
+    expect(screen.queryByTestId("design-handles")).toBeNull();
+    expect(screen.queryByTestId("design-export-error")).toBeNull();
+  });
+
+  it("导出失败：就地错误提示且不触发下载", async () => {
+    vi.mocked(exportDesignToBlob).mockRejectedValue(new Error("boom"));
+    renderWithI18n(<DesignPage />);
+    fireEvent.click(screen.getByTestId("design-download"));
+    await waitFor(() => expect(screen.getByTestId("design-export-error")).toBeTruthy());
+    expect(vi.mocked(downloadBlob)).not.toHaveBeenCalled();
   });
 });

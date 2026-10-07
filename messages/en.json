@@ -300,7 +300,9 @@
       "redo": "Redo",
       "canvasSize": "{width} × {height} px",
       "draftSaving": "Saving…",
-      "draftSaved": "Draft saved"
+      "draftSaved": "Draft saved",
+      "download": "Download PNG",
+      "downloadError": "Export failed, please try again"
     },
     "rightPanel": {
       "canvasTitle": "Canvas",
