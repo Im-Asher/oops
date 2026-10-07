@@ -19,6 +19,7 @@ import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
 import { centerFragmentAt, scaleTemplateElements, viewportCenterToCanvas } from "@/lib/design/insert";
 import { ensureFontLoaded, type DesignFont } from "@/lib/design/fonts";
+import type { FancyTextPreset } from "@/lib/design/fancy-text";
 import type { DesignTemplate } from "@/lib/design/templates";
 import { fontSampleElement, textPresetElement, type TextPreset } from "@/lib/design/text-presets";
 
@@ -58,6 +59,7 @@ export default function DesignPage() {
 function DesignPageInner() {
   const t = useTranslations("design.page");
   const tText = useTranslations("design.textPanel");
+  const tFancy = useTranslations("design.fancy");
   const params = useSearchParams();
   const [state, dispatch] = useReducer(designReducer, params, initState);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -99,25 +101,30 @@ function DesignPageInner() {
     });
   };
 
-  /** 视口中心插入单元素：包围盒中心对齐视口中心，插入后选中（一次撤销粒度）。 */
-  const insertAtViewportCenter = (element: DesignElement) => {
+  /** 视口中心插入元素组：整组包围盒中心对齐视口中心，插入后全部选中（一次撤销粒度）。 */
+  const insertAtViewportCenter = (elements: DesignElement[]) => {
     const rect = canvasAreaRef.current?.getBoundingClientRect();
     const viewport = { width: rect?.width ?? 0, height: rect?.height ?? 0 };
     const center = viewportCenterToCanvas(viewport, state.view);
-    const [placed] = centerFragmentAt([element], center);
-    if (!placed) return;
-    dispatch({ type: "addElements", elements: [placed], select: true });
+    const placed = centerFragmentAt(elements, center);
+    if (placed.length > 0) dispatch({ type: "addElements", elements: placed, select: true });
   };
 
   const handleSelectTextPreset = (preset: TextPreset) => {
-    insertAtViewportCenter(textPresetElement(preset, tText(`presets.${preset.id}.sample`)));
+    insertAtViewportCenter([textPresetElement(preset, tText(`presets.${preset.id}.sample`))]);
   };
 
   // 插入前预热字重（失败静默：font-display swap 兜底），就绪后落画布立即正确渲染。
   const handleSelectFont = (font: DesignFont) => {
     void ensureFontLoaded(font).then(() => {
-      insertAtViewportCenter(fontSampleElement(font, tText("fontSample")));
+      insertAtViewportCenter([fontSampleElement(font, tText("fontSample"))]);
     });
+  };
+
+  // 花字松散插入：文案按词典解析后整组入画布，select 多选整组（可整体拖动、单元素可再选）。
+  const handleSelectFancy = (preset: FancyTextPreset) => {
+    const contents = preset.contentKeys.map((key) => tFancy(key));
+    insertAtViewportCenter(preset.build(contents));
   };
 
   return (
@@ -172,7 +179,11 @@ function DesignPageInner() {
           <aside className="w-60 shrink-0 overflow-y-auto border-r border-border p-3" data-testid="design-panel">
             {activePanel === "templates" && <DesignTemplatePanel onSelect={handleSelectTemplate} />}
             {activePanel === "text" && (
-              <DesignTextPanel onSelectFont={handleSelectFont} onSelectPreset={handleSelectTextPreset} />
+              <DesignTextPanel
+                onSelectFancy={handleSelectFancy}
+                onSelectFont={handleSelectFont}
+                onSelectPreset={handleSelectTextPreset}
+              />
             )}
           </aside>
         )}

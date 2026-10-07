@@ -214,19 +214,19 @@ describe("设计页左栏 rail 与模版面板", () => {
   });
 });
 
+/** 画布内全部元素节点（缩略图不计入）。 */
+function canvasElements(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll('[data-testid="design-canvas-surface"] [data-design-element]'),
+  ) as HTMLElement[];
+}
+
+function openTextPanel() {
+  fireEvent.click(screen.getByTestId("design-rail-text"));
+  expect(screen.getByTestId("design-text-preset-title")).toBeTruthy();
+}
+
 describe("设计页文字面板", () => {
-  /** 画布内全部元素节点（缩略图不计入）。 */
-  function canvasElements(): HTMLElement[] {
-    return Array.from(
-      document.querySelectorAll('[data-testid="design-canvas-surface"] [data-design-element]'),
-    ) as HTMLElement[];
-  }
-
-  function openTextPanel() {
-    fireEvent.click(screen.getByTestId("design-rail-text"));
-    expect(screen.getByTestId("design-text-preset-title")).toBeTruthy();
-  }
-
   it("rail 切换到文字面板：三预设与字体列表渲染，预览以对应样式/字体渲染", () => {
     renderWithI18n(<DesignPage />);
     openTextPanel();
@@ -283,3 +283,74 @@ describe("设计页文字面板", () => {
   });
 });
 
+describe("设计页花字", () => {
+  it("文字面板花字区渲染三卡：缩略以缩小实时渲染元素组", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    for (const id of ["pill", "point", "blast"]) {
+      const card = screen.getByTestId(`design-fancy-${id}`);
+      expect(card.querySelectorAll("[data-design-element]").length).toBeGreaterThan(0);
+    }
+    // blast 两元素：胶囊角标 + 大价格
+    expect(screen.getByTestId("design-fancy-blast").querySelectorAll("[data-design-element]").length).toBe(2);
+  });
+
+  it("点击爆点价格花字：两元素松散入画布并自动多选整组（一次撤销回空）", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    expect(canvasElements().length).toBe(0);
+
+    fireEvent.click(screen.getByTestId("design-fancy-blast"));
+    const elements = canvasElements();
+    expect(elements.length).toBe(2);
+    // 自动多选：合并选择框出现
+    expect(screen.getByTestId("design-selection-box")).toBeTruthy();
+    expect((screen.getByTestId("design-undo") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("design-undo"));
+    expect(canvasElements().length).toBe(0);
+  });
+
+  it("多选态拖动任一元素：整组跟随移动且相对位置不变", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    fireEvent.click(screen.getByTestId("design-fancy-blast"));
+
+    const [first, second] = canvasElements();
+    const id1 = first.getAttribute("data-design-element") as string;
+    const id2 = second.getAttribute("data-design-element") as string;
+    const before = { p1: pos(id1), p2: pos(id2) };
+
+    drag(id1, { x: 10, y: 10 }, { x: 60, y: 25 }, 1);
+    const after = { p1: pos(id1), p2: pos(id2) };
+    const dx1 = parseFloat(after.p1.x) - parseFloat(before.p1.x);
+    const dy1 = parseFloat(after.p1.y) - parseFloat(before.p1.y);
+    const dx2 = parseFloat(after.p2.x) - parseFloat(before.p2.x);
+    const dy2 = parseFloat(after.p2.y) - parseFloat(before.p2.y);
+    expect(dx1).toBeCloseTo(50);
+    expect(dy1).toBeCloseTo(15);
+    // 整组同位移 → 相对位置不变
+    expect(dx2).toBeCloseTo(dx1);
+    expect(dy2).toBeCloseTo(dy1);
+  });
+
+  it("shift 单选组内一个元素：合并框消失，拖动仅移动该元素", () => {
+    renderWithI18n(<DesignPage />);
+    openTextPanel();
+    fireEvent.click(screen.getByTestId("design-fancy-blast"));
+    expect(screen.getByTestId("design-selection-box")).toBeTruthy();
+
+    const [first, second] = canvasElements();
+    const id1 = first.getAttribute("data-design-element") as string;
+    const id2 = second.getAttribute("data-design-element") as string;
+    fireEvent.pointerDown(first, { button: 0, clientX: 5, clientY: 5, pointerId: 3, shiftKey: true });
+    expect(screen.queryByTestId("design-selection-box")).toBeNull();
+
+    const before1 = pos(id1);
+    const before2 = pos(id2);
+    drag(id1, { x: 20, y: 20 }, { x: 120, y: 40 }, 4);
+    expect(parseFloat(pos(id1).x) - parseFloat(before1.x)).toBeCloseTo(100);
+    expect(parseFloat(pos(id1).y) - parseFloat(before1.y)).toBeCloseTo(20);
+    expect(pos(id2)).toEqual(before2);
+  });
+});

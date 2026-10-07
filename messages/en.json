@@ -339,6 +339,22 @@
       "fonts": {
         "smiley-sans": "Smiley Sans",
         "lxgw-wenkai": "LXGW WenKai"
+      },
+      "fancyTitle": "Fancy text"
+    },
+    "fancy": {
+      "pill": {
+        "name": "Pill label",
+        "text": "Limited Offer"
+      },
+      "point": {
+        "name": "Selling point",
+        "text": "Best seller in store"
+      },
+      "blast": {
+        "name": "Price blast",
+        "label": "Save",
+        "price": "$59"
       }
     },
     "dialog": {

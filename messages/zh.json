@@ -339,6 +339,22 @@
       "fonts": {
         "smiley-sans": "得意黑",
         "lxgw-wenkai": "霞鹜文楷"
+      },
+      "fancyTitle": "花字"
+    },
+    "fancy": {
+      "pill": {
+        "name": "胶囊标签",
+        "text": "限时直降"
+      },
+      "point": {
+        "name": "卖点条目",
+        "text": "门店同款热卖中"
+      },
+      "blast": {
+        "name": "爆点价格",
+        "label": "立减",
+        "price": "¥59"
       }
     },
     "dialog": {

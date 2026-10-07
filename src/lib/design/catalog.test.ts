@@ -33,7 +33,7 @@ describe("花字预设目录", () => {
 
   it("促销大字消费两个文案（label + price）", () => {
     const blast = FANCY_TEXT_PRESETS.find((p) => p.id === "blast");
-    expect(blast?.contentKeys).toEqual(["label", "price"]);
+    expect(blast?.contentKeys).toEqual(["blast.label", "blast.price"]);
     const elements = blast?.build(["直降", "¥99"]) ?? [];
     expect(elements.length).toBe(2);
   });
