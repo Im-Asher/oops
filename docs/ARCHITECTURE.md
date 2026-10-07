@@ -29,7 +29,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
 | 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
-| 前端骨架 | 双页结构：`/home` 轻量落地页（侧栏导航 + 创作输入/Agent 卡片入口）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
+| 前端骨架 | 三页结构：`/home` 轻量落地页（侧栏导航 + 创作输入/Agent 卡片入口 + 创建设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
 | 主题 | 手写 ThemeProvider（零依赖）：html `dark` class 切换 + localStorage（`oops-theme`）持久化 + layout 首屏阻塞脚本防闪烁；明暗两套 CSS token |
 | i18n | next-intl cookie 模式（无 URL 路由）：zh/en 双语；层 A UI 文案进词典，层 B LLM 文本由 agent 语言跟随；防回流 = typed messages + lint 禁裸中文 + zh↔en 键对齐单测 |
 
@@ -164,10 +164,12 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布可用，未实现项置灰禁用；主区创作横幅、
+**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，未实现项置灰禁用；主区创作横幅、
 创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
-左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/chat` 页面级
-`redirect("/canvas")` 保存量入口。窄屏（md 以下）聊天与画布互斥切换显示。
+左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
+（顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
+触发，携 `?w=&h=` 建页）+ `/chat` 页面级 `redirect("/canvas")` 保存量入口。窄屏（md 以下）
+聊天与画布互斥切换显示。
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -301,6 +303,7 @@ oops/
 │   │   ├── files/[...path]/route.ts # 资产代理读取（登录后，安全响应头）
 │   │   ├── upload/route.ts         # 图片上传（requireUser + MIME 白名单 + 大小上限；purpose=reference 参考图分支，绑定会话不写消息）
 │   │   ├── chat/page.tsx           # 画布工作台页（顶栏 + 工具条 + 可收起聊天 340px + 画布平面；会话抽屉覆盖层；窄屏聊天/画布互斥切换）
+│   ├── design/page.tsx         # 设计工作台页（reducer 状态 + 顶栏/左轨/画布/面板组合 + localStorage 草稿；尺寸前置弹窗入口在 /home）
 │   │   ├── profile/page.tsx        # 个人信息页（基本资料卡 + 改密卡，proxy 保护）
 │   │   └── api/
 │   │       ├── agents/route.ts     # GET 已注册 Agent 元数据
@@ -337,10 +340,11 @@ oops/
 │   │       └── tools/              # ToolRegistry（ToolExecutionContext 注入 userId）+ 工具实现
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
 │   │   ├── canvas/                 # 画布工作台（多作品平面 stage / 编辑工具条 / 滤镜面板 / 裁剪 / 空态）
+│   │   ├── design/                 # 设计工作台（缩放适配画布 surface / 选中手柄 / 左轨 / 模版-素材-文字面板 / 尺寸前置弹窗）
 │   │   ├── workbench/              # 工作台骨架（顶栏（会话名/保存状态/导出）/ 56px 工具条（会话抽屉、聊天显隐、底部用户入口）/ 会话抽屉）
 │   │   └── chat/                   # 聊天面板与消息渲染（摘要 chip / 双形态 composer）
 │   ├── i18n/                       # next-intl 装配（client-safe）：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型
-│   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储 + 单测）
+│   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
 │   └── types/                      # 共享 TypeScript 类型
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
 ├── drizzle.config.ts               # drizzle-kit 配置（加载 .env.local）
