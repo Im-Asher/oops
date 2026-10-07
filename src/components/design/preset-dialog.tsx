@@ -148,7 +148,10 @@ export function PresetDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent aria-describedby={undefined} className="flex max-w-2xl gap-0 p-0">
+      {/* sm:max-w-2xl 必须带 variant：基础组件的 sm:max-w-sm 在 ≥sm 视口按 CSS
+          输出顺序覆盖无 variant 的 max-w-2xl，弹窗会被压成 384px，双栏挤压、
+          预设网格溢出弹窗边界（卡片悬在遮罩上，点击即误关）。 */}
+      <DialogContent aria-describedby={undefined} className="flex max-w-2xl gap-0 p-0 sm:max-w-2xl">
         {/* 左侧分类 */}
         <div className="w-40 shrink-0 border-r border-border bg-sidebar p-2">
           {(["all", "common", "ecom", "social", "recent"] as CategoryId[]).map((id) => (
