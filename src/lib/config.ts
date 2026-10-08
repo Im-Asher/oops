@@ -14,15 +14,16 @@ const envSchema = z.object({
       (v) => v.startsWith("postgres://") || v.startsWith("postgresql://"),
       "DATABASE_URL 必须是 postgresql 连接串",
     ),
-  MINIO_ENDPOINT: z.string().min(1, "MINIO_ENDPOINT 缺失"),
-  MINIO_PORT: z.coerce.number().int().positive().default(9000),
-  MINIO_USE_SSL: z
+  // S3 兼容对象存储：全部后端专属参数只经 env 配置，代码零硬编码（asset-storage spec）
+  S3_ENDPOINT: z.string().url("S3_ENDPOINT 必须是完整 URL"),
+  S3_REGION: z.string().min(1, "S3_REGION 缺失"),
+  S3_ACCESS_KEY: z.string().min(1, "S3_ACCESS_KEY 缺失"),
+  S3_SECRET_KEY: z.string().min(1, "S3_SECRET_KEY 缺失"),
+  S3_BUCKET: z.string().min(1, "S3_BUCKET 缺失"),
+  S3_FORCE_PATH_STYLE: z
     .enum(["true", "false"])
-    .default("false")
+    .default("true")
     .transform((v) => v === "true"),
-  MINIO_ACCESS_KEY: z.string().min(1, "MINIO_ACCESS_KEY 缺失"),
-  MINIO_SECRET_KEY: z.string().min(1, "MINIO_SECRET_KEY 缺失"),
-  MINIO_BUCKET: z.string().min(1, "MINIO_BUCKET 缺失"),
   QWEN_TOKEN_PLAN_CN_API_KEY: z.string().min(1).optional(),
   OWNER_ID: z.string().min(1).default("owner"),
   // 会话 cookie 签名密钥；长度下限保证离线暴力破解不可行
