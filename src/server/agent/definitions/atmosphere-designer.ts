@@ -11,11 +11,8 @@ export const atmosphereDesigner = defineAgent({
   name: "氛围图设计师",
   description: "专注氛围/场景图与产品图的文生图助手，调用 generate_image 把描述变成图片。",
   icon: "🌄",
-  presets: [
-    "生成一张秋天树林里木桌旁的场景氛围图，暖色调逆光",
-    "为家居品牌生成一张客厅场景图，米色沙发配绿植，午后阳光",
-    "生成一张海边日落时分的野餐场景图，电影感构图",
-  ],
+  // 灵感卡 presets 为词典 key（chat.presets.<agentId>.<key>），/api/agents 按请求 locale 解析为文案。
+  presets: ["autumnWood", "loungeScene", "beachPicnic"],
   tools: ["generate_image"],
   systemPrompt,
 });

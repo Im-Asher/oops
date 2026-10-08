@@ -2,9 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiErrorMessage } from "@/lib/api-error";
 import { resolveDisplayName } from "@/lib/nickname";
 import { cn } from "cn";
 import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -23,11 +25,7 @@ interface Feedback {
   message: string;
 }
 
-const GENDER_OPTIONS: { value: Gender; label: string }[] = [
-  { value: "secret", label: "保密" },
-  { value: "male", label: "男" },
-  { value: "female", label: "女" },
-];
+const GENDER_VALUES: Gender[] = ["secret", "male", "female"];
 
 function FeedbackLine({ feedback }: { feedback: Feedback | null }) {
   if (!feedback) return null;
@@ -60,6 +58,7 @@ function PasswordField({
   required?: boolean;
   value: string;
 }) {
+  const t = useTranslations("profile.password");
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
@@ -74,7 +73,7 @@ function PasswordField({
         value={value}
       />
       <button
-        aria-label={visible ? "隐藏密码" : "显示密码"}
+        aria-label={visible ? t("hide") : t("show")}
         aria-pressed={visible}
         className="absolute inset-y-0 right-0 my-auto mr-1 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={() => setVisible((v) => !v)}
@@ -88,6 +87,8 @@ function PasswordField({
 
 /** 个人信息页：身份头卡 + 基本信息卡（资料维护）+ 安全信息卡（改密），lg 起双栏。proxy 保护非公开路径，此处仅做 401 兜底跳转。 */
 export default function ProfilePage() {
+  const t = useTranslations("profile");
+  const tApi = useTranslations("common.apiErrors");
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [copied, setCopied] = useState(false);
@@ -153,11 +154,14 @@ export default function ProfilePage() {
         router.replace("/login");
         return;
       }
-      const body = await res.json().catch(() => null);
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
       if (!res.ok) {
         setSaveFeedback({
           kind: "error",
-          message: body?.error?.message ?? "保存失败，请稍后再试",
+          // code 已登记 → 词典文案；未登记（如 zod 动态消息）→ server message 兜底
+          message: apiErrorMessage(body?.error, tApi, t("saveFailed")),
         });
         return;
       }
@@ -165,9 +169,9 @@ export default function ProfilePage() {
       setProfile(updated);
       setDisplayName(updated.displayName ?? "");
       setBio(updated.bio ?? "");
-      setSaveFeedback({ kind: "ok", message: "已保存" });
+      setSaveFeedback({ kind: "ok", message: t("saved") });
     } catch {
-      setSaveFeedback({ kind: "error", message: "网络异常，请稍后再试" });
+      setSaveFeedback({ kind: "error", message: t("networkError") });
     } finally {
       setSaving(false);
     }
@@ -176,7 +180,7 @@ export default function ProfilePage() {
   async function onChangePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setPasswordFeedback({ kind: "error", message: "两次输入的新密码不一致" });
+      setPasswordFeedback({ kind: "error", message: t("password.mismatch") });
       return;
     }
     setChanging(true);
@@ -191,11 +195,13 @@ export default function ProfilePage() {
         router.replace("/login");
         return;
       }
-      const body = await res.json().catch(() => null);
+      const body = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
       if (!res.ok) {
         setPasswordFeedback({
           kind: "error",
-          message: body?.error?.message ?? "修改失败，请稍后再试",
+          message: apiErrorMessage(body?.error, tApi, t("password.changeFailed")),
         });
         return;
       }
@@ -205,10 +211,10 @@ export default function ProfilePage() {
       // 响应已下发新 cookie：当前端保持登录，其他端被踢
       setPasswordFeedback({
         kind: "ok",
-        message: "密码已修改，其他设备的登录已全部下线",
+        message: t("password.changedAllSignedOut"),
       });
     } catch {
-      setPasswordFeedback({ kind: "error", message: "网络异常，请稍后再试" });
+      setPasswordFeedback({ kind: "error", message: t("networkError") });
     } finally {
       setChanging(false);
     }
@@ -217,7 +223,7 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-        <p className="text-sm text-muted-foreground">加载中…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       </div>
     );
   }
@@ -229,11 +235,11 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-muted/30">
       <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-10">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          个人信息
+          {t("title")}
         </h1>
 
         <section
-          aria-label="账号身份"
+          aria-label={t("identityLabel")}
           className="flex items-center gap-4 rounded-xl border border-border bg-card p-6 shadow-sm"
         >
           <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
@@ -246,7 +252,7 @@ export default function ProfilePage() {
           <div className="flex shrink-0 items-center gap-1.5">
             <p className="font-mono text-sm text-foreground">oops_{profile.oopsId}</p>
             <Button
-              aria-label="复制 oops ID"
+              aria-label={t("copyOopsId")}
               size="icon-sm"
               variant="ghost"
               onClick={() => void copyOopsId()}
@@ -258,18 +264,18 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <section
-            aria-label="基本信息"
+            aria-label={t("basicTitle")}
             className="flex flex-col space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
           >
             <div className="space-y-1">
-              <h2 className="text-sm font-medium text-foreground">基本信息</h2>
-              <p className="text-xs text-muted-foreground">设置你的昵称、性别与个性签名</p>
+              <h2 className="text-sm font-medium text-foreground">{t("basicTitle")}</h2>
+              <p className="text-xs text-muted-foreground">{t("basicDescription")}</p>
             </div>
 
             <form className="flex flex-1 flex-col space-y-4" onSubmit={onSaveProfile}>
               <div className="space-y-2">
                 <label htmlFor="displayName" className="text-sm font-medium text-foreground">
-                  昵称
+                  {t("displayName")}
                 </label>
                 <Input
                   id="displayName"
@@ -278,31 +284,31 @@ export default function ProfilePage() {
                   maxLength={20}
                   placeholder={nickname}
                 />
-                <p className="text-xs text-muted-foreground">清空保存即恢复默认昵称</p>
+                <p className="text-xs text-muted-foreground">{t("displayNameHint")}</p>
               </div>
 
               <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">性别</span>
+                <span className="text-sm font-medium text-foreground">{t("gender.label")}</span>
                 <div
-                  aria-label="性别"
+                  aria-label={t("gender.label")}
                   className="flex rounded-lg border border-border p-1"
                   role="radiogroup"
                 >
-                  {GENDER_OPTIONS.map((opt) => (
+                  {GENDER_VALUES.map((value) => (
                     <button
-                      key={opt.value}
-                      aria-checked={gender === opt.value}
+                      key={value}
+                      aria-checked={gender === value}
                       className={cn(
                         "flex-1 rounded-md px-3 py-1.5 text-sm transition-colors",
-                        gender === opt.value
+                        gender === value
                           ? "bg-primary/10 font-medium text-foreground"
                           : "text-muted-foreground hover:bg-muted",
                       )}
-                      onClick={() => setGender(opt.value)}
+                      onClick={() => setGender(value)}
                       role="radio"
                       type="button"
                     >
-                      {opt.label}
+                      {t(`gender.${value}`)}
                     </button>
                   ))}
                 </div>
@@ -310,39 +316,39 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <label htmlFor="bio" className="text-sm font-medium text-foreground">
-                  个性签名
+                  {t("bio")}
                 </label>
                 <Input
                   id="bio"
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   maxLength={60}
-                  placeholder="选填，清空即移除"
+                  placeholder={t("bioPlaceholder")}
                 />
               </div>
 
               <div className="mt-auto space-y-4">
                 <FeedbackLine feedback={saveFeedback} />
                 <Button className="w-full" disabled={saving} type="submit">
-                  {saving ? "保存中…" : "保存"}
+                  {saving ? t("saving") : t("save")}
                 </Button>
               </div>
             </form>
           </section>
 
           <section
-            aria-label="安全信息"
+            aria-label={t("securityTitle")}
             className="flex flex-col space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm"
           >
             <div className="space-y-1">
-              <h2 className="text-sm font-medium text-foreground">安全信息</h2>
-              <p className="text-xs text-muted-foreground">修改密码后，其他设备的登录将全部下线</p>
+              <h2 className="text-sm font-medium text-foreground">{t("securityTitle")}</h2>
+              <p className="text-xs text-muted-foreground">{t("securityDescription")}</p>
             </div>
 
             <form className="flex flex-1 flex-col space-y-4" onSubmit={onChangePassword}>
               <div className="space-y-2">
                 <label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
-                  当前密码
+                  {t("currentPassword")}
                 </label>
                 <PasswordField
                   autoComplete="current-password"
@@ -355,7 +361,7 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <label htmlFor="newPassword" className="text-sm font-medium text-foreground">
-                  新密码
+                  {t("newPassword")}
                 </label>
                 <PasswordField
                   autoComplete="new-password"
@@ -365,12 +371,12 @@ export default function ProfilePage() {
                   required
                   value={newPassword}
                 />
-                <p className="text-xs text-muted-foreground">至少 8 位</p>
+                <p className="text-xs text-muted-foreground">{t("passwordHint")}</p>
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-                  确认新密码
+                  {t("confirmPassword")}
                 </label>
                 <PasswordField
                   autoComplete="new-password"
@@ -384,7 +390,7 @@ export default function ProfilePage() {
               <div className="mt-auto space-y-4">
                 <FeedbackLine feedback={passwordFeedback} />
                 <Button className="w-full" disabled={changing} type="submit">
-                  {changing ? "修改中…" : "修改密码"}
+                  {changing ? t("password.changing") : t("password.change")}
                 </Button>
               </div>
             </form>

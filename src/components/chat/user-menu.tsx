@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { resolveDisplayName } from "@/lib/nickname";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,6 +33,7 @@ function isProfileSummary(value: unknown): value is ProfileSummary {
  * 摘要随组件挂载拉取一次即可（账号信息变更频率极低）。
  */
 export function UserMenuContent() {
+  const t = useTranslations("chat.userMenu");
   const router = useRouter();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -76,7 +78,7 @@ export function UserMenuContent() {
         </>
       ) : null}
       <DropdownMenuItem asChild>
-        <Link href="/profile">个人信息</Link>
+        <Link href="/profile">{t("profile")}</Link>
       </DropdownMenuItem>
       <DropdownMenuItem
         className="text-red-400 focus:text-red-300"
@@ -87,7 +89,7 @@ export function UserMenuContent() {
         }}
       >
         <LogOutIcon />
-        {loggingOut ? "退出中…" : "退出登录"}
+        {loggingOut ? t("loggingOut") : t("logout")}
       </DropdownMenuItem>
     </>
   );
@@ -97,6 +99,7 @@ export function UserMenuContent() {
  * 用户入口（原工具条底部）：头像触发 + 用户菜单内容。
  */
 export function UserMenu() {
+  const t = useTranslations("chat.userMenu");
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
 
   useEffect(() => {
@@ -119,7 +122,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label="用户菜单"
+          aria-label={t("label")}
           className="size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground"
           size="icon"
           variant="ghost"

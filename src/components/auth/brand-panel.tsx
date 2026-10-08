@@ -1,14 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Image, { type StaticImageData } from "next/image";
 import { useState } from "react";
 
 import sampleProduct01 from "../../../public/samples/sample-product-01.webp";
 import sampleScene01 from "../../../public/samples/sample-scene-01.webp";
 import sampleScene02 from "../../../public/samples/sample-scene-02.webp";
-
-const HEADLINE = "用说话的方式，得到能直接上架的电商图片";
-const EXPERT_LINE = "驻场氛围图设计师 · 场景图 / 产品图";
 
 function SampleImage({
   src,
@@ -45,19 +43,21 @@ function SampleImage({
 }
 
 export function AuthBrandPanel() {
+  const t = useTranslations("auth.brand");
+
   return (
     <>
       {/* 窄视口：顶部紧凑条 */}
       <header className="flex items-center justify-between gap-4 border-b border-border/60 px-5 py-4 md:hidden">
         <p className="text-base font-semibold tracking-tight text-foreground">oops</p>
         <p className="min-w-0 flex-1 text-right text-xs leading-snug text-muted-foreground">
-          {HEADLINE}
+          {t("headline")}
         </p>
       </header>
 
       {/* md+：左侧品牌面板（约 55/45 分屏） */}
       <aside
-        aria-label="产品介绍"
+        aria-label={t("panelLabel")}
         className="relative hidden flex-col justify-between overflow-hidden border-r border-border/60 p-10 md:flex md:w-[55%] lg:p-14 xl:p-16"
       >
         <div
@@ -66,18 +66,18 @@ export function AuthBrandPanel() {
         />
         <div className="animate-in fade-in duration-200">
           <p className="text-lg font-semibold tracking-tight text-foreground">oops</p>
-          <p className="text-sm text-muted-foreground">AI 电商图像工作台</p>
+          <p className="text-sm text-muted-foreground">{t("tagline")}</p>
         </div>
         <div className="animate-in fade-in duration-200">
           <h1 className="max-w-xl text-4xl font-semibold leading-tight tracking-tight text-foreground xl:text-5xl xl:leading-tight">
-            {HEADLINE}
+            {t("headline")}
           </h1>
         </div>
         <div className="grid h-[min(380px,45vh)] grid-cols-5 grid-rows-2 gap-3 animate-in fade-in duration-200 xl:h-[min(440px,48vh)]">
           <div className="relative col-span-3 row-span-2">
             <SampleImage
               src={sampleScene01}
-              alt="晨光木桌上的白瓷杯咖啡场景图"
+              alt={t("sampleSceneAlt1")}
               sizes="(min-width: 1280px) 40rem, 34rem"
               priority
             />
@@ -85,21 +85,21 @@ export function AuthBrandPanel() {
           <div className="relative col-span-2">
             <SampleImage
               src={sampleScene02}
-              alt="拿铁心形拉花特写氛围图"
+              alt={t("sampleSceneAlt2")}
               sizes="(min-width: 1280px) 24rem, 20rem"
             />
           </div>
           <div className="relative col-span-2">
             <SampleImage
               src={sampleProduct01}
-              alt="白底红苹果产品图"
+              alt={t("sampleProductAlt")}
               sizes="(min-width: 1280px) 24rem, 20rem"
             />
           </div>
         </div>
         <p className="text-sm text-muted-foreground animate-in fade-in duration-200">
-          {EXPERT_LINE}
-          <span className="ml-2 text-xs text-muted-foreground">示例图均由 oops 生成</span>
+          {t("expertLine")}
+          <span className="ml-2 text-xs text-muted-foreground">{t("samplesNote")}</span>
         </p>
       </aside>
     </>

@@ -20,6 +20,7 @@ import { centerViewOn, fitView, panView, zoomAtPoint } from "@/lib/canvas/coords
 import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
 import { itemRect } from "@/lib/canvas/layout";
 import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const ZOOM_STEP = 1.2;
@@ -54,6 +55,7 @@ function CanvasItemView({
   onImageLoad: (item: CanvasItem, aspect: number) => void;
   onRetry?: (item: CanvasItem) => void;
 }) {
+  const t = useTranslations("canvas.stage");
   return (
     <div
       className={`absolute overflow-hidden rounded-lg border border-border/80 bg-popover ${
@@ -80,7 +82,7 @@ function CanvasItemView({
       {item.status === "image" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          alt={item.name ?? "画布作品"}
+          alt={item.name ?? t("itemAlt")}
           className="size-full object-cover"
           draggable={false}
           loading="lazy"
@@ -103,19 +105,19 @@ function CanvasItemView({
       ) : item.status === "generating" ? (
         <div className="flex size-full flex-col items-center justify-center gap-2 border-dashed p-3 text-center">
           <LoaderCircleIcon className="size-5 animate-spin text-muted-foreground" />
-          <p className="text-xs text-foreground/80">生成中…</p>
+          <p className="text-xs text-foreground/80">{t("generating")}</p>
           {item.prompt ? <p className="line-clamp-2 text-xs text-muted-foreground/80">{item.prompt}</p> : null}
         </div>
       ) : (
         <div className="flex size-full flex-col items-center justify-center gap-2 border-red-900/60 p-3 text-center">
           <TriangleAlertIcon className="size-5 text-red-400" />
-          <p className="text-xs text-red-200">生成失败</p>
+          <p className="text-xs text-red-200">{t("failed")}</p>
           {item.errorMessage ? (
             <p className="line-clamp-2 text-xs text-muted-foreground/80">{item.errorMessage}</p>
           ) : null}
           {onRetry ? (
             <Button
-              aria-label="重试生成"
+              aria-label={t("retryAria")}
               className="mt-1 h-7 rounded-md bg-red-500/15 px-2.5 text-xs text-red-200 hover:bg-red-500/25"
               onClick={(event) => {
                 // 阻止冒泡：重试不应触发画布拖拽/选中
@@ -125,7 +127,7 @@ function CanvasItemView({
               size="sm"
               variant="ghost"
             >
-              重试
+              {t("retry")}
             </Button>
           ) : null}
         </div>
@@ -147,6 +149,7 @@ export function CanvasStage({
   onResetEdits,
   onRetryItem,
 }: CanvasStageProps) {
+  const t = useTranslations("canvas.stage");
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef(state.view);
   const cropSessionRef = useRef(false);
@@ -409,7 +412,7 @@ export function CanvasStage({
       onPointerCancel={handlePointerUp}
       ref={containerRef}
       role="application"
-      aria-label="画布，可缩放、平移与拖动作品"
+      aria-label={t("label")}
       tabIndex={0}
     >
       {items.length === 0 ? (
@@ -472,7 +475,7 @@ export function CanvasStage({
             size="sm"
             variant="ghost"
           >
-            取消
+            {t("cancel")}
           </Button>
           <Button
             className="min-h-11 px-3 text-xs"
@@ -480,7 +483,7 @@ export function CanvasStage({
             onClick={confirmCropping}
             size="sm"
           >
-            确认裁剪
+            {t("confirmCrop")}
           </Button>
         </div>
       ) : (

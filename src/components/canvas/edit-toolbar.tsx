@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { CropIcon, RotateCcwIcon, SlidersHorizontalIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface EditToolbarProps {
   cropping: boolean;
@@ -21,6 +22,7 @@ export function EditToolbar({
   onToggleCrop,
   onToggleFilters,
 }: EditToolbarProps) {
+  const t = useTranslations("canvas.editToolbar");
   return (
     <div
       className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-full border border-border bg-popover px-1.5 py-1 shadow-lg shadow-black/30"
@@ -28,7 +30,7 @@ export function EditToolbar({
       onPointerDown={(event) => event.stopPropagation()}
     >
       <Button
-        aria-label="裁剪模式"
+        aria-label={t("cropMode")}
         aria-pressed={cropping}
         className="min-h-11 min-w-11 text-foreground hover:bg-accent"
         onClick={onToggleCrop}
@@ -38,7 +40,7 @@ export function EditToolbar({
         <CropIcon />
       </Button>
       <Button
-        aria-label="滤镜面板"
+        aria-label={t("filterPanel")}
         aria-pressed={filtersOpen}
         className="min-h-11 min-w-11 text-foreground hover:bg-accent"
         onClick={onToggleFilters}
@@ -49,7 +51,7 @@ export function EditToolbar({
       </Button>
       {!cropping ? (
         <Button
-          aria-label="重置编辑"
+          aria-label={t("resetEdits")}
           className="min-h-11 min-w-11 text-foreground hover:bg-accent"
           disabled={!dirty}
           onClick={onResetEdits}

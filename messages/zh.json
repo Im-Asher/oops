@@ -1,0 +1,447 @@
+{
+  "common": {
+    "metadata": {
+      "title": "oops · AI 电商图像工作台",
+      "description": "描述需求，生成商品详情图、海报与场景图"
+    },
+    "apiErrors": {
+      "unauthenticated": "请先登录",
+      "rateLimited": "尝试太频繁了，请稍后再试",
+      "badJson": "请求体需为 JSON",
+      "badForm": "请求体须为 multipart/form-data",
+      "noFile": "缺少 file 字段",
+      "noSession": "参考图上传需要 sessionId",
+      "notFound": "会话不存在",
+      "invalidCredentials": "用户名或密码不正确",
+      "usernameTaken": "用户名已存在",
+      "inviteCodeInvalid": "邀请码无效或已被使用",
+      "wrongPassword": "当前密码不正确",
+      "assetCleanupFailed": "会话资产清理失败，请稍后重试",
+      "invalidAgent": "Agent 不存在",
+      "invalidReference": "引用的图片不存在或无权使用",
+      "tooLarge": "文件过大",
+      "unsupportedType": "不支持的文件类型"
+    },
+    "localeToggle": {
+      "label": "切换语言"
+    },
+    "theme": {
+      "toLight": "切换为亮色模式",
+      "toDark": "切换为暗色模式"
+    }
+  },
+  "home": {
+    "comingSoon": "敬请期待",
+    "buildVersion": "构建版本 {version}",
+    "mainNav": "主导航",
+    "navHome": "首页",
+    "groupCreate": "创建",
+    "navCanvas": "AI 画布",
+    "navCreateDesign": "创建设计",
+    "groupLibrary": "库",
+    "navPortfolio": "作品集",
+    "navAssets": "素材库",
+    "navMessages": "消息中心",
+    "navSettings": "设置",
+    "headline": "用一句话，生成电商好图",
+    "subheadline": "描述你的商品与场景，AI 画布替你完成主图、详情与氛围图。",
+    "fileErrorNonImage": "仅支持图片，{count} 个文件未添加",
+    "fileErrorOverflow": "最多 5 个附件，超出 {count} 个未添加",
+    "fileErrorSeparator": "；"
+  },
+  "canvas": {
+    "emptyState": {
+      "title": "画布还是空的",
+      "description": "在聊天里描述你想要的图片，生成结果会直接出现在画布上；也可通过输入框旁的附件按钮上传参考图"
+    },
+    "editToolbar": {
+      "cropMode": "裁剪模式",
+      "filterPanel": "滤镜面板",
+      "resetEdits": "重置编辑"
+    },
+    "viewToolbar": {
+      "zoomOut": "缩小",
+      "fitReset": "重置为适应画布",
+      "zoomIn": "放大",
+      "fitAll": "适应全部",
+      "fitAllAria": "适应全部作品"
+    },
+    "filterPanel": {
+      "label": "滤镜面板",
+      "title": "滤镜",
+      "close": "关闭滤镜面板",
+      "brightness": "亮度",
+      "contrast": "对比度",
+      "saturate": "饱和度",
+      "presets": "预设",
+      "preset": {
+        "none": "原图",
+        "vivid": "鲜明",
+        "soft": "柔和",
+        "warm": "暖调",
+        "cool": "冷调",
+        "mono": "黑白"
+      },
+      "unsupportedHint": "当前浏览器不支持导出时套用滤镜（ctx.filter），预览正常；导出请改用 Chrome / Edge。",
+      "reset": "重置"
+    },
+    "stage": {
+      "label": "画布，可缩放、平移与拖动作品",
+      "itemAlt": "画布作品",
+      "generating": "生成中…",
+      "failed": "生成失败",
+      "retry": "重试",
+      "retryAria": "重试生成",
+      "cancel": "取消",
+      "confirmCrop": "确认裁剪"
+    },
+    "page": {
+      "toolStatus": {
+        "generateImage": "正在生成图片…",
+        "running": "正在执行 {name}…"
+      },
+      "referenceUploadFailed": "参考图上传失败",
+      "referenceUploadFailedWithStatus": "参考图上传失败（{status}）",
+      "exportFailed": "导出失败",
+      "exportFailedWithStatus": "导出失败（{status}）",
+      "directSend": {
+        "creatingSession": "正在创建会话…",
+        "uploadingAttachments": "正在上传附件（{done}/{total}）…",
+        "attachmentsFailed": "{failed} 个附件上传失败，已停止发送；草稿已回填，可重新添加附件后手动发送",
+        "sending": "正在发送…",
+        "failedDraftRestored": "直发失败，草稿已回填输入框",
+        "sessionCreateFailedRestored": "会话创建失败，草稿已回填输入框，可修改后重发",
+        "sessionCreateFailedQueued": "会话创建失败，文案已保留，可点击「新会话」重试"
+      },
+      "renameFailed": "重命名失败，请重试",
+      "deleteFailed": "删除失败（资产清理未完成），请重试",
+      "agentSwitchFailed": "Agent 切换失败，请重试",
+      "errorLine": "[错误] {message}",
+      "stoppedLine": "[已停止生成]",
+      "connectionLost": "连接中断，请重试",
+      "connectionLostCanvas": "连接中断，生成未完成",
+      "regenerate": "重新生成：{prompt}",
+      "regenerateLast": "重新生成上次的图片",
+      "canvasImageName": "画布图片",
+      "saving": "保存中…",
+      "savedLocal": "已保存（本机）",
+      "exporting": "导出中…",
+      "export": "导出",
+      "revealResult": "有新结果，点击查看",
+      "openChat": "打开聊天"
+    }
+  },
+  "chat": {
+    "panelLabel": "聊天面板",
+    "untitledSession": "未命名会话",
+    "noSessionSelected": "未选择会话",
+    "selectAgent": "选择 Agent",
+    "sessionTitleLabel": "会话标题",
+    "confirmRename": "确认重命名",
+    "cancelRename": "取消重命名",
+    "renameSession": "重命名会话",
+    "sessionHistory": "会话历史",
+    "collapsePanel": "收起聊天面板",
+    "collapse": "收起",
+    "thinking": "思考中",
+    "fileLink": "文件",
+    "emptyPrompt": "选择 Agent 并描述你想要的商品/场景图。",
+    "composer": {
+      "attachLanding": "添加附件",
+      "attachReference": "上传参考图",
+      "attachNeedSession": "先创建会话后可上传参考图",
+      "presetsTitle": "试试这样描述：",
+      "referenceLabel": "引用：{name}",
+      "removeReference": "移除引用 {name}",
+      "pendingFile": "附件：{name}",
+      "removePendingFile": "移除附件 {name}",
+      "inputLabel": "消息输入",
+      "placeholder": "描述你的设计需求…",
+      "placeholderNeedSession": "先创建会话",
+      "selectAgent": "选择 Agent",
+      "stop": "停止生成",
+      "send": "发送"
+    },
+    "resultChip": {
+      "activeLabel": "第 {position} 张图，已在画布选中",
+      "locateLabel": "在画布中定位第 {position} 张图",
+      "activeTitle": "已在画布选中",
+      "viewTitle": "在画布中查看",
+      "generated": "已生成图片 {position}"
+    },
+    "sidebar": {
+      "groupToday": "今天",
+      "groupWeek": "近 7 天",
+      "groupEarlier": "更早",
+      "newChat": "新会话",
+      "closeDrawer": "关闭会话抽屉",
+      "searchLabel": "搜索会话",
+      "searchPlaceholder": "搜索会话…",
+      "listLabel": "会话列表",
+      "emptyAll": "还没有会话，点击「新会话」开始。",
+      "emptyFiltered": "没有匹配的会话。",
+      "deleteConfirm": "删除「{name}」？",
+      "confirmDelete": "确认删除会话",
+      "delete": "删除",
+      "cancelDelete": "取消删除",
+      "cancel": "取消",
+      "renameNamed": "重命名 {name}",
+      "deleteNamed": "删除 {name}"
+    },
+    "userMenu": {
+      "label": "用户菜单",
+      "profile": "个人信息",
+      "logout": "退出登录",
+      "loggingOut": "退出中…"
+    },
+    "reasoning": {
+      "streaming": "思考中…",
+      "label": "思考过程"
+    },
+    "presets": {
+      "atmosphere-designer": {
+        "autumnWood": "生成一张秋天树林里木桌旁的场景氛围图，暖色调逆光",
+        "loungeScene": "为家居品牌生成一张客厅场景图，米色沙发配绿植，午后阳光",
+        "beachPicnic": "生成一张海边日落时分的野餐场景图，电影感构图"
+      },
+      "product-photographer": {
+        "thermosWhiteMain": "为这款保温杯拍一张纯白背景主图，突出杯身的金属质感",
+        "coffeeScene": "木质桌面上的咖啡杯场景摆拍，清晨自然光，温暖氛围",
+        "creamMain": "为这款面霜生成一张电商主图，浅粉背景配柔和阴影，突出瓶身细节"
+      }
+    }
+  },
+  "auth": {
+    "metadata": {
+      "description": "登录或用邀请码注册，开始生成能直接上架的电商图片"
+    },
+    "networkError": "网络异常，请稍后再试",
+    "username": "用户名",
+    "password": "密码",
+    "passwordHint": "至少 8 位",
+    "inviteCode": "邀请码",
+    "displayName": "昵称",
+    "optional": "（可选）",
+    "rules": {
+      "label": "用户名规则",
+      "summary": "3–20 个字符，以字母开头，仅含字母、数字或下划线",
+      "length": "3–20 个字符",
+      "startsWithLetter": "以字母开头",
+      "allowedChars": "仅含字母、数字或下划线"
+    },
+    "login": {
+      "submit": "登录",
+      "submitting": "登录中…",
+      "submitFailed": "登录失败，请稍后再试",
+      "firstTime": "首次使用？",
+      "registerLink": "用邀请码注册"
+    },
+    "register": {
+      "submit": "注册并进入工作台",
+      "submitting": "注册中…",
+      "submitFailed": "注册失败，请稍后再试",
+      "invitePlaceholder": "向管理员索取",
+      "displayNamePlaceholder": "聊天中展示的名字",
+      "haveAccount": "已有账号？"
+    },
+    "brand": {
+      "headline": "用说话的方式，得到能直接上架的电商图片",
+      "expertLine": "驻场氛围图设计师 · 场景图 / 产品图",
+      "tagline": "AI 电商图像工作台",
+      "panelLabel": "产品介绍",
+      "samplesNote": "示例图均由 oops 生成",
+      "sampleSceneAlt1": "晨光木桌上的白瓷杯咖啡场景图",
+      "sampleSceneAlt2": "拿铁心形拉花特写氛围图",
+      "sampleProductAlt": "白底红苹果产品图"
+    }
+  },
+  "profile": {
+    "title": "个人信息",
+    "identityLabel": "账号身份",
+    "copyOopsId": "复制 oops ID",
+    "loading": "加载中…",
+    "basicTitle": "基本信息",
+    "basicDescription": "设置你的昵称、性别与个性签名",
+    "displayName": "昵称",
+    "displayNameHint": "清空保存即恢复默认昵称",
+    "gender": {
+      "label": "性别",
+      "secret": "保密",
+      "male": "男",
+      "female": "女"
+    },
+    "bio": "个性签名",
+    "bioPlaceholder": "选填，清空即移除",
+    "saving": "保存中…",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败，请稍后再试",
+    "networkError": "网络异常，请稍后再试",
+    "securityTitle": "安全信息",
+    "securityDescription": "修改密码后，其他设备的登录将全部下线",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "passwordHint": "至少 8 位",
+    "password": {
+      "hide": "隐藏密码",
+      "show": "显示密码",
+      "mismatch": "两次输入的新密码不一致",
+      "changeFailed": "修改失败，请稍后再试",
+      "changedAllSignedOut": "密码已修改，其他设备的登录已全部下线",
+      "changing": "修改中…",
+      "change": "修改密码"
+    }
+  },
+  "design": {
+    "page": {
+      "back": "返回",
+      "undo": "撤销",
+      "redo": "重做",
+      "canvasSize": "{width} × {height} px",
+      "draftSaving": "保存中…",
+      "draftSaved": "草稿已保存",
+      "download": "下载 PNG",
+      "downloadError": "导出失败，请重试"
+    },
+    "rightPanel": {
+      "canvasTitle": "画布",
+      "background": "背景色",
+      "geometryTitle": "位置与大小",
+      "x": "X",
+      "y": "Y",
+      "width": "宽",
+      "height": "高",
+      "rotation": "旋转",
+      "layerTitle": "层级",
+      "bringFront": "置于顶层",
+      "sendBack": "置于底层",
+      "bringForward": "上移一层",
+      "sendBackward": "下移一层",
+      "textTitle": "文本",
+      "content": "内容",
+      "font": "字体",
+      "fontSize": "字号",
+      "fontWeight": "粗细",
+      "weightNormal": "常规",
+      "weightBold": "加粗",
+      "textColor": "颜色",
+      "align": "对齐",
+      "alignLeft": "左对齐",
+      "alignCenter": "居中",
+      "alignRight": "右对齐",
+      "lineHeight": "行高",
+      "pillBackground": "胶囊底色",
+      "pillOn": "有",
+      "pillOff": "无",
+      "opacity": "透明度",
+      "imageTitle": "图片",
+      "radius": "圆角",
+      "fit": "适配",
+      "fitCover": "填充",
+      "fitContain": "完整",
+      "shapeTitle": "形状",
+      "fill": "填充色"
+    },
+    "canvas": {
+      "label": "设计画布"
+    },
+    "rail": {
+      "label": "设计功能栏",
+      "templates": "模版",
+      "text": "文字",
+      "materials": "素材"
+    },
+    "templatePanel": {
+      "title": "模版",
+      "names": {
+        "ecom-main": "电商主图",
+        "xhs-cover": "种草封面"
+      }
+    },
+    "materialsPanel": {
+      "title": "素材",
+      "names": {
+        "badge-starburst": "爆炸贴",
+        "badge-percent": "折扣贴",
+        "tag-price": "价格吊牌",
+        "ribbon-banner": "横幅缎带",
+        "arrow-doodle": "手绘箭头",
+        "wave-deco": "波浪装饰",
+        "bubble-chat": "对话气泡",
+        "crown": "皇冠",
+        "lightning": "闪电",
+        "star": "星星"
+      }
+    },
+    "textPanel": {
+      "presetsTitle": "文字预设",
+      "fontsTitle": "艺术字体",
+      "fontSample": "夏日上新",
+      "presets": {
+        "title": {
+          "name": "标题",
+          "sample": "夏日清爽上新"
+        },
+        "subtitle": {
+          "name": "副标题",
+          "sample": "轻盈质地 · 持久留香"
+        },
+        "body": {
+          "name": "正文",
+          "sample": "输入正文描述产品卖点"
+        }
+      },
+      "fonts": {
+        "smiley-sans": "得意黑",
+        "lxgw-wenkai": "霞鹜文楷"
+      },
+      "fancyTitle": "花字"
+    },
+    "fancy": {
+      "pill": {
+        "name": "胶囊标签",
+        "text": "限时直降"
+      },
+      "point": {
+        "name": "卖点条目",
+        "text": "门店同款热卖中"
+      },
+      "blast": {
+        "name": "爆点价格",
+        "label": "立减",
+        "price": "¥59"
+      }
+    },
+    "dialog": {
+      "title": "新建设计",
+      "description": "选择尺寸预设或自定义画布大小",
+      "categoryAll": "全部",
+      "groupCommon": "常用尺寸",
+      "groupEcom": "电商物料",
+      "groupSocial": "社交媒体",
+      "recent": "最近使用",
+      "recentEmpty": "还没有使用记录",
+      "customSize": "自定义尺寸",
+      "width": "宽",
+      "height": "高",
+      "unit": "px",
+      "lockRatio": "锁定比例",
+      "create": "创建"
+    },
+    "presets": {
+      "poster-mobile": { "name": "手机海报" },
+      "poster-square": { "name": "方形海报" },
+      "poster-landscape": { "name": "横版海报" },
+      "video-vertical": { "name": "竖版视频封面" },
+      "main-image": { "name": "电商主图" },
+      "detail-page": { "name": "电商详情页" },
+      "livestream-cover": { "name": "直播封面" },
+      "shop-banner": { "name": "店铺横幅" },
+      "xhs-cover": { "name": "小红书封面" },
+      "xhs-image": { "name": "小红书图文" },
+      "moments": { "name": "朋友圈海报" },
+      "weibo": { "name": "微博配图" }
+    }
+  }
+}

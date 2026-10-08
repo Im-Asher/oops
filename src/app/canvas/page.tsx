@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionSidebar } from "@/components/chat/session-sidebar";
 import { UserMenuContent } from "@/components/chat/user-menu";
+import { apiErrorMessage } from "@/lib/api-error";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
 import { DownloadIcon, MessageSquareIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   canvasReducer,
   initialCanvasState,
@@ -21,11 +23,6 @@ import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat"
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { hasPendingHandoff, takePendingHandoffFiles } from "@/lib/chat/home-handoff";
-
-/** 工具状态行的展示文案（按工具名；未收录的用通用文案）。 */
-const TOOL_STATUS_LABELS: Record<string, string> = {
-  generate_image: "正在生成图片…",
-};
 
 /**
  * useSearchParams 需要客户端回退边界：静态预渲染期间由 Suspense 兜底。
@@ -49,6 +46,8 @@ interface SessionSlot {
 const EMPTY_SLOT: SessionSlot = { messages: [], draft: "", busy: false };
 
 function ChatPageInner() {
+  const t = useTranslations("canvas");
+  const tApi = useTranslations("common.apiErrors");
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -197,13 +196,20 @@ function ChatPageInner() {
       const res = await fetch("/upload", { method: "POST", body: form });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as
-          | { error?: { message?: string } }
+          | { error?: { code?: string; message?: string } }
           | null;
-        throw new Error(err?.error?.message ?? `参考图上传失败（${res.status}）`);
+        // code 已登记 → 词典文案；未登记（上传插值消息等）→ server message 兜底
+        throw new Error(
+          apiErrorMessage(
+            err?.error,
+            tApi,
+            t("page.referenceUploadFailedWithStatus", { status: res.status }),
+          ),
+        );
       }
       return (await res.json()) as { assetId: string; url: string };
     },
-    [],
+    [t, tApi],
   );
   // 参考图上传：上传后落画布并选中即引用（手动路径，错误以 chip 下方提示呈现）。
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -220,10 +226,10 @@ function ChatPageInner() {
           selectNew: true,
         });
       } catch (e) {
-        setReferenceError(e instanceof Error ? e.message : "参考图上传失败");
+        setReferenceError(e instanceof Error ? e.message : t("page.referenceUploadFailed"));
       }
     },
-    [currentId, uploadReferenceTo],
+    [currentId, t, uploadReferenceTo],
   );
 
   // 会话工作区本机持久化：画布/草稿变化 300ms 防抖落盘；未完成恢复的会话不写，避免切换瞬间用清空态覆盖。
@@ -328,17 +334,17 @@ function ChatPageInner() {
       if (!res.ok) {
         const err = (await res
           .json()
-          .catch(() => null)) as { error?: { message?: string } } | null;
-        throw new Error(err?.error?.message ?? `导出失败（${res.status}）`);
+          .catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+        throw new Error(apiErrorMessage(err?.error, tApi, t("page.exportFailedWithStatus", { status: res.status })));
       }
       await loadMessages(currentId);
       handleResetEdits();
     } catch (e) {
-      setExportError(e instanceof Error ? e.message : "导出失败");
+      setExportError(e instanceof Error ? e.message : t("page.exportFailed"));
     } finally {
       setExporting(false);
     }
-  }, [canvas, currentId, loadMessages, handleResetEdits, dirty]);
+  }, [canvas, currentId, loadMessages, handleResetEdits, dirty, t, tApi]);
 
   useEffect(() => {
     fetch("/api/agents")
@@ -382,13 +388,13 @@ function ChatPageInner() {
       // 不直发（spec/canvas-workspace「刷新丢附件保草稿」）。
       directSendRef.current = sendParam === "1" && hasPendingHandoff();
       if (directSendRef.current) {
-        setDirectSendStatus({ text: "正在创建会话…", tone: "progress" });
+        setDirectSendStatus({ text: t("page.directSend.creatingSession"), tone: "progress" });
       }
     }
     if (agentParam) {
       setAgentId(agentParam);
     }
-  }, [draftParam, agentParam, sendParam, sendNonceParam]);
+  }, [draftParam, agentParam, sendParam, sendNonceParam, t]);
   function applyPendingDraft(id: string) {
     const draft = pendingDraftRef.current;
     if (!draft) return;
@@ -503,14 +509,17 @@ function ChatPageInner() {
     try {
       let refs: string[] = [];
       if (files.length) {
-        setDirectSendStatus({ text: `正在上传附件（0/${files.length}）…`, tone: "progress" });
+        setDirectSendStatus({
+          text: t("page.directSend.uploadingAttachments", { done: 0, total: files.length }),
+          tone: "progress",
+        });
         let done = 0;
         const settled = await Promise.allSettled(
           files.map(async (file) => {
             const data = await uploadReferenceTo(sessionId, file);
             done += 1;
             setDirectSendStatus({
-              text: `正在上传附件（${done}/${files.length}）…`,
+              text: t("page.directSend.uploadingAttachments", { done, total: files.length }),
               tone: "progress",
             });
             return { ...data, name: file.name };
@@ -528,7 +537,7 @@ function ChatPageInner() {
           updateSlot(sessionId, (slot) => ({ ...slot, draft: text }));
           setComposerFocusNonce((n) => n + 1);
           setDirectSendStatus({
-            text: `${files.length - ok.length} 个附件上传失败，已停止发送；草稿已回填，可重新添加附件后手动发送`,
+            text: t("page.directSend.attachmentsFailed", { failed: files.length - ok.length }),
             tone: "error",
           });
           return;
@@ -539,7 +548,7 @@ function ChatPageInner() {
         });
         refs = ok.map((v) => v.assetId);
       }
-      setDirectSendStatus({ text: "正在发送…", tone: "progress" });
+      setDirectSendStatus({ text: t("page.directSend.sending"), tone: "progress" });
       await runRound(sessionId, text, refs);
       setDirectSendStatus(null);
     } catch (e) {
@@ -547,7 +556,7 @@ function ChatPageInner() {
       updateSlot(sessionId, (slot) => ({ ...slot, draft: text }));
       setComposerFocusNonce((n) => n + 1);
       setDirectSendStatus({
-        text: e instanceof Error ? e.message : "直发失败，草稿已回填输入框",
+        text: e instanceof Error ? e.message : t("page.directSend.failedDraftRestored"),
         tone: "error",
       });
     }
@@ -568,13 +577,19 @@ function ChatPageInner() {
         await selectSession(first.id);
         updateSlot(first.id, (slot) => ({ ...slot, draft: text }));
         setComposerFocusNonce((n) => n + 1);
-        setDirectSendStatus({ text: "会话创建失败，草稿已回填输入框，可修改后重发", tone: "error" });
+        setDirectSendStatus({
+          text: t("page.directSend.sessionCreateFailedRestored"),
+          tone: "error",
+        });
         return;
       }
     }
     // 无会话可回填（如首次使用）：草稿留在队列，点「新会话」即按常规路径消费。
     pendingDraftRef.current = text;
-    setDirectSendStatus({ text: "会话创建失败，文案已保留，可点击「新会话」重试", tone: "error" });
+    setDirectSendStatus({
+      text: t("page.directSend.sessionCreateFailedQueued"),
+      tone: "error",
+    });
   }
 
   /** 重命名会话：乐观更新本地列表，失败回滚并提示。 */
@@ -589,7 +604,7 @@ function ChatPageInner() {
     });
     if (!res.ok) {
       setSessions(previous);
-      setActionError("重命名失败，请重试");
+      setActionError(t("page.renameFailed"));
     }
   }
 
@@ -598,7 +613,7 @@ function ChatPageInner() {
     setActionError(null);
     const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      setActionError("删除失败（资产清理未完成），请重试");
+      setActionError(t("page.deleteFailed"));
       return;
     }
     setSlots((prev) => {
@@ -636,7 +651,7 @@ function ChatPageInner() {
         list.map((s) => (s.id === currentId ? { ...s, agentId: id } : s)),
       );
     } else {
-      setActionError("Agent 切换失败，请重试");
+      setActionError(t("page.agentSwitchFailed"));
     }
   }
 
@@ -763,7 +778,10 @@ function ChatPageInner() {
             {
               type: "tool_status",
               id: event.id,
-              label: TOOL_STATUS_LABELS[event.name] ?? `正在执行 ${event.name}…`,
+              label:
+                event.name === "generate_image"
+                  ? t("page.toolStatus.generateImage")
+                  : t("page.toolStatus.running", { name: event.name }),
             },
           ]);
           break;
@@ -803,7 +821,7 @@ function ChatPageInner() {
                 id: event.id,
                 patch: {
                   status: "failed",
-                  errorMessage: String(event.details?.message ?? "生成失败"),
+                  errorMessage: String(event.details?.message ?? t("stage.failed")),
                 },
               });
             }
@@ -830,7 +848,7 @@ function ChatPageInner() {
           break;
         }
         case "error":
-          appendText(`\n[错误] ${event.message}`);
+          appendText(`\n${t("page.errorLine", { message: event.message })}`);
           // 聊天与画布一致呈现：本轮仍在生成中的占位卡同步置失败，不留悬空转圈。
           failPendingPlaceholders(sessionId, event.message);
           break;
@@ -867,7 +885,7 @@ function ChatPageInner() {
       if (ac.signal.aborted) {
         // 用户主动停止：当轮标记已停止（仅本轮 UI 状态，不进持久化正文），
         // 未结算占位卡移除——服务端已将已生成部分落库，刷新后以部分内容呈现。
-        appendText("\n[已停止生成]");
+        appendText(`\n${t("page.stoppedLine")}`);
         if (currentIdRef.current === sessionId) {
           for (const pid of roundPlaceholders) {
             const item = canvasStateRef.current.items.find((i) => i.id === pid);
@@ -876,8 +894,8 @@ function ChatPageInner() {
         }
       } else {
         // 网络/流中断：聊天侧补错误行，画布侧未结算占位卡置失败（服务端回合可能已完成，切回会话时以服务器为准）。
-        appendText("\n[错误] 连接中断，请重试");
-        failPendingPlaceholders(sessionId, "连接中断，生成未完成");
+        appendText(`\n${t("page.errorLine", { message: t("page.connectionLost") })}`);
+        failPendingPlaceholders(sessionId, t("page.connectionLostCanvas"));
       }
     } finally {
       abortRef.current = null;
@@ -904,7 +922,9 @@ function ChatPageInner() {
   /** 失败占位卡重试：以卡内保存的原始意图（prompt + 原引用）重新发起一轮。 */
   function retryItem(item: CanvasItem) {
     if (!currentId || busy) return;
-    const text = item.prompt ? `重新生成：${item.prompt}` : "重新生成上次的图片";
+    const text = item.prompt
+      ? t("page.regenerate", { prompt: item.prompt })
+      : t("page.regenerateLast");
     const refs = item.referenceAssetId ? [item.referenceAssetId] : [];
     void runRound(currentId, text, refs);
   }
@@ -916,7 +936,10 @@ function ChatPageInner() {
   // 引用 = 画布选中的图片条目；移除 chip = 取消选中（无选中 = 新方案）。
   const composerReference =
     selectedCanvasItem && selectedCanvasItem.status === "image"
-      ? { assetId: selectedCanvasItem.assetId, name: selectedCanvasItem.name ?? "画布图片" }
+      ? {
+          assetId: selectedCanvasItem.assetId,
+          name: selectedCanvasItem.name ?? t("page.canvasImageName"),
+        }
       : null;
 
   return (
@@ -935,8 +958,8 @@ function ChatPageInner() {
             {saveStatus === "idle"
               ? null
               : saveStatus === "saving"
-                ? "保存中…"
-                : "已保存（本机）"}
+                ? t("page.saving")
+                : t("page.savedLocal")}
           </span>
           <Button
             className="h-8 gap-1.5 bg-violet-500/90 px-3 text-xs text-white hover:bg-violet-500"
@@ -945,7 +968,7 @@ function ChatPageInner() {
             size="sm"
           >
             <DownloadIcon />
-            {exporting ? "导出中…" : "导出"}
+            {exporting ? t("page.exporting") : t("page.export")}
           </Button>
         </div>
         {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
@@ -956,7 +979,7 @@ function ChatPageInner() {
             onClick={handleRevealClick}
             type="button"
           >
-            有新结果，点击查看
+            {t("page.revealResult")}
           </button>
         ) : null}
         <CanvasStage
@@ -995,7 +1018,7 @@ function ChatPageInner() {
       {/* 聊天收起后的重开入口：画布左上悬浮 */}
       {!chatOpen ? (
         <button
-          aria-label="打开聊天"
+          aria-label={t("page.openChat")}
           className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-full border border-border bg-popover/90 text-foreground shadow-lg hover:bg-accent"
           onClick={() => setChatOpen(true)}
           type="button"

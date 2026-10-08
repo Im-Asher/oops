@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { shouldSendOnEnter } from "@/lib/chat/keyboard";
 import type { AgentInfo } from "@/types/chat";
 import { ArrowUpIcon, PaperclipIcon, SquareIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
 export interface ComposerReference {
@@ -79,14 +80,15 @@ export function Composer({
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const t = useTranslations("chat.composer");
   // landing 形态下会话在跳转后由画布创建，首页输入不设门槛。
   const sessionReady = variant === "landing" || hasSession;
   // landing 语境下无「会话」概念，附件钮文案随之调整。
   const attachLabel = onAttach
     ? variant === "landing"
-      ? "添加附件"
-      : "上传参考图"
-    : "先创建会话后可上传参考图";
+      ? t("attachLanding")
+      : t("attachReference")
+    : t("attachNeedSession");
 
   // 聚焦信号 nonce 变化即聚焦一次（新建会话后带回聊天框）。
   useEffect(() => {
@@ -103,7 +105,7 @@ export function Composer({
     <div className="rounded-xl border border-border bg-card p-2 transition-colors focus-within:border-ring">
       {presets?.length ? (
         <div className="flex flex-col gap-1.5 px-1 pb-2" data-testid="preset-cards">
-          <p className="text-xs text-muted-foreground/80">试试这样描述：</p>
+          <p className="text-xs text-muted-foreground/80">{t("presetsTitle")}</p>
           {presets.map((text) => (
             <button
               className="flex items-start gap-2 rounded-lg border border-border bg-popover/60 px-3 py-2 text-left text-xs text-foreground/80 hover:border-ring hover:bg-accent"
@@ -120,9 +122,9 @@ export function Composer({
       {reference ? (
         <div className="flex items-center gap-1.5 px-1 pb-1.5">
           <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300">
-            引用：{reference.name}
+            {t("referenceLabel", { name: reference.name })}
             <button
-              aria-label={`移除引用 ${reference.name}`}
+              aria-label={t("removeReference", { name: reference.name })}
               className="ml-0.5 text-violet-600/80 dark:text-violet-600 dark:text-violet-300/80 hover:text-violet-700 dark:hover:text-violet-700 dark:text-violet-200"
               onClick={onRemoveReference}
               type="button"
@@ -139,9 +141,9 @@ export function Composer({
               className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300"
               key={f.id}
             >
-              附件：{f.name}
+              {t("pendingFile", { name: f.name })}
               <button
-                aria-label={`移除附件 ${f.name}`}
+                aria-label={t("removePendingFile", { name: f.name })}
                 className="ml-0.5 hover:text-violet-700 dark:hover:text-violet-200"
                 onClick={() => onRemovePendingFile?.(f.id)}
                 type="button"
@@ -153,7 +155,7 @@ export function Composer({
         </div>
       ) : null}
       <Textarea
-        aria-label="消息输入"
+        aria-label={t("inputLabel")}
         ref={textareaRef}
         className={`field-sizing-content ${variant === "landing" ? "max-h-60 min-h-15" : "max-h-40 min-h-10"} resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0`}
         disabled={busy || !sessionReady}
@@ -181,7 +183,7 @@ export function Composer({
           e.preventDefault();
           onSend();
         }}
-        placeholder={sessionReady ? "描述你的设计需求…" : "先创建会话"}
+        placeholder={sessionReady ? t("placeholder") : t("placeholderNeedSession")}
         rows={1}
         value={value}
       />
@@ -200,11 +202,11 @@ export function Composer({
           </Button>
           <Select onValueChange={onAgentChange} value={agentId}>
             <SelectTrigger
-              aria-label="选择 Agent"
+              aria-label={t("selectAgent")}
               className="w-auto gap-1.5 border-0 bg-transparent px-2 text-xs text-foreground/80 shadow-none hover:bg-accent"
               size="sm"
             >
-              <SelectValue placeholder="选择 Agent" />
+              <SelectValue placeholder={t("selectAgent")} />
             </SelectTrigger>
             <SelectContent className="bg-popover text-foreground">
               {agents.map((a) => (
@@ -221,17 +223,17 @@ export function Composer({
         {busy && onStop ? (
           // 生成中：发送钮变为停止钮（点击中断本轮流，服务端真停并部分落库）
           <Button
-            aria-label="停止生成"
+            aria-label={t("stop")}
             className="size-8 rounded-full bg-accent hover:bg-accent/80"
             onClick={onStop}
             size="icon-sm"
-            title="停止生成"
+            title={t("stop")}
           >
             <SquareIcon className="size-3 fill-current" />
           </Button>
         ) : (
           <Button
-            aria-label="发送"
+            aria-label={t("send")}
             className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
             disabled={busy || !sessionReady || !value.trim()}
             onClick={onSend}

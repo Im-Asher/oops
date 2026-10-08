@@ -1,13 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "cn";
+import { apiErrorMessage } from "@/lib/api-error";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useState } from "react";
 
 export default function RegisterPage() {
+  const t = useTranslations("auth");
+  const tApi = useTranslations("common.apiErrors");
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
@@ -19,9 +23,13 @@ export default function RegisterPage() {
   // 实时规则提示与注册 zod 同步（3–20、字母开头、仅字母/数字/下划线）
   const trimmedUsername = username.trim();
   const usernameRules = [
-    { ok: trimmedUsername.length >= 3 && trimmedUsername.length <= 20, text: "3–20 个字符" },
-    { ok: /^[A-Za-z]/.test(trimmedUsername), text: "以字母开头" },
-    { ok: /^[A-Za-z0-9_]*$/.test(trimmedUsername), text: "仅含字母、数字或下划线" },
+    {
+      key: "length",
+      ok: trimmedUsername.length >= 3 && trimmedUsername.length <= 20,
+      text: t("rules.length"),
+    },
+    { key: "startsWithLetter", ok: /^[A-Za-z]/.test(trimmedUsername), text: t("rules.startsWithLetter") },
+    { key: "allowedChars", ok: /^[A-Za-z0-9_]*$/.test(trimmedUsername), text: t("rules.allowedChars") },
   ];
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -39,12 +47,13 @@ export default function RegisterPage() {
         router.refresh();
         return;
       }
+      // code 已登记 → 词典文案；未登记（如 zod 动态校验消息）→ server message 兜底
       const body = (await res.json().catch(() => null)) as {
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
       } | null;
-      setError(body?.error?.message ?? "注册失败，请稍后再试");
+      setError(apiErrorMessage(body?.error, tApi, t("register.submitFailed")));
     } catch {
-      setError("网络异常，请稍后再试");
+      setError(t("networkError"));
     } finally {
       setPending(false);
     }
@@ -57,20 +66,20 @@ export default function RegisterPage() {
     >
       <div className="space-y-2">
         <label htmlFor="inviteCode" className="text-sm font-medium text-foreground">
-          邀请码
+          {t("inviteCode")}
         </label>
         <Input
           id="inviteCode"
           value={inviteCode}
           onChange={(e) => setInviteCode(e.target.value)}
-          placeholder="向管理员索取"
+          placeholder={t("register.invitePlaceholder")}
           autoFocus
           required
         />
       </div>
       <div className="space-y-2">
         <label htmlFor="username" className="text-sm font-medium text-foreground">
-          用户名
+          {t("username")}
         </label>
         <Input
           id="username"
@@ -81,13 +90,13 @@ export default function RegisterPage() {
           minLength={3}
           pattern="[A-Za-z][A-Za-z0-9_]*"
           required
-          title="3–20 个字符，以字母开头，仅含字母、数字或下划线"
+          title={t("rules.summary")}
         />
         {trimmedUsername.length > 0 && (
-          <ul className="space-y-0.5" aria-label="用户名规则">
+          <ul className="space-y-0.5" aria-label={t("rules.label")}>
             {usernameRules.map((rule) => (
               <li
-                key={rule.text}
+                key={rule.key}
                 className={cn(
                   "text-xs",
                   rule.ok ? "text-emerald-600" : "text-muted-foreground",
@@ -101,7 +110,7 @@ export default function RegisterPage() {
       </div>
       <div className="space-y-2">
         <label htmlFor="displayName" className="text-sm font-medium text-foreground">
-          昵称 <span className="font-normal text-muted-foreground">（可选）</span>
+          {t("displayName")} <span className="font-normal text-muted-foreground">{t("optional")}</span>
         </label>
         <Input
           id="displayName"
@@ -109,12 +118,12 @@ export default function RegisterPage() {
           onChange={(e) => setDisplayName(e.target.value)}
           autoComplete="nickname"
           maxLength={20}
-          placeholder="聊天中展示的名字"
+          placeholder={t("register.displayNamePlaceholder")}
         />
       </div>
       <div className="space-y-2">
         <label htmlFor="password" className="text-sm font-medium text-foreground">
-          密码
+          {t("password")}
         </label>
         <Input
           id="password"
@@ -125,16 +134,16 @@ export default function RegisterPage() {
           minLength={8}
           required
         />
-        <p className="text-xs text-muted-foreground">至少 8 位</p>
+        <p className="text-xs text-muted-foreground">{t("passwordHint")}</p>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "注册中…" : "注册并进入工作台"}
+        {pending ? t("register.submitting") : t("register.submit")}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        已有账号？
+        {t("register.haveAccount")}{" "}
         <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
-          登录
+          {t("login.submit")}
         </Link>
       </p>
     </form>

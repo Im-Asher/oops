@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { takePendingHandoffFiles } from "@/lib/chat/home-handoff";
 import { APP_VERSION } from "@/lib/version";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import HomePage from "./page";
 
 const push = vi.fn();
+const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, refresh }),
 }));
 
 const AGENTS = {
@@ -59,21 +61,27 @@ function imageFile(name: string): File {
 }
 
 describe("首页落地页", () => {
-  it("侧栏：AI 画布可用、创建设计与其余导航项置灰禁用", async () => {
-    render(<HomePage />);
+  it("侧栏：AI 画布与创建设计可用（弹窗触发）、其余导航项置灰禁用", async () => {
+    renderWithI18n(<HomePage />);
     const canvasLink = await screen.findByText("AI 画布");
     expect(canvasLink.closest("a")?.getAttribute("href")).toBe("/canvas");
     const designBtn = screen.getByText("创建设计") as HTMLButtonElement;
-    expect(designBtn.disabled).toBe(true);
+    expect(designBtn.disabled).toBe(false);
+    await userEvent.click(designBtn);
+    expect(await screen.findByText("新建设计")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     for (const label of ["作品集", "素材库", "消息中心", "设置"]) {
       expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
     }
     // 用户入口（头像触发）可达
     expect(screen.getByRole("button", { name: "用户菜单" })).toBeTruthy();
+    // 语言切换入口与主题切换并列（双入口之一）
+    expect(screen.getByRole("button", { name: "切换语言" })).toBeTruthy();
   });
 
   it("创作直发：提交携带文本 + send 标记跳 /canvas（空输入不可提交）", async () => {
-    render(<HomePage />);
+    renderWithI18n(<HomePage />);
     const input = await screen.findByLabelText("消息输入");
     // 空输入：发送禁用，回车不跳转
     expect((screen.getByLabelText("发送") as HTMLButtonElement).disabled).toBe(true);
@@ -91,7 +99,7 @@ describe("首页落地页", () => {
   });
 
   it("直发乐观态：提交后输入锁定（路由锁），不可重复触发", async () => {
-    render(<HomePage />);
+    renderWithI18n(<HomePage />);
     const input = await screen.findByLabelText("消息输入");
     await userEvent.type(input, "为保温杯拍一张主图");
     await userEvent.click(screen.getByLabelText("发送"));
@@ -101,7 +109,7 @@ describe("首页落地页", () => {
   });
 
   it("附件：添加图片出现可移除 chip；非图片与超 5 张被拒绝并提示", async () => {
-    render(<HomePage />);
+    renderWithI18n(<HomePage />);
     await screen.findByLabelText("消息输入");
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
@@ -134,7 +142,7 @@ describe("首页落地页", () => {
   });
 
   it("携带附件直发：附件经 handoff store 交接给画布侧", async () => {
-    render(<HomePage />);
+    renderWithI18n(<HomePage />);
     const input = await screen.findByLabelText("消息输入");
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(fileInput, { target: { files: [imageFile("ref.png")] } });
@@ -146,7 +154,7 @@ describe("首页落地页", () => {
   });
 
   it("侧栏品牌区在 logo 旁展示版本徽标", async () => {
-    render(<HomePage />);
+    renderWithI18n(<HomePage />);
     const badge = await screen.findByTestId("app-version-badge");
     expect(badge.textContent).toBe(`v${APP_VERSION}`);
     expect(screen.getByText("oops")).toBeTruthy();

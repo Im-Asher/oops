@@ -1,0 +1,447 @@
+{
+  "common": {
+    "metadata": {
+      "title": "oops · AI e-commerce image workbench",
+      "description": "Describe what you need to generate product detail images, posters and scene images"
+    },
+    "localeToggle": {
+      "label": "Switch language"
+    },
+    "theme": {
+      "toLight": "Switch to light mode",
+      "toDark": "Switch to dark mode"
+    },
+    "apiErrors": {
+      "unauthenticated": "Please log in first",
+      "rateLimited": "Too many attempts. Please wait a moment and try again.",
+      "badJson": "Request body must be JSON",
+      "badForm": "Request body must be multipart/form-data",
+      "noFile": "Missing the file field",
+      "noSession": "Reference upload requires a sessionId",
+      "notFound": "Session not found",
+      "invalidCredentials": "Incorrect username or password",
+      "usernameTaken": "Username already taken",
+      "inviteCodeInvalid": "Invalid or already-used invite code",
+      "wrongPassword": "Current password is incorrect",
+      "assetCleanupFailed": "Session asset cleanup failed. Please try again later.",
+      "invalidAgent": "Agent not found",
+      "invalidReference": "The referenced image does not exist or may not be used",
+      "tooLarge": "File too large",
+      "unsupportedType": "Unsupported file type"
+    }
+  },
+  "home": {
+    "comingSoon": "Coming soon",
+    "buildVersion": "Build {version}",
+    "mainNav": "Main navigation",
+    "navHome": "Home",
+    "groupCreate": "Create",
+    "navCanvas": "AI canvas",
+    "navCreateDesign": "Create design",
+    "groupLibrary": "Library",
+    "navPortfolio": "Portfolio",
+    "navAssets": "Assets",
+    "navMessages": "Messages",
+    "navSettings": "Settings",
+    "headline": "E-commerce visuals from a single sentence",
+    "subheadline": "Describe your product and scene — the AI canvas handles hero shots, detail pages and atmosphere images.",
+    "fileErrorNonImage": "Images only — {count} file(s) not added",
+    "fileErrorOverflow": "Up to 5 attachments — {count} not added",
+    "fileErrorSeparator": "; "
+  },
+  "canvas": {
+    "emptyState": {
+      "title": "The canvas is empty",
+      "description": "Describe the image you want in the chat — results appear right on the canvas. You can also upload reference images with the attach button next to the input."
+    },
+    "editToolbar": {
+      "cropMode": "Crop mode",
+      "filterPanel": "Filter panel",
+      "resetEdits": "Reset edits"
+    },
+    "viewToolbar": {
+      "zoomOut": "Zoom out",
+      "fitReset": "Reset to fit canvas",
+      "zoomIn": "Zoom in",
+      "fitAll": "Fit all",
+      "fitAllAria": "Fit all artworks"
+    },
+    "filterPanel": {
+      "label": "Filter panel",
+      "title": "Filters",
+      "close": "Close filter panel",
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturate": "Saturation",
+      "presets": "Presets",
+      "preset": {
+        "none": "Original",
+        "vivid": "Vivid",
+        "soft": "Soft",
+        "warm": "Warm",
+        "cool": "Cool",
+        "mono": "Mono"
+      },
+      "unsupportedHint": "This browser cannot apply filters on export (ctx.filter). Preview is unaffected; use Chrome or Edge to export with filters.",
+      "reset": "Reset"
+    },
+    "stage": {
+      "label": "Canvas — zoom, pan and drag artworks",
+      "itemAlt": "Canvas artwork",
+      "generating": "Generating…",
+      "failed": "Generation failed",
+      "retry": "Retry",
+      "retryAria": "Retry generation",
+      "cancel": "Cancel",
+      "confirmCrop": "Confirm crop"
+    },
+    "page": {
+      "toolStatus": {
+        "generateImage": "Generating image…",
+        "running": "Running {name}…"
+      },
+      "referenceUploadFailed": "Reference upload failed",
+      "referenceUploadFailedWithStatus": "Reference upload failed ({status})",
+      "exportFailed": "Export failed",
+      "exportFailedWithStatus": "Export failed ({status})",
+      "directSend": {
+        "creatingSession": "Creating session…",
+        "uploadingAttachments": "Uploading attachments ({done}/{total})…",
+        "attachmentsFailed": "{failed} attachment(s) failed to upload; sending stopped. Your draft is restored — re-add the attachments and send again.",
+        "sending": "Sending…",
+        "failedDraftRestored": "Direct send failed; your draft is restored in the input box",
+        "sessionCreateFailedRestored": "Failed to create session; your draft is restored — edit and resend",
+        "sessionCreateFailedQueued": "Failed to create session; your text is kept — click New chat to retry"
+      },
+      "renameFailed": "Rename failed, please retry",
+      "deleteFailed": "Delete failed (asset cleanup incomplete), please retry",
+      "agentSwitchFailed": "Agent switch failed, please retry",
+      "errorLine": "[Error] {message}",
+      "stoppedLine": "[Stopped]",
+      "connectionLost": "Connection lost, please retry",
+      "connectionLostCanvas": "Connection lost; generation not completed",
+      "regenerate": "Regenerate: {prompt}",
+      "regenerateLast": "Regenerate the last image",
+      "canvasImageName": "Canvas image",
+      "saving": "Saving…",
+      "savedLocal": "Saved (locally)",
+      "exporting": "Exporting…",
+      "export": "Export",
+      "revealResult": "New result — click to view",
+      "openChat": "Open chat"
+    }
+  },
+  "chat": {
+    "panelLabel": "Chat panel",
+    "untitledSession": "Untitled session",
+    "noSessionSelected": "No session selected",
+    "selectAgent": "Select agent",
+    "sessionTitleLabel": "Session title",
+    "confirmRename": "Confirm rename",
+    "cancelRename": "Cancel rename",
+    "renameSession": "Rename session",
+    "sessionHistory": "Session history",
+    "collapsePanel": "Collapse chat panel",
+    "collapse": "Collapse",
+    "thinking": "Thinking",
+    "fileLink": "File",
+    "emptyPrompt": "Pick an agent and describe the product or scene image you want.",
+    "composer": {
+      "attachLanding": "Add attachments",
+      "attachReference": "Upload reference image",
+      "attachNeedSession": "Create a session first to upload reference images",
+      "presetsTitle": "Try describing it like this:",
+      "referenceLabel": "Reference: {name}",
+      "removeReference": "Remove reference {name}",
+      "pendingFile": "Attachment: {name}",
+      "removePendingFile": "Remove attachment {name}",
+      "inputLabel": "Message input",
+      "placeholder": "Describe what you want to create…",
+      "placeholderNeedSession": "Create a session first",
+      "selectAgent": "Select agent",
+      "stop": "Stop generating",
+      "send": "Send"
+    },
+    "resultChip": {
+      "activeLabel": "Image {position}, selected on canvas",
+      "locateLabel": "Locate image {position} on canvas",
+      "activeTitle": "Selected on canvas",
+      "viewTitle": "View on canvas",
+      "generated": "Generated image {position}"
+    },
+    "sidebar": {
+      "groupToday": "Today",
+      "groupWeek": "Last 7 days",
+      "groupEarlier": "Earlier",
+      "newChat": "New chat",
+      "closeDrawer": "Close session drawer",
+      "searchLabel": "Search sessions",
+      "searchPlaceholder": "Search sessions…",
+      "listLabel": "Session list",
+      "emptyAll": "No sessions yet — click New chat to start.",
+      "emptyFiltered": "No matching sessions.",
+      "deleteConfirm": "Delete \"{name}\"?",
+      "confirmDelete": "Confirm session deletion",
+      "delete": "Delete",
+      "cancelDelete": "Cancel deletion",
+      "cancel": "Cancel",
+      "renameNamed": "Rename {name}",
+      "deleteNamed": "Delete {name}"
+    },
+    "userMenu": {
+      "label": "User menu",
+      "profile": "Profile",
+      "logout": "Log out",
+      "loggingOut": "Logging out…"
+    },
+    "reasoning": {
+      "streaming": "Thinking…",
+      "label": "Reasoning"
+    },
+    "presets": {
+      "atmosphere-designer": {
+        "autumnWood": "Generate a cozy autumn scene with a wooden table in the forest, warm backlit tones",
+        "loungeScene": "Create a living-room lifestyle image for a home decor brand: beige sofa, green plants, soft afternoon light",
+        "beachPicnic": "Generate a beach picnic at sunset with a cinematic composition"
+      },
+      "product-photographer": {
+        "thermosWhiteMain": "Shoot a clean white-background hero shot of this thermos, highlighting its metallic finish",
+        "coffeeScene": "Style a coffee cup on a wooden desk in morning light for a warm, natural look",
+        "creamMain": "Create an e-commerce hero image of this face cream on a soft pink background with gentle shadows, emphasizing the bottle details"
+      }
+    }
+  },
+  "auth": {
+    "metadata": {
+      "description": "Log in or sign up with an invite code to generate e-commerce images ready for listing"
+    },
+    "networkError": "Network error, please try again",
+    "username": "Username",
+    "password": "Password",
+    "passwordHint": "At least 8 characters",
+    "inviteCode": "Invite code",
+    "displayName": "Display name",
+    "optional": "(optional)",
+    "rules": {
+      "label": "Username rules",
+      "summary": "3–20 characters, starting with a letter, letters, numbers or underscores only",
+      "length": "3–20 characters",
+      "startsWithLetter": "Starts with a letter",
+      "allowedChars": "Letters, numbers or underscores only"
+    },
+    "login": {
+      "submit": "Log in",
+      "submitting": "Logging in…",
+      "submitFailed": "Login failed, please try again later",
+      "firstTime": "First time here?",
+      "registerLink": "Sign up with invite code"
+    },
+    "register": {
+      "submit": "Sign up and enter workspace",
+      "submitting": "Signing up…",
+      "submitFailed": "Sign-up failed, please try again later",
+      "invitePlaceholder": "Ask your admin",
+      "displayNamePlaceholder": "Name shown in chat",
+      "haveAccount": "Already have an account?"
+    },
+    "brand": {
+      "headline": "E-commerce images ready to list — just by describing them",
+      "expertLine": "In-house atmosphere designer · Scene / product shots",
+      "tagline": "AI e-commerce image studio",
+      "panelLabel": "Product introduction",
+      "samplesNote": "Sample images generated by oops",
+      "sampleSceneAlt1": "Coffee scene with white porcelain cup on a sunlit wooden table",
+      "sampleSceneAlt2": "Close-up atmosphere shot of heart-shaped latte art",
+      "sampleProductAlt": "Red apple on white background product shot"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "identityLabel": "Account identity",
+    "copyOopsId": "Copy oops ID",
+    "loading": "Loading…",
+    "basicTitle": "Basic info",
+    "basicDescription": "Set your display name, gender and bio",
+    "displayName": "Display name",
+    "displayNameHint": "Clear and save to restore the default name",
+    "gender": {
+      "label": "Gender",
+      "secret": "Prefer not to say",
+      "male": "Male",
+      "female": "Female"
+    },
+    "bio": "Bio",
+    "bioPlaceholder": "Optional, clear to remove",
+    "saving": "Saving…",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed, please try again later",
+    "networkError": "Network error, please try again",
+    "securityTitle": "Security",
+    "securityDescription": "After changing your password, all other devices will be signed out",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordHint": "At least 8 characters",
+    "password": {
+      "hide": "Hide password",
+      "show": "Show password",
+      "mismatch": "New passwords do not match",
+      "changeFailed": "Change failed, please try again later",
+      "changedAllSignedOut": "Password changed. All other devices have been signed out",
+      "changing": "Changing…",
+      "change": "Change password"
+    }
+  },
+  "design": {
+    "page": {
+      "back": "Back",
+      "undo": "Undo",
+      "redo": "Redo",
+      "canvasSize": "{width} × {height} px",
+      "draftSaving": "Saving…",
+      "draftSaved": "Draft saved",
+      "download": "Download PNG",
+      "downloadError": "Export failed, please try again"
+    },
+    "rightPanel": {
+      "canvasTitle": "Canvas",
+      "background": "Background",
+      "geometryTitle": "Position & size",
+      "x": "X",
+      "y": "Y",
+      "width": "W",
+      "height": "H",
+      "rotation": "Rotation",
+      "layerTitle": "Layer",
+      "bringFront": "Bring to front",
+      "sendBack": "Send to back",
+      "bringForward": "Bring forward",
+      "sendBackward": "Send backward",
+      "textTitle": "Text",
+      "content": "Content",
+      "font": "Font",
+      "fontSize": "Size",
+      "fontWeight": "Weight",
+      "weightNormal": "Regular",
+      "weightBold": "Bold",
+      "textColor": "Color",
+      "align": "Align",
+      "alignLeft": "Align left",
+      "alignCenter": "Align center",
+      "alignRight": "Align right",
+      "lineHeight": "Line height",
+      "pillBackground": "Pill background",
+      "pillOn": "On",
+      "pillOff": "Off",
+      "opacity": "Opacity",
+      "imageTitle": "Image",
+      "radius": "Radius",
+      "fit": "Fit",
+      "fitCover": "Cover",
+      "fitContain": "Contain",
+      "shapeTitle": "Shape",
+      "fill": "Fill"
+    },
+    "canvas": {
+      "label": "Design canvas"
+    },
+    "rail": {
+      "label": "Design tools",
+      "templates": "Templates",
+      "text": "Text",
+      "materials": "Materials"
+    },
+    "templatePanel": {
+      "title": "Templates",
+      "names": {
+        "ecom-main": "E-commerce Main",
+        "xhs-cover": "Social Cover"
+      }
+    },
+    "materialsPanel": {
+      "title": "Materials",
+      "names": {
+        "badge-starburst": "Burst badge",
+        "badge-percent": "Percent badge",
+        "tag-price": "Price tag",
+        "ribbon-banner": "Ribbon banner",
+        "arrow-doodle": "Doodle arrow",
+        "wave-deco": "Wave deco",
+        "bubble-chat": "Chat bubble",
+        "crown": "Crown",
+        "lightning": "Lightning",
+        "star": "Star"
+      }
+    },
+    "textPanel": {
+      "presetsTitle": "Text presets",
+      "fontsTitle": "Artistic fonts",
+      "fontSample": "Summer Drop",
+      "presets": {
+        "title": {
+          "name": "Title",
+          "sample": "Fresh Summer Launch"
+        },
+        "subtitle": {
+          "name": "Subtitle",
+          "sample": "Light texture · Lasting scent"
+        },
+        "body": {
+          "name": "Body",
+          "sample": "Describe your product here"
+        }
+      },
+      "fonts": {
+        "smiley-sans": "Smiley Sans",
+        "lxgw-wenkai": "LXGW WenKai"
+      },
+      "fancyTitle": "Fancy text"
+    },
+    "fancy": {
+      "pill": {
+        "name": "Pill label",
+        "text": "Limited Offer"
+      },
+      "point": {
+        "name": "Selling point",
+        "text": "Best seller in store"
+      },
+      "blast": {
+        "name": "Price blast",
+        "label": "Save",
+        "price": "$59"
+      }
+    },
+    "dialog": {
+      "title": "New design",
+      "description": "Choose a size preset or set a custom canvas size",
+      "categoryAll": "All",
+      "groupCommon": "Common sizes",
+      "groupEcom": "E-commerce",
+      "groupSocial": "Social media",
+      "recent": "Recent",
+      "recentEmpty": "No history yet",
+      "customSize": "Custom size",
+      "width": "Width",
+      "height": "Height",
+      "unit": "px",
+      "lockRatio": "Lock ratio",
+      "create": "Create"
+    },
+    "presets": {
+      "poster-mobile": { "name": "Mobile poster" },
+      "poster-square": { "name": "Square poster" },
+      "poster-landscape": { "name": "Landscape poster" },
+      "video-vertical": { "name": "Vertical video cover" },
+      "main-image": { "name": "Product main image" },
+      "detail-page": { "name": "Product detail page" },
+      "livestream-cover": { "name": "Livestream cover" },
+      "shop-banner": { "name": "Shop banner" },
+      "xhs-cover": { "name": "RedNote cover" },
+      "xhs-image": { "name": "RedNote post" },
+      "moments": { "name": "Moments poster" },
+      "weibo": { "name": "Weibo image" }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderWithI18n } from "@/test/render-with-i18n";
 import { Composer } from "./composer";
 import type { AgentInfo } from "@/types/chat";
 
@@ -34,7 +35,7 @@ function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {})
     hasSession: true,
     ...overrides,
   };
-  render(<Composer {...props} />);
+  renderWithI18n(<Composer {...props} />);
   return props;
 }
 
@@ -80,7 +81,7 @@ describe("Composer landing 变体（首页直发）", () => {
       hasSession: false,
       variant: "landing",
     } as const;
-    const { rerender } = render(<Composer {...props} value="" />);
+    const { rerender } = renderWithI18n(<Composer {...props} value="" />);
     const textarea = screen.getByLabelText("消息输入");
     await user.type(textarea, "画一张秋天树林");
     await user.keyboard("{Enter}");

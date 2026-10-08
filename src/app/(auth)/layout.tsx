@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { AuthBrandPanel } from "@/components/auth/brand-panel";
 
-export const metadata: Metadata = {
-  description: "登录或用邀请码注册，开始生成能直接上架的电商图片",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.metadata");
+  return { description: t("description") };
+}
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
