@@ -14,12 +14,12 @@ export interface S3Like {
 }
 
 export const defaultS3Client = new S3Client({
-  endpoint: `http://${getConfig().MINIO_ENDPOINT}:${getConfig().MINIO_PORT}`,
-  region: "us-east-1",
-  forcePathStyle: true,
+  endpoint: getConfig().S3_ENDPOINT,
+  region: getConfig().S3_REGION,
+  forcePathStyle: getConfig().S3_FORCE_PATH_STYLE,
   credentials: {
-    accessKeyId: getConfig().MINIO_ACCESS_KEY,
-    secretAccessKey: getConfig().MINIO_SECRET_KEY,
+    accessKeyId: getConfig().S3_ACCESS_KEY,
+    secretAccessKey: getConfig().S3_SECRET_KEY,
   },
 });
 
@@ -49,7 +49,7 @@ export interface Storage {
 }
 
 export function createStorage(client: S3Like = defaultS3Client): Storage {
-  const bucket = getConfig().MINIO_BUCKET;
+  const bucket = getConfig().S3_BUCKET;
   return {
     async putObject(key, body, contentType) {
       await client.send(
