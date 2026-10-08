@@ -18,6 +18,8 @@ services:
       timeout: 3s
       retries: 10
 
+  # 本地 dev 专用 S3 兼容后端（私有桶）。生产/云上不经 compose：
+  # 在 .env.local 把 S3_* 指向 Supabase / 阿里云 OSS / 腾讯云 COS 即可切换，代码零改动。
   minio:
     image: minio/minio:latest
     container_name: oops-minio
@@ -37,6 +39,7 @@ services:
       timeout: 3s
       retries: 10
 
+  # 一次性 job：建私有桶 oops-assets（与 .env.local 的 S3_BUCKET 对应）
   minio-init:
     image: minio/mc:latest
     container_name: oops-minio-init

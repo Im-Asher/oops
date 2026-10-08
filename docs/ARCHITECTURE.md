@@ -17,7 +17,7 @@ Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
                                       └── tool: save_asset ──► 图片存储
    │
    ▼
-Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose 部署）
+Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Supabase·OSS·COS，env 切换）
 ```
 
 核心决策（已确认）：
@@ -48,17 +48,26 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（MinIO / S3 兼容，Docker Compose �
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发（`render_html` 工具延后） |
-| 图片存储 | MinIO（S3 兼容）→ 存储抽象 | 本地开发走 Docker Compose；接口兼容 OSS/S3/R2 |
+| 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
 | 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线） |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
 
+图片存储后端对照（全部经 `S3_*` 环境变量切换；易错点详见 `.env.example` 注释）：
+
+| 后端 | S3_ENDPOINT | S3_REGION | S3_FORCE_PATH_STYLE | 备注 |
+| --- | --- | --- | --- | --- |
+| MinIO（本地 dev） | `http://localhost:9000` | 任意（如 `us-east-1`） | `true` | Docker Compose 自带并自动建桶 |
+| Supabase | `https://<ref>.supabase.co/storage/v1/s3` | 项目真实 region | `true` | Dashboard 生成 S3 access key |
+| 阿里云 OSS | `https://oss-cn-hangzhou.aliyuncs.com` | `cn-hangzhou`（**不带 `oss-` 前缀**） | `false` | 签名 region 与 endpoint 前缀解耦 |
+| 腾讯云 COS | `https://cos.ap-guangzhou.myqcloud.com` | `ap-guangzhou` | `false` | bucket 名必须带 `-<appid>` 后缀 |
+
 ## 3. Agent 层：声明式注册
 
 **两张注册表解耦：ToolRegistry + AgentRegistry。**
 
-- **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落 MinIO→assets 的原子语义）；`render_html`/`save_asset` 属刻意延后项。
+- **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落对象存储→assets 的原子语义）；`render_html`/`save_asset` 属刻意延后项。
 - **AgentRegistry**：启动时扫描 `src/server/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/icon/tools，不含 systemPrompt）给前端 `GET /api/agents`。
 
 新增 Agent = 新增一个文件：
@@ -89,7 +98,7 @@ generate_image({ prompt, size, aspectRatio })
   → 写 tasks 表 (pending)
   → 进程内 executor（单例，并发 2，单任务超时 90s；重启后 running 标记 failed）
   → 调 DashScope Token Plan 万相 wan2.7-image（POST multimodal-generation，同步返回 base64）
-  → provider 内把返回图下载/转 base64 → 写入 MinIO → assets 表落库
+  → provider 内把返回图下载/转 base64 → 写入对象存储 → assets 表落库
   → task 流转 pending → running → succeeded/failed
 ```
 
@@ -115,7 +124,7 @@ SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组
 ② Route Handler：requireUser 取 userId → 引用资产归属校验（存在/userId/sessionId 匹配，≤5）→
    用户消息以"原文 + 引用块"落库（content 与 UI 文本保持原文）→ AgentRegistry 取配置 → 加载历史 → agentLoop
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
-④ 工具执行：generate_image（出图 → 下载转 base64 → 落 MinIO → assets 落库，userId 源自工具上下文）返回自有 `/files` URL
+④ 工具执行：generate_image（出图 → 下载转 base64 → 落对象存储 → assets 落库，userId 源自工具上下文）返回自有 `/files` URL
 ⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
 ⑥ 收尾：assistant 消息（含 tool parts）落库，图片入 assets → 画布可见
 ```
@@ -310,7 +319,7 @@ oops/
 │   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
 │   │       ├── profile/            # GET/PATCH 资料 + POST 改密（requireUser + 改密按 IP 限频）
 │   │       ├── sessions/route.ts   # 会话列表/新建（按认证用户隔离）
-│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删 MinIO 对象→assets→会话，messages 级联）
+│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联）
 │   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # 认证域（password / session-cookie / require-user / register / authenticate / rate-limit）
@@ -325,7 +334,7 @@ oops/
 │   │   │   ├── task.repo.ts        # 任务 仓储
 │   │   │   └── mock-db.ts          # 仓储单测用的 drizzle 查询 mock
 │   │   ├── infra/
-│   │       ├── storage/            # 存储抽象（MinIO / S3 兼容）
+│   │       ├── storage/            # 存储抽象（S3 兼容，env 切换后端）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
 │   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
 │   │           ├── upload.ts       # 上传/画布导出处理（userId 必传）
@@ -364,7 +373,7 @@ oops/
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
 - **多租户 SaaS**：注册/登录与用户级数据隔离已落地，后续补配额/积分、团队与组织隔离。
-- **多实例部署**：存储已为 MinIO（S3 兼容）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
+- **多实例部署**：存储为 S3 兼容（env 可切云上后端）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
 - **Agent 市场**：AgentRegistry 已是配置驱动，可平移到 DB 存储开放自定义。
 - **局部重绘/抠图**：作为新工具加入 ToolRegistry，Agent 按需引用。
 
