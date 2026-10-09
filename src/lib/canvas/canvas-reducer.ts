@@ -3,7 +3,7 @@
  * 画布是统一平面：items 为会话全部作品（含生成占位卡），view 为视图变换，
  * edit（裁剪/滤镜）挂在每个条目上、作用于选中条目——切换选中不丢编辑。
  */
-import { ITEM_WIDTH, placeNear, placeNew } from "@/lib/canvas/layout";
+import { ITEM_WIDTH, placeNear, placeNew, type PlaceAnchor } from "@/lib/canvas/layout";
 
 export interface CanvasView {
   scale: number;
@@ -99,6 +99,8 @@ export type CanvasAction =
       }>;
       /** 上传参考图等场景需立即成为引用：选中最后新增条目。 */
       selectNew?: boolean;
+      /** 视口锚点（世界坐标）：无引用条目围绕它外扩找空闲位；缺省走原点网格。 */
+      anchor?: PlaceAnchor;
     }
   | {
       type: "addPlaceholder";
@@ -107,6 +109,8 @@ export type CanvasAction =
       prompt?: string;
       agentIcon?: string;
       agentName?: string;
+      /** 视口锚点（世界坐标）：无引用占位卡围绕它外扩找空闲位；缺省走原点网格。 */
+      anchor?: PlaceAnchor;
     }
   | { type: "patchItem"; id: string; patch: Partial<Omit<CanvasItem, "id" | "edit">> }
   | { type: "removeItem"; id: string }
@@ -200,11 +204,13 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
       let lastNewId: string | undefined;
       for (const image of action.images) {
         if (items.some((item) => item.assetId === image.assetId)) continue;
-        // 带血缘的修改结果放置在源图附近；其余按货架流找空位
+        // 带血缘的修改结果放置在源图附近；其余按货架流找空位（有锚点则围绕锚点外扩）
         const source = image.referenceAssetId
           ? items.find((item) => item.assetId === image.referenceAssetId)
           : undefined;
-        const slot = source ? placeNear(source, items, 1) : placeNew(items, 1);
+        const slot = source
+          ? placeNear(source, items, 1)
+          : placeNew(items, 1, undefined, action.anchor);
         const id = createItemId();
         lastNewId = id;
         items = [
@@ -238,7 +244,9 @@ export function canvasReducer(state: CanvasState, action: CanvasAction): CanvasS
       const source = action.referenceAssetId
         ? state.items.find((item) => item.assetId === action.referenceAssetId)
         : undefined;
-      const slot = source ? placeNear(source, state.items, 1) : placeNew(state.items, 1);
+      const slot = source
+        ? placeNear(source, state.items, 1)
+        : placeNew(state.items, 1, undefined, action.anchor);
       const item: CanvasItem = {
         id: action.id,
         assetId: "",

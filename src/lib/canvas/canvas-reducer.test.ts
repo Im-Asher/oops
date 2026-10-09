@@ -318,3 +318,53 @@ describe("署名徽标（agentIcon/agentName）", () => {
     expect(state.items[0]).toMatchObject({ agentIcon: "📸", agentName: "产品摄影师" });
   });
 });
+
+describe("视口锚定放置（anchor payload）", () => {
+  const anchor = { x: 500, y: 400 };
+
+  it("addPlaceholder 带 anchor 中心落位；不带 anchor 走原点网格", () => {
+    const anchored = canvasReducer(initialCanvasState, {
+      type: "addPlaceholder",
+      id: "ph1",
+      anchor,
+    });
+    expect(anchored.items[0]).toMatchObject({ id: "ph1", x: 340, y: 240 });
+
+    const legacy = canvasReducer(initialCanvasState, { type: "addPlaceholder", id: "ph2" });
+    expect(legacy.items[0]).toMatchObject({ id: "ph2", x: 0, y: 0 });
+  });
+
+  it("addImageItems 无引用条目围绕锚点落位；带引用仍邻近源图", () => {
+    let state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [{ assetId: "a", url: "/files/a.png" }],
+      anchor,
+    });
+    expect(state.items[0]).toMatchObject({ x: 340, y: 240 });
+
+    state = canvasReducer(state, {
+      type: "addImageItems",
+      images: [{ assetId: "b", url: "/files/b.png", referenceAssetId: "a" }],
+      anchor,
+    });
+    // 版本邻近放置不受锚点影响：源图右侧
+    expect(state.items[1]).toMatchObject({ x: 684, y: 240 });
+  });
+
+  it("一轮多张无引用图片在锚点周围环排且互不重叠", () => {
+    const state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [
+        { assetId: "a", url: "/files/a.png" },
+        { assetId: "b", url: "/files/b.png" },
+        { assetId: "c", url: "/files/c.png" },
+      ],
+      anchor,
+    });
+    expect(state.items.map((i) => [i.x, i.y])).toEqual([
+      [340, 240],
+      [-4, -104],
+      [340, -104],
+    ]);
+  });
+});
