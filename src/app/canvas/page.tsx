@@ -122,11 +122,10 @@ function ChatPageInner() {
   function viewportAnchor(): PlaceAnchor | undefined {
     const el = canvasWrapRef.current;
     if (!el) return undefined;
-    const center = screenToCanvas(
+    return screenToCanvas(
       { x: el.clientWidth / 2, y: el.clientHeight / 2 },
       canvasStateRef.current.view,
     );
-    return { x: center.x, y: center.y };
   }
 
   /** "有新结果"chip 点击：以当前缩放定位并选中该结果，同时收起提示。 */
