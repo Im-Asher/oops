@@ -86,6 +86,63 @@ describe("placeNew 锚定", () => {
     expect(placeNew([first], 1, undefined)).toEqual({ x: 0, y: 344, width: 320, height: 320 });
   });
 
+  it("非有限锚点回退原点列优先行为", () => {
+    const first = makeItem({ id: "a", x: 0, y: 0 });
+    expect(placeNew([first], 1, undefined, { x: NaN, y: 0 })).toEqual({
+      x: 0,
+      y: 344,
+      width: 320,
+      height: 320,
+    });
+    expect(placeNew([first], 1, undefined, { x: 500, y: Infinity })).toEqual({
+      x: 0,
+      y: 344,
+      width: 320,
+      height: 320,
+    });
+  });
+
+  it("锚点对齐考虑条目高度（aspect ≠ 1）", () => {
+    expect(placeNew([], 1.5, undefined, anchor)).toEqual({
+      x: 340,
+      y: 160,
+      width: 320,
+      height: 480,
+    });
+  });
+
+  it("环 1 次序完整钉死（(row, col) 字典序）", () => {
+    const items: CanvasItem[] = [makeItem({ id: "c", x: 340, y: 240 })];
+    const ring1 = [
+      { x: -4, y: -104 },
+      { x: 340, y: -104 },
+      { x: 684, y: -104 },
+      { x: -4, y: 240 },
+      { x: 684, y: 240 },
+      { x: -4, y: 584 },
+      { x: 340, y: 584 },
+      { x: 684, y: 584 },
+    ];
+    ring1.forEach((pos, i) => {
+      expect(placeNew(items, 1, undefined, anchor)).toEqual({
+        x: pos.x,
+        y: pos.y,
+        width: 320,
+        height: 320,
+      });
+      items.push(
+        makeItem({ id: `r${i}`, x: pos.x, y: pos.y, assetId: `a${i}`, url: `/files/a${i}.png` }),
+      );
+    });
+    // 环 1 填满后落到环 2 首格 (-2, -2)
+    expect(placeNew(items, 1, undefined, anchor)).toEqual({
+      x: -348,
+      y: -448,
+      width: 320,
+      height: 320,
+    });
+  });
+
   it("连续多张在锚点周围环排且互不重叠", () => {
     const first = placeNew([], 1, undefined, anchor);
     const second = placeNew([makeItem({ id: "i1", x: first.x, y: first.y })], 1, undefined, anchor);

@@ -34,6 +34,7 @@ export function itemRect(item: CanvasItem): Rect {
  * 无锚点：列优先网格从世界原点扫描（先向下、再向右）。
  * 有锚点：中心对齐锚点的槽优先，随后按 Chebyshev 环外扩
  * （环内按 (row, col) 字典序固定排序），取首个不相交槽；200 环无空位退回原点槽。
+ * 注：aspect 较大（高 > 步长）时纵向相邻环格互相重叠，可能直接跳到更外环，行为仍确定。
  */
 export function placeNew(
   items: ReadonlyArray<CanvasItem>,
@@ -59,15 +60,15 @@ export function placeNew(
     return { x: 0, y: 0, width: ITEM_WIDTH, height };
   }
   const step = ITEM_WIDTH + ITEM_GAP;
-  const centerX = anchor.x - ITEM_WIDTH / 2;
-  const centerY = anchor.y - height / 2;
-  const center = trySlot(centerX, centerY);
+  const slotX = anchor.x - ITEM_WIDTH / 2;
+  const slotY = anchor.y - height / 2;
+  const center = trySlot(slotX, slotY);
   if (center) return center;
   for (let ring = 1; ring <= 200; ring++) {
     for (let row = -ring; row <= ring; row++) {
       for (let col = -ring; col <= ring; col++) {
         if (Math.max(Math.abs(col), Math.abs(row)) !== ring) continue;
-        const slot = trySlot(centerX + col * step, centerY + row * step);
+        const slot = trySlot(slotX + col * step, slotY + row * step);
         if (slot) return slot;
       }
     }
