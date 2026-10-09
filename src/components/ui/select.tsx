@@ -78,8 +78,7 @@ function SelectContent({
           data-position={position}
           className={cn(
             // 修正上游怪癖：popper 模式下 Viewport 不应被压成触发器高度（下拉列表需要完整展开）
-        "data-[position=popper]:w-full data-[position=popper]:min-w-(--radix-select-trigger-width)",
-            position === "popper" && ""
+            "data-[position=popper]:w-full data-[position=popper]:min-w-(--radix-select-trigger-width)",
           )}
         >
           {children}
