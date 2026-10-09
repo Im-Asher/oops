@@ -367,4 +367,17 @@ describe("视口锚定放置（anchor payload）", () => {
       [340, -104],
     ]);
   });
+
+  it("同批混合：无引用图走锚点落位，引用图仍邻近源图", () => {
+    const state = canvasReducer(initialCanvasState, {
+      type: "addImageItems",
+      images: [
+        { assetId: "a", url: "/files/a.png" },
+        { assetId: "b", url: "/files/b.png", referenceAssetId: "a" },
+      ],
+      anchor,
+    });
+    expect(state.items[0]).toMatchObject({ assetId: "a", x: 340, y: 240 });
+    expect(state.items[1]).toMatchObject({ assetId: "b", x: 684, y: 240 });
+  });
 });
