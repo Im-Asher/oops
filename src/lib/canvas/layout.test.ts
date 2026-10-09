@@ -52,6 +52,67 @@ describe("placeNew", () => {
   });
 });
 
+describe("placeNew 锚定", () => {
+  const anchor = { x: 500, y: 400 };
+
+  it("空画布时中心对齐锚点落位", () => {
+    expect(placeNew([], 1, undefined, anchor)).toEqual({
+      x: 340,
+      y: 240,
+      width: 320,
+      height: 320,
+    });
+  });
+
+  it("中心被占时按 Chebyshev 环外扩，环内 (row, col) 字典序", () => {
+    const center = makeItem({ id: "c", x: 340, y: 240 });
+    expect(placeNew([center], 1, undefined, anchor)).toEqual({
+      x: -4,
+      y: -104,
+      width: 320,
+      height: 320,
+    });
+    const blocker = makeItem({ id: "b", x: -4, y: -104, assetId: "b", url: "/files/b.png" });
+    expect(placeNew([center, blocker], 1, undefined, anchor)).toEqual({
+      x: 340,
+      y: -104,
+      width: 320,
+      height: 320,
+    });
+  });
+
+  it("无锚点时保持原点列优先行为", () => {
+    const first = makeItem({ id: "a", x: 0, y: 0 });
+    expect(placeNew([first], 1, undefined)).toEqual({ x: 0, y: 344, width: 320, height: 320 });
+  });
+
+  it("连续多张在锚点周围环排且互不重叠", () => {
+    const first = placeNew([], 1, undefined, anchor);
+    const second = placeNew([makeItem({ id: "i1", x: first.x, y: first.y })], 1, undefined, anchor);
+    const third = placeNew(
+      [
+        makeItem({ id: "i1", x: first.x, y: first.y }),
+        makeItem({ id: "i2", x: second.x, y: second.y, assetId: "b", url: "/files/b.png" }),
+      ],
+      1,
+      undefined,
+      anchor,
+    );
+    expect(second).toEqual({ x: -4, y: -104, width: 320, height: 320 });
+    expect(third).toEqual({ x: 340, y: -104, width: 320, height: 320 });
+    const slots = [first, second, third];
+    for (let i = 0; i < slots.length; i++) {
+      for (let j = i + 1; j < slots.length; j++) {
+        const a = slots[i];
+        const b = slots[j];
+        const overlap =
+          a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+});
+
 describe("placeNear", () => {
   it("首个版本放在源图右侧，源图位置不变", () => {
     const source = makeItem({ id: "s", x: 0, y: 0 });
