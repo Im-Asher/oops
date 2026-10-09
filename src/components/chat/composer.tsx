@@ -157,7 +157,7 @@ export function Composer({
       <Textarea
         aria-label={t("inputLabel")}
         ref={textareaRef}
-        className={`field-sizing-content ${variant === "landing" ? "max-h-60 min-h-15" : "max-h-40 min-h-10"} resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0`}
+        className={`field-sizing-content ${variant === "landing" ? "max-h-60 min-h-15" : "max-h-80 min-h-20"} resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0`}
         disabled={busy || !sessionReady}
         onBlur={() => {
           composingRef.current = false;
@@ -208,9 +208,19 @@ export function Composer({
             >
               <SelectValue placeholder={t("selectAgent")} />
             </SelectTrigger>
-            <SelectContent className="bg-popover text-foreground">
+            <SelectContent
+              align="start"
+              className="bg-popover text-foreground"
+              position="popper"
+              side="top"
+              sideOffset={6}
+            >
               {agents.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
+                <SelectItem
+                  className="data-[state=checked]:bg-accent"
+                  key={a.id}
+                  value={a.id}
+                >
                   <span className="flex items-center gap-2">
                     <span aria-hidden>{a.icon}</span>
                     {a.name}
