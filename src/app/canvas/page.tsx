@@ -15,8 +15,8 @@ import {
   isDirty,
   selectedItem,
 } from "@/lib/canvas/canvas-reducer";
-import { centerViewOn, rectVisibleInViewport } from "@/lib/canvas/coords";
-import { itemRect } from "@/lib/canvas/layout";
+import { centerViewOn, rectVisibleInViewport, screenToCanvas } from "@/lib/canvas/coords";
+import { itemRect, type PlaceAnchor } from "@/lib/canvas/layout";
 import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
@@ -114,6 +114,20 @@ function ChatPageInner() {
     canvasStateRef.current = canvas;
   }, [canvas]);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 新结果视口锚点（占位卡创建/上传条目落位时刻的画布容器中心，世界坐标）。
+   * ref 未就绪返回 undefined，reducer 回退原点网格（会话恢复等路径不传）。
+   */
+  function viewportAnchor(): PlaceAnchor | undefined {
+    const el = canvasWrapRef.current;
+    if (!el) return undefined;
+    const center = screenToCanvas(
+      { x: el.clientWidth / 2, y: el.clientHeight / 2 },
+      canvasStateRef.current.view,
+    );
+    return { x: center.x, y: center.y };
+  }
 
   /** "有新结果"chip 点击：以当前缩放定位并选中该结果，同时收起提示。 */
   function handleRevealClick() {
@@ -224,6 +238,7 @@ function ChatPageInner() {
           type: "addImageItems",
           images: [{ assetId: data.assetId, url: data.url, name: file.name }],
           selectNew: true,
+          anchor: viewportAnchor(),
         });
       } catch (e) {
         setReferenceError(e instanceof Error ? e.message : t("page.referenceUploadFailed"));
@@ -532,6 +547,7 @@ function ChatPageInner() {
             dispatch({
               type: "addImageItems",
               images: ok.map((v) => ({ assetId: v.assetId, url: v.url, name: v.name })),
+              anchor: viewportAnchor(),
             });
           }
           updateSlot(sessionId, (slot) => ({ ...slot, draft: text }));
@@ -545,6 +561,7 @@ function ChatPageInner() {
         dispatch({
           type: "addImageItems",
           images: ok.map((v) => ({ assetId: v.assetId, url: v.url, name: v.name })),
+          anchor: viewportAnchor(),
         });
         refs = ok.map((v) => v.assetId);
       }
@@ -770,6 +787,7 @@ function ChatPageInner() {
                   ? args.referenceAssetId
                   : roundRefs[0],
               prompt: typeof args.prompt === "string" ? args.prompt : undefined,
+              anchor: viewportAnchor(),
               ...(sig ?? {}),
             });
           }
