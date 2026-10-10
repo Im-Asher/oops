@@ -25,6 +25,11 @@ const envSchema = z.object({
     .default("true")
     .transform((v) => v === "true"),
   QWEN_TOKEN_PLAN_CN_API_KEY: z.string().min(1).optional(),
+  // LLM 装配（llm-assembly spec）：供应商显式声明 + 角色级模型覆盖（目录模型 id）。
+  // 未配置仅透传，目录/解析层负责校验与回退。
+  LLM_PROVIDER: z.string().min(1).default("qwen-token-plan-cn"),
+  LLM_MAIN_MODEL: z.string().min(1).optional(),
+  LLM_SUMMARIZER_MODEL: z.string().min(1).optional(),
   OWNER_ID: z.string().min(1).default("owner"),
   // 会话 cookie 签名密钥；长度下限保证离线暴力破解不可行
   AUTH_SECRET: z
@@ -55,6 +60,12 @@ export const IMAGE_ENDPOINT =
   "https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
 /** Token Plan China API key，图像生成与 LLM 共用（DashScope Bearer 鉴权）。 */
 export const QWEN_TOKEN_PLAN_CN_API_KEY = process.env.QWEN_TOKEN_PLAN_CN_API_KEY;
+
+/** LLM 供应商声明（llm-assembly spec）；缺省 qwen 保持现状零迁移。 */
+export const LLM_PROVIDER = process.env.LLM_PROVIDER ?? "qwen-token-plan-cn";
+/** 角色级模型覆盖（值为目录模型 id）；未设置走目录 roleDefaults。 */
+export const LLM_MAIN_MODEL = process.env.LLM_MAIN_MODEL;
+export const LLM_SUMMARIZER_MODEL = process.env.LLM_SUMMARIZER_MODEL;
 
 export type AppConfig = z.infer<typeof envSchema>;
 

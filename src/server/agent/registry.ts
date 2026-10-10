@@ -1,4 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { ModelCapability } from "@/server/llm/catalog";
+import type { AgentModelDeclaration } from "@/server/llm/resolver";
 import { toolRegistry, type ToolExecutionContext } from "./tools/registry";
 
 export interface AgentDefinition {
@@ -12,7 +14,12 @@ export interface AgentDefinition {
   /** 允许该 Agent 调用的工具名（按名授权）。 */
   tools: string[];
   systemPrompt: string;
+  /** 按角色的模型能力需求声明（llm-assembly spec）；未声明走全局装配，行为不变。 */
+  models?: AgentModelDeclaration;
 }
+
+/** 合法能力位（与 catalog 字面量联合同步；defineAgent 校验用）。 */
+const VALID_CAPABILITIES: readonly ModelCapability[] = ["vision"];
 
 /** 透出给前端的轻量元数据（不含 systemPrompt 等敏感/大字段）。 */
 export interface AgentMetadata {
@@ -24,8 +31,18 @@ export interface AgentMetadata {
   tools: string[];
 }
 
-/** 声明式 Agent 工厂：仅做结构校验与透传，无副作用。 */
+/** 声明式 Agent 工厂：结构校验（含模型能力声明）后透传，无副作用。 */
 export function defineAgent(def: AgentDefinition): AgentDefinition {
+  const declared = def.models?.main?.capabilities;
+  if (declared !== undefined) {
+    if (!Array.isArray(declared) || declared.length === 0) {
+      throw new Error(`Agent ${def.id} 的 models.main.capabilities 必须为非空数组`);
+    }
+    const invalid = declared.filter((c) => !VALID_CAPABILITIES.includes(c));
+    if (invalid.length > 0) {
+      throw new Error(`Agent ${def.id} 声明了未知模型能力：${invalid.join(", ")}`);
+    }
+  }
   return def;
 }
 

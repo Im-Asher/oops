@@ -9,9 +9,13 @@ import {
   type MutableImagesModels,
 } from "@earendil-works/pi-ai";
 import { IMAGE_ENDPOINT, IMAGE_MODELS, QWEN_TOKEN_PLAN_CN_API_KEY } from "@/lib/config";
+import { findImageProvider } from "@/server/llm/catalog";
 
-export const DASHSCOPE_IMAGE_PROVIDER = "dashscope-token-plan";
-export const DASHSCOPE_IMAGE_MODEL = "wan2.7-image";
+// 常量来源改为模型目录（llm-assembly spec）；导出保持不变，消费方无感。
+// 兜底字面量仅为类型收窄，catalog.test 已锁条目存在性与取值一致。
+const imageEntry = findImageProvider("dashscope-token-plan");
+export const DASHSCOPE_IMAGE_PROVIDER = imageEntry?.providerId ?? "dashscope-token-plan";
+export const DASHSCOPE_IMAGE_MODEL = imageEntry?.defaultModelId ?? "wan2.7-image";
 
 export type ImageGenErrorKind = "content_rejected" | "rate_limited" | "timeout" | "unknown";
 

@@ -1,7 +1,7 @@
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo, type SessionRepo } from "@/server/db/session.repo";
-import { getChatModel, getChatModels } from "@/server/infra/providers/llm";
+import { getChatModelForRole, getChatModels } from "@/server/infra/providers/llm";
 import { agentRegistry } from "./registry";
 import { compactSessionHistory, summaryPrefixMessage } from "./compact";
 import { toolRegistry } from "./tools/registry";
@@ -35,7 +35,20 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
     return;
   }
 
-  const model = getChatModel();
+  // 按角色装配（llm-assembly spec）：main 带该 Agent 的模型能力声明，summarizer 走全局装配。
+  // 装配层配置错误（供应商未登记/覆盖模型不存在/能力不满足）显式回喂 SSE，回合不执行。
+  let model: ReturnType<typeof getChatModelForRole>;
+  let summaryModel: ReturnType<typeof getChatModelForRole>;
+  try {
+    model = getChatModelForRole("main", def.models);
+    summaryModel = getChatModelForRole("summarizer");
+  } catch (err) {
+    args.onEvent({
+      type: "error",
+      message: (err as Error)?.message ?? "模型配置错误",
+    });
+    return;
+  }
   const tools = agentRegistry.getAgentTools(args.agentId, {
     userId: args.userId,
     sessionId: args.sessionId,
@@ -62,7 +75,7 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
       excludeMessageId: args.userMessageId,
       deps: {
         summarize: async (systemPrompt, input) => {
-          const result = await getChatModels().completeSimple(model, {
+          const result = await getChatModels().completeSimple(summaryModel, {
             systemPrompt,
             messages: [{ role: "user", content: input, timestamp: Date.now() }],
           });

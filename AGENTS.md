@@ -74,6 +74,7 @@ src/
 ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
 │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
 │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
+│   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
 │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
 ├── components/     # React components (client)
 ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）

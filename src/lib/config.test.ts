@@ -19,6 +19,29 @@ describe("parseEnv", () => {
     expect(config.QWEN_TOKEN_PLAN_CN_API_KEY).toBeUndefined();
   });
 
+  it("applies LLM_PROVIDER default (qwen) when unset", () => {
+    const config = parseEnv(validEnv);
+    expect(config.LLM_PROVIDER).toBe("qwen-token-plan-cn");
+    expect(config.LLM_MAIN_MODEL).toBeUndefined();
+    expect(config.LLM_SUMMARIZER_MODEL).toBeUndefined();
+  });
+
+  it("passes through explicit LLM role overrides", () => {
+    const config = parseEnv({
+      ...validEnv,
+      LLM_PROVIDER: "glm",
+      LLM_MAIN_MODEL: "glm-4-plus",
+      LLM_SUMMARIZER_MODEL: "glm-4-flash",
+    });
+    expect(config.LLM_PROVIDER).toBe("glm");
+    expect(config.LLM_MAIN_MODEL).toBe("glm-4-plus");
+    expect(config.LLM_SUMMARIZER_MODEL).toBe("glm-4-flash");
+  });
+
+  it("throws when LLM_PROVIDER is empty", () => {
+    expect(() => parseEnv({ ...validEnv, LLM_PROVIDER: "" })).toThrowError(/LLM_PROVIDER/);
+  });
+
   it("transforms S3_FORCE_PATH_STYLE", () => {
     const config = parseEnv({
       ...validEnv,

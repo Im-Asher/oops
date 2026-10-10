@@ -68,7 +68,16 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 }));
 
 vi.mock("@/server/infra/providers/llm", () => ({
-  getChatModel: () => ({ id: "test" }) as never,
+  // 模拟装配层：Agent 声明 vision 而装配结果不满足时抛配置错误（ModelConfigError 语义）
+  getChatModelForRole: (
+    role: string,
+    declaration?: { main?: { capabilities?: string[] } },
+  ) => {
+    if (role === "main" && declaration?.main?.capabilities?.includes("vision")) {
+      throw new Error("供应商 fixture 的模型 m 缺少所需能力：vision");
+    }
+    return { id: "test", role } as never;
+  },
   getChatModels: () =>
     ({ streamSimple: async function* () {}, completeSimple: h.completeSimple }) as never,
 }));
@@ -672,5 +681,37 @@ describe("runAgent (runtime bridge)", () => {
     expect(initial.messages).toHaveLength(1);
     expect(initial.messages[0].role).toBe("assistant");
     expect(initial.messages[0].content.map((c) => c.type)).toEqual(["text", "toolCall"]);
+  });
+
+  it("装配错误可见：能力声明不满足时 SSE error 事件回喂，回合不执行", async () => {
+    agentRegistry.register(
+      defineAgent({
+        id: "vision-unmet",
+        name: "测试",
+        description: "test",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        models: { main: { capabilities: ["vision"] } },
+      }),
+    );
+    const { repo, create } = makeRepo();
+    const events: Record<string, unknown>[] = [];
+    await runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "vision-unmet",
+      userText: "hi",
+      userMessageId: "mu1",
+      signal: new AbortController().signal,
+      onEvent: (e: Record<string, unknown>) => events.push(e),
+      repos: { message: repo as never },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "error" });
+    expect(events[0].message).toContain("vision");
+    // 回合未执行：无落库
+    expect(create).not.toHaveBeenCalled();
   });
 });

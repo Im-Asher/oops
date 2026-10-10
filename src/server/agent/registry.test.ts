@@ -86,4 +86,64 @@ describe("AgentRegistry", () => {
     expect(meta.find((a) => a.id === "atmosphere-designer")?.presets).toHaveLength(3);
     expect(meta.find((a) => a.id === "product-photographer")?.presets).toHaveLength(3);
   });
+
+  it("models 声明：合法能力位透传，运行时/装配层可读取", () => {
+    agentRegistry.register(
+      defineAgent({
+        id: "models-declared",
+        name: "测试",
+        description: "测试 Agent",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        models: { main: { capabilities: ["vision"] } },
+      }),
+    );
+    expect(agentRegistry.get("models-declared")?.models?.main?.capabilities).toEqual(["vision"]);
+  });
+
+  it("models 校验：空 capabilities 启动即报错", () => {
+    expect(() =>
+      defineAgent({
+        id: "empty-caps",
+        name: "测试",
+        description: "测试 Agent",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        models: { main: { capabilities: [] } },
+      }),
+    ).toThrowError(/非空数组/);
+  });
+
+  it("models 校验：未知能力名启动即报错", () => {
+    expect(() =>
+      defineAgent({
+        id: "bad-caps",
+        name: "测试",
+        description: "测试 Agent",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        // 故意越类型：运行时守卫须拦截（unknown 能力）
+        models: { main: { capabilities: ["telepathy" as "vision"] } },
+      }),
+    ).toThrowError(/未知模型能力/);
+  });
+
+  it("未声明 models 的定义保持原状（字段缺省）", () => {
+    const def = defineAgent({
+      id: "no-models",
+      name: "测试",
+      description: "测试 Agent",
+      icon: "🧪",
+      presets: [],
+      tools: [],
+      systemPrompt: "x",
+    });
+    expect(def.models).toBeUndefined();
+  });
 });
