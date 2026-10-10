@@ -173,6 +173,11 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
     canvas items, draft and view restore (workspace saved locally per session)
     → deleting a session must remove its MinIO objects and asset rows (GC)
     → narrow-viewport check: chat/canvas toggle exclusively, session drawer.
+  - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model and
+    Chromium installed): pick poster-designer → attach a product image →
+    request a poster → verify the rendered poster appears in chat and canvas
+    (vision input, HTML sandbox render) → select the poster as a reference
+    for an edit round → reload to confirm restore.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
 - Playwright screenshot rendering is covered by a service-level test using a
   minimal HTML fixture; keep it hermetic (no network).

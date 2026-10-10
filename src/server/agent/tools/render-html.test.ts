@@ -49,7 +49,7 @@ const outcome = {
   taskId: "t1",
 };
 
-const validArgs = { html: "<html><body>x</body></html>", height: 1334 };
+const validArgs = { html: "<html><body>x</body></html>", height: 1334 as const };
 
 describe("render_html 工具：schema 约束与血缘", () => {
   beforeEach(() => {

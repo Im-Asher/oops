@@ -47,7 +47,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
-| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图，进程内限并发（`render_html` 工具延后） |
+| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图（`src/server/infra/render/`），进程内限并发，与生图共用执行器闸门 |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
 | 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线） |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
@@ -67,7 +67,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 
 **两张注册表解耦：ToolRegistry + AgentRegistry。**
 
-- **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落对象存储→assets 的原子语义）；`render_html`/`save_asset` 属刻意延后项。
+- **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落对象存储→assets 的原子语义）；`render_html`（HTML→沙箱截图→assets，海报链路）；`save_asset` 属刻意延后项。
 - **AgentRegistry**：启动时扫描 `src/server/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/icon/tools，不含 systemPrompt）给前端 `GET /api/agents`。
 
 新增 Agent = 新增一个文件：
@@ -111,6 +111,7 @@ generate_image({ prompt, size, aspectRatio })
 | 工具 | 语义 | 场景 |
 | --- | --- | --- |
 | `generate_image` | 同步等待结果返回 agent；可选 `referenceAssetId`（画布引用的源图，zod + 归属校验，失败结构化回喂；通过校验后写入任务 payload 与 `assets.meta.referenceAssetId` 血缘） | 组合工作流：先生成背景图，agent 拿 URL 再写 HTML 海报 |
+| `render_html` | agent 产出完整自包含海报 HTML（宽 750 固定 + 高度档位枚举，HTML ≤200KB）→ 沙箱截图落 assets；截图以 `ImageContent` 回喂 agent（后续轮可看见自己的产出），血缘经 `referenceAssetId` 透传 | 海报链路核心：版式精确可控、文字准确 |
 | `schedule_batch`（后续） | 提交即返回 taskId | 批量出图/重生成，无需 agent 继续推理 |
 
 SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组件），10~30s 可接受。
@@ -366,7 +367,12 @@ oops/
 （ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
 `src/server/db` 为领域仓储层（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
 
-> 后续 change 才落地（尚未实现）：`src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）；
+> `src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）已落地：
+> 沙箱渲染（禁 JS 三重约束 = HTML 预校验 + 脚本请求拦截 + CSP 纵深、出网白名单、单渲染超时）、
+> 浏览器实例进程内复用；渲染前把 `/files/` 引用内联为 data URI（沙箱默认断网，相对路径不可解析）。
+> 多模态上下文：声明 vision 能力的 Agent（海报设计师）将引用商品图以 `ImageContent` 注入本轮
+> LLM 输入（非 vision Agent 保持文本引用块），transcript 图片一律清洗为引用占位文本（无 base64 落库）；
+> 部署海报场景需 `LLM_MAIN_MODEL` 指向已登记的 vision 模型（qwen3-vl-plus）。
 > 领域聚合/任务状态机等按需演进（`task-executor` 已落地）。
 > 图片浏览/编辑已在 `chat/page.tsx` 的**画布工作台**承载（缩略图上屏 + 裁剪/滤镜/导出），不再单独规划 `gallery` 作品库页。
 

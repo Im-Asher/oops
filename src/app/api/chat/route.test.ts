@@ -198,8 +198,8 @@ describe("POST /api/chat", () => {
 
   it("引用注入：userText = 原文 + 引用块（assetId/url/原prompt），content 列保持原文，transcript 与 userText 一致", async () => {
     h.assetRows = [
-      { id: "a1", userId: "u1", sessionId: "s1", storageKey: "assets/x.png", prompt: "海边日落" },
-      { id: "a2", userId: "u1", sessionId: "s1", storageKey: "assets/y.png", prompt: null },
+      { id: "a1", userId: "u1", sessionId: "s1", storageKey: "assets/x.png", prompt: "海边日落", mimeType: "image/png" },
+      { id: "a2", userId: "u1", sessionId: "s1", storageKey: "assets/y.png", prompt: null, mimeType: "image/png" },
     ];
     h.events = [JSON.stringify({ type: "finish", stopReason: "stop" })];
     await post("改成夜景", ["a1", "a2"]);
@@ -221,7 +221,7 @@ describe("POST /api/chat", () => {
   });
 
   it("引用校验：越权（他人资产）引用整体拒绝，不落库不进 LLM", async () => {
-    h.assetRows = [{ id: "a1", userId: "u2", sessionId: "s1", storageKey: "x.png", prompt: null }];
+    h.assetRows = [{ id: "a1", userId: "u2", sessionId: "s1", storageKey: "x.png", prompt: null, mimeType: "image/png" }];
     const res = await post("改成夜景", ["a1"]);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: { code: string } };
@@ -232,7 +232,7 @@ describe("POST /api/chat", () => {
 
   it("引用校验：跨会话与不存在的引用同样拒绝", async () => {
     h.assetRows = [
-      { id: "a1", userId: "u1", sessionId: "s-other", storageKey: "x.png", prompt: null },
+      { id: "a1", userId: "u1", sessionId: "s-other", storageKey: "x.png", prompt: null, mimeType: "image/png" },
     ];
     const res = await post("改成夜景", ["a1", "missing"]);
     expect(res.status).toBe(400);

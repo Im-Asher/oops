@@ -143,6 +143,10 @@ export async function renderHtml(input: RenderHtmlInput): Promise<RenderedPage> 
     }
   } catch (err) {
     if (err instanceof RenderError) throw err;
+    // playwright 内部等待（setContent/screenshot 等）超时统一归类 timeout
+    if ((err as Error)?.name === "TimeoutError") {
+      throw new RenderError("timeout", `渲染超过 ${timeoutMs}ms 未完成`);
+    }
     throw new RenderError("unknown", "渲染失败", err);
   } finally {
     await context.close().catch(() => {});
