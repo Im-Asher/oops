@@ -208,6 +208,11 @@
         "thermosWhiteMain": "Shoot a clean white-background hero shot of this thermos, highlighting its metallic finish",
         "coffeeScene": "Style a coffee cup on a wooden desk in morning light for a warm, natural look",
         "creamMain": "Create an e-commerce hero image of this face cream on a soft pink background with gentle shadows, emphasizing the bottle details"
+      },
+      "poster-designer": {
+        "promoSale": "Design a flash-sale poster for this product with a bold price block and top selling point",
+        "festivalMain": "Design a festival mega-sale hero poster for this product with festive colors, a headline and promo details",
+        "newArrival": "Design a minimal, premium new-arrival poster for this product highlighting its details with one tagline"
       }
     }
   },

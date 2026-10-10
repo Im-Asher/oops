@@ -6,6 +6,7 @@ import {
   generateImage,
 } from "@/server/infra/providers/dashscope-images";
 import { renderHtml, RenderError } from "@/server/infra/render/render-html";
+import { inlineFileRefs } from "@/server/infra/render/inline-files";
 import { createStorage, defaultS3Client, extFromMime, generateAssetKey } from "@/server/infra/storage/s3";
 
 /** 单任务超时（毫秒）。 */
@@ -209,7 +210,9 @@ registerTaskHandler("render_html", async (payload, ctx) => {
   };
   let rendered: Awaited<ReturnType<typeof renderHtml>>;
   try {
-    rendered = await renderHtml({ html, width, height, signal: ctx.signal });
+    // 版式引用的商品图/底图先内联为 data URI（沙箱默认断网，相对路径不可解析）
+    const html2 = await inlineFileRefs(html);
+    rendered = await renderHtml({ html: html2, width, height, signal: ctx.signal });
   } catch (err) {
     if (err instanceof RenderError) {
       throw new TaskError(err.message, err.kind);
