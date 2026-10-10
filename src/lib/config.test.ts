@@ -50,6 +50,31 @@ describe("parseEnv", () => {
     expect(config.S3_FORCE_PATH_STYLE).toBe(false);
   });
 
+  it("applies render sandbox defaults", () => {
+    const config = parseEnv(validEnv);
+    expect(config.RENDER_ALLOWED_HOSTS).toEqual([]);
+    expect(config.RENDER_TIMEOUT_MS).toBe(30000);
+    expect(config.RENDER_EXECUTABLE_PATH).toBeUndefined();
+  });
+
+  it("parses render sandbox overrides", () => {
+    const config = parseEnv({
+      ...validEnv,
+      RENDER_ALLOWED_HOSTS: "cdn.example.com, img.example.com",
+      RENDER_TIMEOUT_MS: "5000",
+      RENDER_EXECUTABLE_PATH: "/usr/bin/chromium",
+    });
+    expect(config.RENDER_ALLOWED_HOSTS).toEqual(["cdn.example.com", "img.example.com"]);
+    expect(config.RENDER_TIMEOUT_MS).toBe(5000);
+    expect(config.RENDER_EXECUTABLE_PATH).toBe("/usr/bin/chromium");
+  });
+
+  it("throws when RENDER_TIMEOUT_MS is not positive", () => {
+    expect(() => parseEnv({ ...validEnv, RENDER_TIMEOUT_MS: "0" })).toThrowError(
+      /RENDER_TIMEOUT_MS/,
+    );
+  });
+
   it("throws when DATABASE_URL is missing", () => {
     const { DATABASE_URL: _omit, ...env } = validEnv;
     expect(() => parseEnv(env)).toThrowError(/DATABASE_URL/);

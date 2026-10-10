@@ -5,12 +5,21 @@ import {
   DASHSCOPE_IMAGE_PROVIDER,
   generateImage,
 } from "@/server/infra/providers/dashscope-images";
+import { renderHtml, RenderError } from "@/server/infra/render/render-html";
 import { createStorage, defaultS3Client, extFromMime, generateAssetKey } from "@/server/infra/storage/s3";
 
 /** 单任务超时（毫秒）。 */
 export const TASK_TIMEOUT_MS = 90_000;
 /** 全局并发上限。 */
 export const TASK_CONCURRENCY = 2;
+
+/** 已实现 handler 的任务类型（schema 枚举的子集；export 预留）。 */
+const TASK_TYPES = ["generate_image", "render_html"] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+/** 运行时枚举守卫（工具/路由层校验用；executor 仍接受测试注入的临时类型）。 */
+export function isTaskType(v: string): v is TaskType {
+  return (TASK_TYPES as readonly string[]).includes(v);
+}
 
 export class TaskError extends Error {
   constructor(
@@ -87,7 +96,7 @@ export async function submitAndWait(
 ): Promise<unknown> {
   const repo = opts.repo ?? createTaskRepo();
   const created = await repo.create({
-    type: type as "generate_image",
+    type: type as TaskType,
     payload,
     sessionId: opts.sessionId,
     userId: opts.userId,
@@ -181,6 +190,57 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
     model: DASHSCOPE_IMAGE_MODEL,
     size,
     provider: DASHSCOPE_IMAGE_PROVIDER,
+    taskId: ctx.taskId,
+    ...(referenceAssetId ? { referenceAssetId } : {}),
+  };
+});
+
+/**
+ * render_html handler（html-rendering spec）：HTML 渲染 → 截图 → S3 → assets
+ * 原子语义（任一步失败整体失败，不留半成品资产）；截图 base64 随 result 返回
+ * 供工具回喂模型，落库时经 slimForDb 剔除。
+ */
+registerTaskHandler("render_html", async (payload, ctx) => {
+  const { html, width, height, referenceAssetId } = payload as {
+    html: string;
+    width: number;
+    height: number;
+    referenceAssetId?: string;
+  };
+  let rendered: Awaited<ReturnType<typeof renderHtml>>;
+  try {
+    rendered = await renderHtml({ html, width, height, signal: ctx.signal });
+  } catch (err) {
+    if (err instanceof RenderError) {
+      throw new TaskError(err.message, err.kind);
+    }
+    throw new TaskError("渲染失败", "unknown");
+  }
+  const storage = createStorage(defaultS3Client);
+  const assetRepo: AssetRepo = createAssetRepo();
+  const key = generateAssetKey("png");
+  await storage.putObject(key, rendered.png, "image/png");
+  const asset = await assetRepo.create({
+    storageKey: key,
+    mimeType: "image/png",
+    kind: "image",
+    width,
+    height,
+    sessionId: ctx.sessionId,
+    meta: {
+      renderedFromHtml: true,
+      taskId: ctx.taskId,
+      ...(referenceAssetId ? { referenceAssetId } : {}),
+    },
+    userId: ctx.userId,
+  });
+  return {
+    assetId: asset.id,
+    url: `/files/${key}`,
+    data: Buffer.from(rendered.png).toString("base64"),
+    mimeType: "image/png",
+    width,
+    height,
     taskId: ctx.taskId,
     ...(referenceAssetId ? { referenceAssetId } : {}),
   };

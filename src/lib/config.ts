@@ -45,6 +45,14 @@ const envSchema = z.object({
     .default(
       "https://token-plan.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
     ),
+  // 渲染沙箱（html-rendering spec）：出网白名单（host 逗号分隔，空=仅内联资源）、
+  // 单渲染超时 ms、可选 Chromium 可执行路径（未设走 playwright 默认解析）。
+  RENDER_ALLOWED_HOSTS: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+  RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  RENDER_EXECUTABLE_PATH: z.string().min(1).optional(),
 });
 
 /** 图像生成可用模型白名单（provider 配置校验）。 */
@@ -66,6 +74,16 @@ export const LLM_PROVIDER = process.env.LLM_PROVIDER ?? "qwen-token-plan-cn";
 /** 角色级模型覆盖（值为目录模型 id）；未设置走目录 roleDefaults。 */
 export const LLM_MAIN_MODEL = process.env.LLM_MAIN_MODEL;
 export const LLM_SUMMARIZER_MODEL = process.env.LLM_SUMMARIZER_MODEL;
+
+/** 渲染出网白名单 host 列表；空表示仅允许 data: 等内联资源。 */
+export const RENDER_ALLOWED_HOSTS = (process.env.RENDER_ALLOWED_HOSTS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+/** 单次渲染超时（毫秒）。 */
+export const RENDER_TIMEOUT_MS = Number(process.env.RENDER_TIMEOUT_MS ?? 30000);
+/** Chromium 可执行路径（可选；未设走 playwright 默认解析）。 */
+export const RENDER_EXECUTABLE_PATH = process.env.RENDER_EXECUTABLE_PATH;
 
 export type AppConfig = z.infer<typeof envSchema>;
 
