@@ -56,6 +56,24 @@ describe("toUIMessage", () => {
     const imagePart = msg.parts.find((p) => p.type === "image");
     expect((imagePart as { sourceAssetId?: string }).sourceAssetId).toBeUndefined();
   });
+
+  it("海报渲染结果（render_html）重建为图片 part（与生图同等地位，可选中引用）", () => {
+    const msg = toUIMessage("m5", "assistant", "海报已生成", [
+      {
+        type: "render_html",
+        url: "/files/poster.png",
+        assetId: "a3",
+        width: 750,
+        height: 1334,
+        taskId: "t9",
+      },
+    ]);
+    expect(msg.parts).toContainEqual({
+      type: "image",
+      url: "/files/poster.png",
+      assetId: "a3",
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

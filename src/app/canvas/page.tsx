@@ -774,7 +774,10 @@ function ChatPageInner() {
           // 画布占位卡：生成工具有引用时邻近放置（血缘取模型传参，回退本轮选中引用）。
           // 已知限制：生成中刷新页面会丢失占位卡（本地态），且本轮 SSE 不恢复；
           // 服务端任务与消息仍在，刷新后重新拉取消息由 deriveImages 重建已完成的图。
-          if (currentIdRef.current === sessionId && event.name === "generate_image") {
+          if (
+            currentIdRef.current === sessionId &&
+            (event.name === "generate_image" || event.name === "render_html")
+          ) {
             const args = (event.args ?? {}) as { referenceAssetId?: unknown; prompt?: unknown };
             roundPlaceholders.push(event.id);
             const sig = agentSigOf(currentSession?.agentId ?? agentId);
@@ -798,7 +801,9 @@ function ChatPageInner() {
               label:
                 event.name === "generate_image"
                   ? t("page.toolStatus.generateImage")
-                  : t("page.toolStatus.running", { name: event.name }),
+                  : event.name === "render_html"
+                    ? t("page.toolStatus.renderHtml")
+                    : t("page.toolStatus.running", { name: event.name }),
             },
           ]);
           break;

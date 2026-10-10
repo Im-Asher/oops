@@ -98,6 +98,7 @@
     "page": {
       "toolStatus": {
         "generateImage": "Generating image…",
+        "renderHtml": "Rendering poster…",
         "running": "Running {name}…"
       },
       "referenceUploadFailed": "Reference upload failed",

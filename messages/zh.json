@@ -98,6 +98,7 @@
     "page": {
       "toolStatus": {
         "generateImage": "正在生成图片…",
+        "renderHtml": "正在渲染海报…",
         "running": "正在执行 {name}…"
       },
       "referenceUploadFailed": "参考图上传失败",
