@@ -101,6 +101,18 @@ function imagePlaceholder(ref: { url?: string; assetId?: string }): TextContent 
 }
 
 /**
+ * user 消息图片块的留存文本：ImageContent 本体不含资产引用，引用线索由组装侧
+ * （route 层）以扩展字段附带——留存带 assetId/url 的占位文本，绝不携带 base64。
+ */
+function userImagePlaceholder(c: ImageContent): TextContent {
+  const ext = c as ImageContent & { assetId?: unknown; url?: unknown };
+  const assetId = typeof ext.assetId === "string" ? ext.assetId : undefined;
+  const url = typeof ext.url === "string" ? ext.url : undefined;
+  const asset = assetId ? ` (assetId: ${assetId})` : "";
+  return { type: "text", text: `[图片附件: ${url ?? "(无引用信息)"}${asset}]` };
+}
+
+/**
  * 清洗单条 message：assistant 剥 thinking；user/toolResult 的图片块文本化。
  * 注意：details 字段原样保留（当前工具契约下 details 只含小型元数据，图片 base64
  * 只出现在 content 中——新增工具 MUST NOT 把图片数据放进 details，否则绕过清洗）。
@@ -122,9 +134,7 @@ function sanitizeMessage(message: Message): Message {
   if (message.role === "user" && Array.isArray(message.content)) {
     return {
       ...message,
-      content: message.content.map((c) =>
-        isImageContent(c) ? { type: "text", text: "[图片附件]" } : c,
-      ),
+      content: message.content.map((c) => (isImageContent(c) ? userImagePlaceholder(c) : c)),
     };
   }
   return message;

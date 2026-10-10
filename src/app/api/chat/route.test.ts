@@ -14,10 +14,28 @@ const h = vi.hoisted(() => ({
   runAgentArgs: [] as Record<string, unknown>[],
   messageCreates: [] as Record<string, unknown>[],
   userId: null as string | null,
-  assetRows: [] as { id: string; userId: string; sessionId: string; storageKey: string; prompt: string | null }[],
+  assetRows: [] as { id: string; userId: string; sessionId: string; storageKey: string; prompt: string | null; mimeType: string }[],
+  visionAgent: false,
+  storageBytes: [137, 80, 78, 71] as number[],
 }));
 
 vi.mock("@/server/agent", () => ({ default: {} }));
+vi.mock("@/server/agent/registry", () => ({
+  agentRegistry: {
+    // 仅 poster-designer 声明 vision（fixture 判定）
+    get: (id: string) =>
+      id === "poster-designer" && h.visionAgent
+        ? { models: { main: { capabilities: ["vision"] } } }
+        : undefined,
+  },
+}));
+vi.mock("@/server/infra/storage/s3", () => ({
+  createStorage: () => ({
+    getObject: async () => ({
+      Body: { transformToByteArray: async () => h.storageBytes },
+    }),
+  }),
+}));
 vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
@@ -62,14 +80,14 @@ vi.mock("@/server/agent/moderation", () => ({
 
 import { POST } from "./route";
 
-function post(message: string, referenceAssetIds?: string[]) {
+function post(message: string, referenceAssetIds?: string[], agentId = "atmosphere-designer") {
   return POST(
     new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         sessionId: "s1",
-        agentId: "atmosphere-designer",
+        agentId,
         message,
         ...(referenceAssetIds ? { referenceAssetIds } : {}),
       }),
@@ -229,5 +247,54 @@ describe("POST /api/chat", () => {
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe("INVALID");
     expect(h.runAgentCalls).toBe(0);
+  });
+
+  it("vision Agent：引用图片字节转 base64 注入 runAgent.images，transcript 图片文本化（无 base64）", async () => {
+    h.visionAgent = true;
+    h.sessionAgentId = "poster-designer";
+    h.assetRows = [
+      { id: "a1", userId: "u1", sessionId: "s1", storageKey: "assets/x.png", prompt: null, mimeType: "image/png" },
+    ];
+    h.events = [JSON.stringify({ type: "finish", stopReason: "stop" })];
+    await post("给这个保温杯做海报", ["a1"], "poster-designer");
+    const args = h.runAgentArgs[0] as { images?: { assetId: string; url: string; data: string; mimeType: string }[] };
+    expect(args.images).toHaveLength(1);
+    expect(args.images?.[0]).toMatchObject({
+      assetId: "a1",
+      url: "/files/assets/x.png",
+      data: Buffer.from(h.storageBytes).toString("base64"),
+      mimeType: "image/png",
+    });
+    // transcript：图片块被清洗为带引用线索的占位文本，绝无 base64
+    const transcript = h.messageCreates[0].transcript as {
+      messages: { role: string; content: { type: string; text?: string }[] }[];
+    };
+    const texts = transcript.messages[0].content.filter((c) => c.type === "text").map((c) => c.text ?? "");
+    expect(texts.some((t) => t.includes("[图片附件: /files/assets/x.png (assetId: a1)]"))).toBe(true);
+    expect(JSON.stringify(transcript)).not.toContain(Buffer.from(h.storageBytes).toString("base64"));
+  });
+
+  it("非 vision Agent：引用仅文本注入，不传 images（行为不变）", async () => {
+    h.assetRows = [
+      { id: "a1", userId: "u1", sessionId: "s1", storageKey: "assets/x.png", prompt: null, mimeType: "image/png" },
+    ];
+    h.events = [JSON.stringify({ type: "finish", stopReason: "stop" })];
+    await post("改成夜景", ["a1"]);
+    const args = h.runAgentArgs[0] as { images?: unknown[] };
+    expect(args.images ?? []).toHaveLength(0);
+    const transcript = h.messageCreates[0].transcript as {
+      messages: { content: unknown }[];
+    };
+    // 纯文本 transcript（引用块随 userText 落库）
+    expect(typeof transcript.messages[0].content).toBe("string");
+  });
+
+  it("vision Agent 无引用：不触发 storage 读取，images 为空", async () => {
+    h.visionAgent = true;
+    h.sessionAgentId = "poster-designer";
+    h.events = [JSON.stringify({ type: "finish", stopReason: "stop" })];
+    await post("直接描述需求", undefined, "poster-designer");
+    const args = h.runAgentArgs[0] as { images?: unknown[] };
+    expect(args.images ?? []).toHaveLength(0);
   });
 });

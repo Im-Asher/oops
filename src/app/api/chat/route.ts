@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { UserMessage } from "@earendil-works/pi-ai";
-import { runAgent } from "@/server/agent/runtime";
+import { runAgent, type AgentImageInput } from "@/server/agent/runtime";
+import { agentRegistry } from "@/server/agent/registry";
 import { screenInput } from "@/server/agent/moderation";
 import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
@@ -8,6 +9,7 @@ import { requireUser } from "@/server/auth/require-user";
 import { createAssetRepo } from "@/server/db/asset.repo";
 import { createMessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo } from "@/server/db/session.repo";
+import { createStorage } from "@/server/infra/storage/s3";
 import type { Asset } from "@/server/db/schema";
 import type { SseEvent } from "@/server/agent/types";
 
@@ -28,6 +30,31 @@ function buildReferenceBlock(assets: Asset[]): string {
     (a) => `- assetId: ${a.id}, url: /files/${a.storageKey}, 原prompt: ${a.prompt || "(无)"}`,
   );
   return `[引用画布图片]\n${lines.join("\n")}`;
+}
+
+/** vision Agent 判定：声明 main 需要 vision 时，引用图片以 ImageContent 注入本轮。 */
+function requiresVision(agentId: string): boolean {
+  const def = agentRegistry.get(agentId);
+  return def?.models?.main?.capabilities?.includes("vision") ?? false;
+}
+
+/** 引用图片字节读取：归属校验通过后从存储取字节转 base64（vision 注入用）。 */
+async function loadVisionImages(assets: Asset[]): Promise<AgentImageInput[]> {
+  const storage = createStorage();
+  const out: AgentImageInput[] = [];
+  for (const a of assets) {
+    if (!a.mimeType.startsWith("image/")) continue;
+    const obj = await storage.getObject(a.storageKey);
+    const bytes = await obj.Body?.transformToByteArray();
+    if (!bytes) continue;
+    out.push({
+      assetId: a.id,
+      url: `/files/${a.storageKey}`,
+      data: Buffer.from(bytes).toString("base64"),
+      mimeType: a.mimeType,
+    });
+  }
+  return out;
 }
 
 /** 聊天入口：认证 → 校验 → 落库用户消息 → 经 agentLoop 流式生成（SSE）。 */
@@ -83,6 +110,10 @@ export async function POST(req: Request): Promise<Response> {
   const userText =
     message + (referenceAssets.length > 0 ? `\n\n${buildReferenceBlock(referenceAssets)}` : "");
 
+  // vision 注入（poster-generation spec）：引用归属校验通过后，vision Agent 将图片
+  // 字节并入本轮 LLM 输入；非 vision Agent 忽略图片，仅文本引用块，行为不变。
+  const visionImages = requiresVision(agentId) ? await loadVisionImages(referenceAssets) : [];
+
   // 首条用户消息自动命名：仅当标题为空时截取前 20 字（手动命名与后续消息不覆盖；失败不阻断聊天）
   if (session.title == null) {
     try {
@@ -93,8 +124,26 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const messageRepo = createMessageRepo();
-  // user 消息双视图落库：content 列存原文（UI 渲染），transcript 存 LLM 视图（含引用块，与 userText 一致）
-  const userMessage: UserMessage = { role: "user", content: userText, timestamp: Date.now() };
+  // user 消息双视图落库：content 列存原文（UI 渲染），transcript 存 LLM 视图。
+  // vision 回合的 transcript 与 LLM 视图同构（text + 图片引用），清洗器把图片块
+  // 文本化为带引用线索的占位（无 base64 落库）。
+  const userMessage: UserMessage =
+    visionImages.length > 0
+      ? {
+          role: "user",
+          timestamp: Date.now(),
+          content: [
+            { type: "text", text: userText },
+            ...visionImages.map((img) => ({
+              type: "image" as const,
+              data: img.data,
+              mimeType: img.mimeType,
+              assetId: img.assetId,
+              url: img.url,
+            })),
+          ],
+        }
+      : { role: "user", content: userText, timestamp: Date.now() };
   const userRow = await messageRepo.create({
     sessionId,
     userId,
@@ -118,6 +167,7 @@ export async function POST(req: Request): Promise<Response> {
           agentId,
           userText,
           userMessageId: userRow.id,
+          images: visionImages,
           signal: ac.signal,
           onEvent: send,
           repos: { message: messageRepo },

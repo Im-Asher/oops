@@ -45,6 +45,19 @@ describe("qwen 默认条目与现状一致", () => {
   });
 });
 
+describe("vision 模型条目", () => {
+  it("qwen 目录登记 vision 能力模型（海报 Agent 能力供给）", () => {
+    const qwen = findTextProvider("qwen-token-plan-cn");
+    const vision = qwen?.models.find((m) => m.capabilities.includes("vision"));
+    expect(vision?.id).toBe("qwen3-vl-plus");
+  });
+
+  it("roleDefaults 仍指向纯文本模型（默认行为零回归）", () => {
+    const qwen = findTextProvider("qwen-token-plan-cn");
+    expect(qwen?.models.find((m) => m.id === qwen?.roleDefaults.main)?.capabilities).toEqual([]);
+  });
+});
+
 describe("dashscope 图像条目与现状一致", () => {
   it("providerId 与 defaultModelId 为现状常量值", () => {
     const dashscope = findImageProvider("dashscope-token-plan");

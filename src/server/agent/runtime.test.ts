@@ -11,6 +11,9 @@ const h = vi.hoisted(() => ({
   updateSummary: vi.fn(async () => ({})),
   // 中断测试用闸门：非空时 prompt 在每个事件派发前等待，测试可在此窗口触发 abort
   gate: null as Promise<void> | null,
+  // vision 链路探针：prompt 实参捕获 + 装配层是否支持 vision
+  promptArgs: [] as unknown[][],
+  visionSupported: false,
 }));
 
 vi.mock("@/server/db/session.repo", () => ({
@@ -40,7 +43,8 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
     abort() {
       this.abortRequested = true;
     }
-    async prompt() {
+    async prompt(...args: unknown[]) {
+      h.promptArgs.push(args);
       // 贴近真实 Agent：prompt 将本轮消息追加到历史之后（不整体替换）
       this.state = { messages: [...this.state.messages, ...h.stateMessages] };
       for (const ev of h.scripted) {
@@ -68,12 +72,17 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
 }));
 
 vi.mock("@/server/infra/providers/llm", () => ({
-  // 模拟装配层：Agent 声明 vision 而装配结果不满足时抛配置错误（ModelConfigError 语义）
+  // 模拟装配层：Agent 声明 vision 而装配结果不满足时抛配置错误（ModelConfigError 语义）；
+  // h.visionSupported 模拟部署方已配置 vision 模型的场景
   getChatModelForRole: (
     role: string,
     declaration?: { main?: { capabilities?: string[] } },
   ) => {
-    if (role === "main" && declaration?.main?.capabilities?.includes("vision")) {
+    if (
+      role === "main" &&
+      declaration?.main?.capabilities?.includes("vision") &&
+      !h.visionSupported
+    ) {
       throw new Error("供应商 fixture 的模型 m 缺少所需能力：vision");
     }
     return { id: "test", role } as never;
@@ -137,6 +146,8 @@ describe("runAgent (runtime bridge)", () => {
     h.stateMessages = [];
     h.session = null;
     h.gate = null;
+    h.promptArgs = [];
+    h.visionSupported = false;
     h.completeSimple.mockReset();
     h.updateSummary.mockClear();
   });
@@ -681,6 +692,82 @@ describe("runAgent (runtime bridge)", () => {
     expect(initial.messages).toHaveLength(1);
     expect(initial.messages[0].role).toBe("assistant");
     expect(initial.messages[0].content.map((c) => c.type)).toEqual(["text", "toolCall"]);
+  });
+
+  it("vision Agent 携带图片：prompt 收到 ImageContent 数组（多模态注入）", async () => {
+    h.visionSupported = true;
+    agentRegistry.register(
+      defineAgent({
+        id: "vision-ok",
+        name: "测试",
+        description: "test",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        models: { main: { capabilities: ["vision"] } },
+      }),
+    );
+    const { repo } = makeRepo();
+    await runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "vision-ok",
+      userText: "给这个做海报",
+      userMessageId: "mu1",
+      images: [{ assetId: "a1", url: "/files/x.png", data: "IMGDATA", mimeType: "image/png" }],
+      signal: new AbortController().signal,
+      onEvent: () => {},
+      repos: { message: repo as never },
+    });
+    expect(h.promptArgs).toHaveLength(1);
+    const [text, images] = h.promptArgs[0] as [string, { type: string; data: string; mimeType: string }[]];
+    expect(text).toBe("给这个做海报");
+    expect(images).toEqual([{ type: "image", data: "IMGDATA", mimeType: "image/png" }]);
+  });
+
+  it("非 vision Agent 忽略 images：prompt 仅文本（现状路径不变）", async () => {
+    const { repo } = makeRepo();
+    await runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "test-agent",
+      userText: "hi",
+      userMessageId: "mu1",
+      images: [{ assetId: "a1", url: "/files/x.png", data: "IMGDATA", mimeType: "image/png" }],
+      signal: new AbortController().signal,
+      onEvent: () => {},
+      repos: { message: repo as never },
+    });
+    expect(h.promptArgs[0]).toEqual(["hi", undefined]);
+  });
+
+  it("vision Agent 未携带图片：prompt 收到空数组（不破坏单参调用语义）", async () => {
+    h.visionSupported = true;
+    agentRegistry.register(
+      defineAgent({
+        id: "vision-ok2",
+        name: "测试",
+        description: "test",
+        icon: "🧪",
+        presets: [],
+        tools: [],
+        systemPrompt: "x",
+        models: { main: { capabilities: ["vision"] } },
+      }),
+    );
+    const { repo } = makeRepo();
+    await runAgent({
+      sessionId: "s1",
+      userId: "u1",
+      agentId: "vision-ok2",
+      userText: "hi",
+      userMessageId: "mu1",
+      signal: new AbortController().signal,
+      onEvent: () => {},
+      repos: { message: repo as never },
+    });
+    expect(h.promptArgs[0]).toEqual(["hi", []]);
   });
 
   it("装配错误可见：能力声明不满足时 SSE error 事件回喂，回合不执行", async () => {

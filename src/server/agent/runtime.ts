@@ -1,4 +1,5 @@
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
 import { createSessionRepo, type SessionRepo } from "@/server/db/session.repo";
 import { getChatModelForRole, getChatModels } from "@/server/infra/providers/llm";
@@ -11,6 +12,16 @@ import type { SseEvent } from "./types";
 /** 回放消息数硬上限（tasks.md 3.2：任何情况下不爆炸的最后防线） */
 const REPLAY_MAX_MESSAGES = 40;
 
+/** 本轮注入 LLM 的引用图片（route 层已做归属校验并从存储读取字节）。 */
+export interface AgentImageInput {
+  assetId: string;
+  /** 自有 files URL（/files/<storageKey>），供 transcript 留存引用线索。 */
+  url: string;
+  /** base64 图片字节。 */
+  data: string;
+  mimeType: string;
+}
+
 export interface RunAgentArgs {
   sessionId: string;
   agentId: string;
@@ -19,6 +30,8 @@ export interface RunAgentArgs {
   userMessageId: string;
   // 已认证用户（require-user 解析）：贯穿工具上下文与落库归属
   userId: string;
+  // 引用图片（vision Agent 专用；非 vision Agent 忽略，行为不变）
+  images?: readonly AgentImageInput[];
   signal: AbortSignal;
   onEvent: (event: SseEvent) => void;
   repos?: { message: MessageRepo; session?: SessionRepo };
@@ -185,7 +198,17 @@ export async function runAgent(args: RunAgentArgs): Promise<void> {
   }
 
   try {
-    await agent.prompt(args.userText);
+    // vision 链路（poster-generation spec）：仅当 Agent 声明需要 vision 时把引用图片
+    // 以 ImageContent 并入本轮输入；非 vision Agent 忽略 images，保持纯文本路径不变。
+    const requiresVision = def.models?.main?.capabilities?.includes("vision") ?? false;
+    const images: ImageContent[] | undefined = requiresVision
+      ? (args.images ?? []).map((img) => ({
+          type: "image" as const,
+          data: img.data,
+          mimeType: img.mimeType,
+        }))
+      : undefined;
+    await agent.prompt(args.userText, images);
   } catch (err) {
     // 中断引发的异常不外推（SSE 已断，收尾事件无法也无需送达），仅吞掉
     if (!args.signal.aborted) {

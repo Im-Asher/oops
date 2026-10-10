@@ -42,7 +42,12 @@ export const TEXT_PROVIDERS: readonly TextProviderEntry[] = [
     providerId: "qwen-token-plan-cn",
     label: "Qwen Token Plan (CN)",
     configEnvNames: ["QWEN_TOKEN_PLAN_CN_API_KEY"],
-    models: [{ id: "qwen3.8-max", capabilities: [] }],
+    models: [
+      { id: "qwen3.8-max", capabilities: [] },
+      // vision 模型：海报 Agent 等声明 vision 能力时的供给条目；
+      // 部署需以 LLM_MAIN_MODEL 指向之（默认 main 保持 qwen3.8-max 零回归）。
+      { id: "qwen3-vl-plus", capabilities: ["vision"] },
+    ],
     roleDefaults: { main: "qwen3.8-max", summarizer: "qwen3.8-max" },
   },
 ];

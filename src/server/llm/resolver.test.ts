@@ -45,6 +45,24 @@ describe("resolveTextModel 优先级链", () => {
   });
 });
 
+describe("vision 模型解析（真实 qwen 目录）", () => {
+  const visionDecl = { main: { capabilities: ["vision"] as const } };
+
+  it("env 指向已登记 vision 模型时声明满足", () => {
+    const resolved = resolveTextModel("main", visionDecl, {
+      ...baseEnv,
+      mainModel: "qwen3-vl-plus",
+    });
+    expect(resolved.modelId).toBe("qwen3-vl-plus");
+  });
+
+  it("默认纯文本模型不满足 vision 声明时 fail-fast（含能力名与模型）", () => {
+    expect(() => resolveTextModel("main", visionDecl, baseEnv)).toThrowError(
+      /qwen3\.8-max[\s\S]*vision/,
+    );
+  });
+});
+
 describe("resolveTextModel 能力需求校验", () => {
   it("声明满足：候选模型具备所需能力时解析通过", () => {
     const resolved = resolveTextModel(

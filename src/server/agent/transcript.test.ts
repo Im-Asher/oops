@@ -130,13 +130,38 @@ describe("sanitizeTranscript（写侧清洗）", () => {
     ]);
   });
 
-  it("user 图片附件替换为文本占位", () => {
+  it("user 图片附件替换为引用占位文本（无引用线索时无 assetId）", () => {
     const out = sanitizeTranscript([makeUserWithImage()]);
     const [user] = out.messages as UserMessage[];
     expect(user.content).toEqual([
       { type: "text", text: "看看这张图" },
-      { type: "text", text: "[图片附件]" },
+      { type: "text", text: "[图片附件: (无引用信息)]" },
     ]);
+  });
+
+  it("user 图片附件带引用扩展字段时留存 assetId 与 url（引用线索不丢失）", () => {
+    const out = sanitizeTranscript([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "看看这张图" },
+          {
+            type: "image",
+            data: BIG_BASE64,
+            mimeType: "image/png",
+            assetId: "a1",
+            url: "/files/assets/x.png",
+          },
+        ],
+        timestamp: 0,
+      } as UserMessage,
+    ]);
+    const [user] = out.messages as UserMessage[];
+    expect(user.content).toEqual([
+      { type: "text", text: "看看这张图" },
+      { type: "text", text: "[图片附件: /files/assets/x.png (assetId: a1)]" },
+    ]);
+    expect(JSON.stringify(out)).not.toContain("iVBORw0KGgo");
   });
 
   it("输出带 v:1 版本标记，isSerializedTranscript 校验通过", () => {
