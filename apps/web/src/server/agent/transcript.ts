@@ -1,5 +1,5 @@
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
-import { createMessageRepo } from "@/server/db/message.repo";
+import { createMessageRepo } from "@oops/db/message.repo";
 
 export type UIMessagePart =
   | { type: "text"; text: string }

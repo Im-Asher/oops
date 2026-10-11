@@ -23,7 +23,7 @@ vi.mock("@/server/agent", () => ({
 vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
-vi.mock("@/server/db/session.repo", () => ({
+vi.mock("@oops/db/session.repo", () => ({
   createSessionRepo: () => ({
     get: vi.fn(async (id: string, userId: string) =>
       h.sessionRow && h.sessionRow.id === id && h.sessionRow.userId === userId
@@ -43,7 +43,7 @@ vi.mock("@/server/db/session.repo", () => ({
     }),
   }),
 }));
-vi.mock("@/server/db/asset.repo", () => ({
+vi.mock("@oops/db/asset.repo", () => ({
   createAssetRepo: () => ({
     listKeysBySession: vi.fn(async () => {
       if (h.failOnKey === "__list__") throw new Error("list boom");

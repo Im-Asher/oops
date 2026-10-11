@@ -8,7 +8,7 @@ const h = vi.hoisted(() => ({
   hashPassword: vi.fn(),
 }));
 
-vi.mock("@/server/db/user.repo", () => ({
+vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: () => ({
     findById: h.findById,
     updateProfile: h.updateProfile,

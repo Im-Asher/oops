@@ -1,9 +1,9 @@
-import type { User } from "@/server/db/schema";
+import type { User } from "@oops/db/schema";
 import {
   createUserRepo,
   type ProfilePatch,
   type UserGender,
-} from "@/server/db/user.repo";
+} from "@oops/db/user.repo";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 
 export interface ProfileData {

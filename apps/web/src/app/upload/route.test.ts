@@ -12,7 +12,7 @@ vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
 
-vi.mock("@/server/db/session.repo", () => ({
+vi.mock("@oops/db/session.repo", () => ({
   createSessionRepo: () => ({
     get: async (sessionId: string, userId: string) =>
       h.sessionExists ? { id: sessionId, userId, agentId: "atmosphere-designer", title: null } : undefined,
@@ -39,8 +39,8 @@ vi.mock("@/server/infra/storage/s3", () => ({
   defaultS3Client: {},
 }));
 
-vi.mock("@/server/db/asset.repo", () => ({ createAssetRepo: () => ({}) }));
-vi.mock("@/server/db/message.repo", () => ({ createMessageRepo: () => ({}) }));
+vi.mock("@oops/db/asset.repo", () => ({ createAssetRepo: () => ({}) }));
+vi.mock("@oops/db/message.repo", () => ({ createMessageRepo: () => ({}) }));
 
 import { POST } from "./route";
 

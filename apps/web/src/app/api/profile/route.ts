@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/server/auth/require-user";
-import { createUserRepo } from "@/server/db/user.repo";
+import { createUserRepo } from "@oops/db/user.repo";
 import { toProfile, updateProfile } from "@/server/profile/profile";
 
 function unauthorized(): Response {

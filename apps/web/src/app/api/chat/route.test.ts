@@ -39,7 +39,7 @@ vi.mock("@/server/infra/storage/s3", () => ({
 vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
-vi.mock("@/server/db/asset.repo", () => ({
+vi.mock("@oops/db/asset.repo", () => ({
   createAssetRepo: () => ({
     getManyByIds: async (ids: string[]) => h.assetRows.filter((a) => ids.includes(a.id)),
   }),
@@ -51,7 +51,7 @@ vi.mock("@/server/agent/runtime", () => ({
     for (const e of h.events) args.onEvent(JSON.parse(e));
   }),
 }));
-vi.mock("@/server/db/session.repo", () => ({
+vi.mock("@oops/db/session.repo", () => ({
   createSessionRepo: () => ({
     get: async () =>
       h.sessionExists
@@ -65,7 +65,7 @@ vi.mock("@/server/db/session.repo", () => ({
     }),
   }),
 }));
-vi.mock("@/server/db/message.repo", () => ({
+vi.mock("@oops/db/message.repo", () => ({
   createMessageRepo: () => ({
     create: vi.fn(async (i: Record<string, unknown>) => {
       h.messageCreates.push(i);

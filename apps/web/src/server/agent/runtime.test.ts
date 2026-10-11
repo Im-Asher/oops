@@ -16,7 +16,7 @@ const h = vi.hoisted(() => ({
   visionSupported: false,
 }));
 
-vi.mock("@/server/db/session.repo", () => ({
+vi.mock("@oops/db/session.repo", () => ({
   createSessionRepo: () => ({
     get: vi.fn(async () => h.session),
     updateSummary: h.updateSummary,
@@ -93,7 +93,7 @@ vi.mock("@/server/infra/providers/llm", () => ({
 
 import { runAgent } from "./runtime";
 import { agentRegistry, defineAgent } from "./registry";
-import type { MessageRepo } from "@/server/db/message.repo";
+import type { MessageRepo } from "@oops/db/message.repo";
 
 interface ToolEndDetails {
   assetId?: string;

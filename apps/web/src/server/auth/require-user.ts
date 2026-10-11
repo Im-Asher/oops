@@ -1,5 +1,5 @@
 import { getAuthConfig } from "@oops/config";
-import { createUserRepo } from "@/server/db/user.repo";
+import { createUserRepo } from "@oops/db/user.repo";
 import {
   parseSessionCookieValue,
   readSessionCookie,

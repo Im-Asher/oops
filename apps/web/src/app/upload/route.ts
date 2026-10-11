@@ -1,9 +1,9 @@
 import { handleDerivedUpload, handleReferenceUpload, handleUpload } from "@/server/infra/storage/upload";
 import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
 import { requireUser } from "@/server/auth/require-user";
-import { createAssetRepo } from "@/server/db/asset.repo";
-import { createMessageRepo } from "@/server/db/message.repo";
-import { createSessionRepo } from "@/server/db/session.repo";
+import { createAssetRepo } from "@oops/db/asset.repo";
+import { createMessageRepo } from "@oops/db/message.repo";
+import { createSessionRepo } from "@oops/db/session.repo";
 
 export const dynamic = "force-dynamic";
 

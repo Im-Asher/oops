@@ -1,8 +1,8 @@
-import { db as defaultDb } from "@/server/db";
-import { createUserRepo } from "@/server/db/user.repo";
-import { createInviteCodeRepo } from "@/server/db/invite-code.repo";
-import type { DbClient } from "@/server/db/invite-code.repo";
-import type { User } from "@/server/db/schema";
+import { db as defaultDb } from "@oops/db";
+import { createUserRepo } from "@oops/db/user.repo";
+import { createInviteCodeRepo } from "@oops/db/invite-code.repo";
+import type { DbClient } from "@oops/db/invite-code.repo";
+import type { User } from "@oops/db/schema";
 import { generateUniqueOopsId } from "./oops-id";
 
 export type RegisterFailureReason = "invite_code_invalid" | "username_taken";

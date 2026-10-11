@@ -31,7 +31,7 @@ vi.mock("@/server/domain/tasks/task-executor", () => ({
   ),
 }));
 
-vi.mock("@/server/db/asset.repo", () => ({
+vi.mock("@oops/db/asset.repo", () => ({
   createAssetRepo: () => ({
     get: async (id: string) => (h.assetRow?.id === id ? h.assetRow : undefined),
   }),

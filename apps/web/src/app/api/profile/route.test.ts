@@ -7,7 +7,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/auth/require-user", () => ({ requireUser: h.requireUser }));
-vi.mock("@/server/db/user.repo", () => ({
+vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: () => ({ findById: h.findById }),
 }));
 vi.mock("@/server/profile/profile", async (importOriginal) => ({

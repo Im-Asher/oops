@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { registerUser } from "./register";
-import type { DbClient } from "@/server/db/invite-code.repo";
+import type { DbClient } from "@oops/db/invite-code.repo";
 
 // 事务 stub：db.transaction(fn) 直接以链式 stub 调用 fn；Proxy mock 无法驱动事务流
 function makeTxStub(

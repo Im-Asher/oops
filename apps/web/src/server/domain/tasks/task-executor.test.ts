@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TaskInput, TaskRepo } from "@/server/db/task.repo";
+import type { TaskInput, TaskRepo } from "@oops/db/task.repo";
 import { RenderError } from "@/server/infra/render/render-html";
 import {
   recoverInterruptedTasks,

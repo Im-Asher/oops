@@ -1,4 +1,4 @@
-import { createUserRepo } from "@/server/db/user.repo";
+import { createUserRepo } from "@oops/db/user.repo";
 import { verifyPassword } from "./password";
 
 // 未知用户时对固定哑哈希执行等价 scrypt 运算，抹平"用户名是否存在"的耗时侧信道

@@ -1,6 +1,6 @@
 import { extFromMime, generateAssetKey, type Storage } from "./s3";
-import type { AssetRepo } from "@/server/db/asset.repo";
-import type { MessageRepo } from "@/server/db/message.repo";
+import type { AssetRepo } from "@oops/db/asset.repo";
+import type { MessageRepo } from "@oops/db/message.repo";
 
 export const ALLOWED_IMAGE_TYPES = [
   "image/png",

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { hashPassword } from "./password";
 
-vi.mock("@/server/db/user.repo", () => ({
+vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: () => ({ findByUsername: findByUsernameMock }),
 }));
 

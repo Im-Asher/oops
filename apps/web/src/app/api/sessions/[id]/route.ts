@@ -2,8 +2,8 @@ import { z } from "zod";
 import { requireUser } from "@/server/auth/require-user";
 import { agentRegistry } from "@/server/agent";
 import { loadSessionMessages } from "@/server/agent/transcript";
-import { createSessionRepo } from "@/server/db/session.repo";
-import { createAssetRepo } from "@/server/db/asset.repo";
+import { createSessionRepo } from "@oops/db/session.repo";
+import { createAssetRepo } from "@oops/db/asset.repo";
 import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
 
 export const dynamic = "force-dynamic";

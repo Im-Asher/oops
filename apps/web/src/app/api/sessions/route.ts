@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/server/auth/require-user";
-import { createSessionRepo } from "@/server/db/session.repo";
+import { createSessionRepo } from "@oops/db/session.repo";
 
 export const dynamic = "force-dynamic";
 

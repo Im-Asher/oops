@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { submitAndWait } from "@/server/domain/tasks/task-executor";
-import { createAssetRepo } from "@/server/db/asset.repo";
+import { createAssetRepo } from "@oops/db/asset.repo";
 import type { ToolDefinition } from "./registry";
 
 /** 海报固定宽（电商主图宽度惯例）。 */

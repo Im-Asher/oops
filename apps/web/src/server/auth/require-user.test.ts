@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSessionCookieValue } from "./session-cookie";
 import { requireUser } from "./require-user";
 
-vi.mock("@/server/db/user.repo", () => ({
+vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: vi.fn(() => ({ findById: findByIdMock })),
 }));
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { submitAndWait } from "@/server/domain/tasks/task-executor";
-import { createAssetRepo } from "@/server/db/asset.repo";
+import { createAssetRepo } from "@oops/db/asset.repo";
 import type { ToolDefinition } from "./registry";
 
 const SIZES = [

@@ -1,5 +1,5 @@
-import { createAssetRepo, type AssetRepo } from "@/server/db/asset.repo";
-import { createTaskRepo, type TaskRepo } from "@/server/db/task.repo";
+import { createAssetRepo, type AssetRepo } from "@oops/db/asset.repo";
+import { createTaskRepo, type TaskRepo } from "@oops/db/task.repo";
 import {
   DASHSCOPE_IMAGE_MODEL,
   DASHSCOPE_IMAGE_PROVIDER,

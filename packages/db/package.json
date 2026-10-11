@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "@oops/config": "workspace:*",
+    "dotenv": "^18.0.4",
     "drizzle-orm": "^0.45.3",
     "pg": "^8.23.0"
   },

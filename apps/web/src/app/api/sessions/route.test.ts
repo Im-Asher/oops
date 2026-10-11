@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@/server/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
-vi.mock("@/server/db/session.repo", () => ({
+vi.mock("@oops/db/session.repo", () => ({
   createSessionRepo: () => ({
     list: vi.fn(async (userId: string) => {
       h.listCalls.push(userId);

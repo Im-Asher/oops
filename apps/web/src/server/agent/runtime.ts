@@ -1,7 +1,7 @@
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
-import { createMessageRepo, type MessageRepo } from "@/server/db/message.repo";
-import { createSessionRepo, type SessionRepo } from "@/server/db/session.repo";
+import { createMessageRepo, type MessageRepo } from "@oops/db/message.repo";
+import { createSessionRepo, type SessionRepo } from "@oops/db/session.repo";
 import { getChatModelForRole, getChatModels } from "@/server/infra/providers/llm";
 import { agentRegistry } from "./registry";
 import { compactSessionHistory, summaryPrefixMessage } from "./compact";
