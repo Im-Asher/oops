@@ -17,10 +17,7 @@ function requestWithCookie(value?: string): Request {
 }
 
 function sessionCookie(userId: string, tv = 0): string {
-  return createSessionCookieValue(
-    { userId, exp: 1_800_000_000, tv },
-    process.env.AUTH_SECRET!,
-  );
+  return createSessionCookieValue({ userId, exp: 1_800_000_000, tv }, SECRET);
 }
 
 beforeEach(() => {

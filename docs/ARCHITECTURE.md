@@ -309,7 +309,7 @@ Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列�
 ```
 oops/
 ├── apps/web/                       # web 应用包 @oops/web —— 下列 src/ 子树、messages/、public/、
-│   │                               #   drizzle/、.env.example、drizzle.config.ts、vitest.* 均位于其下
+│   │                               #   .env.example（及 gitignored 的 .env.local）、vitest.* 均位于其下
 ├── src/
 │   ├── proxy.ts                    # Edge 层引导（cookie 存在性 → 302 /login；非安全边界）
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
@@ -330,17 +330,8 @@ oops/
 │   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联）
 │   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
-│   │   ├── auth/                   # 认证域（password / session-cookie / require-user / register / authenticate / rate-limit）
-│   │   ├── db/                     # Drizzle client + schema + 仓储
-│   │   │   ├── schema.ts           # 六表 + 枚举定义
-│   │   │   ├── index.ts            # pg Pool 单例（惰性）
-│   │   │   ├── user.repo.ts        # 用户 仓储
-│   │   │   ├── invite-code.repo.ts # 邀请码 仓储（条件 UPDATE 防超发）
-│   │   │   ├── session.repo.ts     # 会话 仓储（接口 + 实现）
-│   │   │   ├── message.repo.ts     # 消息 仓储
-│   │   │   ├── asset.repo.ts       # 资产 仓储
-│   │   │   ├── task.repo.ts        # 任务 仓储
-│   │   │   └── mock-db.ts          # 仓储单测用的 drizzle 查询 mock
+│   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
+│   │   ├── db/                     # → @oops/db（packages/db：schema + 6 仓储 + drizzle/ 迁移与 drizzle.config.ts 共址）
 │   │   ├── infra/
 │   │       ├── storage/            # 存储抽象（S3 兼容，env 切换后端）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
@@ -361,17 +352,23 @@ oops/
 │   │   ├── workbench/              # 工作台骨架（顶栏（会话名/保存状态/导出）/ 56px 工具条（会话抽屉、聊天显隐、底部用户入口）/ 会话抽屉）
 │   │   └── chat/                   # 聊天面板与消息渲染（摘要 chip / 双形态 composer）
 │   ├── i18n/                       # next-intl 装配（client-safe）：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型
-│   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
+│   ├── lib/                        # 客户端安全共享：utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
 │   └── types/                      # 共享 TypeScript 类型
+├── packages/                       # 共享包（TS 源码直出，Next transpilePackages；分层 config → db → llm → auth 单向禁逆）
+│   ├── config/                     # @oops/config：env schema 按域分组 + 域级 getter + parseEnv 全量入口
+│   ├── db/                         # @oops/db：Drizzle schema/仓储 + drizzle/ 迁移目录 + drizzle.config.ts 共址
+│   ├── llm/                        # @oops/llm：模型目录 catalog + 角色 resolver（llm-assembly）
+│   └── auth/                       # @oops/auth：password / session / require-user / require-admin / register / authenticate / rate-limit
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
-├── pnpm-workspace.yaml             # workspace 声明（apps/* + packages/*；packages/ M0.2 抽包填充）
-├── package.json                    # 根编排壳：dev/build/start/db:* 经 --filter、lint/typecheck/test 经 -r 转发
+├── pnpm-workspace.yaml             # workspace 声明（apps/* + packages/*）
+├── package.json                    # 根编排壳：dev/build/start → --filter @oops/web、db:* → --filter @oops/db、lint/typecheck/test → -r
 └── pnpm-lock.yaml                  # workspace 单一锁文件
 ```
 
 **分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import
 （ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
-`src/server/db` 为领域仓储层（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
+领域仓储层为 `@oops/db`（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
+共享包依赖单向：`config → db → llm → auth` 禁逆；app 只经 `@oops/*` 公共 API（exports 子路径）消费，env 全部经 `@oops/config` 域 getter 读取。
 
 > `src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）已落地：
 > 沙箱渲染（禁 JS 三重约束 = HTML 预校验 + 脚本请求拦截 + CSP 纵深、出网白名单、单渲染超时）、

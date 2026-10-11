@@ -89,12 +89,13 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
 │   │   ├── components/     # React components (client)
 │   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
-│   │   ├── lib/            # Shared utilities (client-safe, 含 config)
+│   │   ├── lib/            # Shared utilities (client-safe)
 │   │   └── types/          # Shared TypeScript types
 │   ├── messages/      # next-intl 词典（zh.json + en.json）
-│   ├── public/  drizzle/  # 静态资源与 Drizzle migrations
-│   └── .env.local     # env files live HERE (loaded by Next + drizzle-kit from apps/web)
-├── packages/          # shared packages（M0.2 抽包 @oops/*，当前为空）
+│   ├── public/        # 静态资源
+│   └── .env.local     # env files live HERE (loaded by Next；drizzle-kit 经 @oops/db 反向指回此文件)
+├── packages/          # shared packages：@oops/{config,db,llm,auth}（TS 源码直出 + transpilePackages；
+│                      #   包间分层 config → db → llm → auth 单向禁逆，app 只经 @oops/* exports 消费）
 ├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
 
@@ -112,8 +113,8 @@ pnpm start              # Start production server — forwards to @oops/web
 pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
 pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
 pnpm test               # Run unit tests (Vitest) — pnpm -r test
-pnpm db:generate        # Generate Drizzle migrations — forwards to @oops/web
-pnpm db:migrate         # Apply migrations (requires running Postgres) — forwards to @oops/web
+pnpm db:generate        # Generate Drizzle migrations — forwards to @oops/db
+pnpm db:migrate         # Apply migrations (requires running Postgres) — forwards to @oops/db
 ```
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
@@ -131,6 +132,11 @@ drizzle-kit load them from the app directory; root scripts forward with
     Pure domain logic belongs in `src/server/domain/`; infrastructure
     (providers/storage/db/render) lives in `src/server/infra/` behind
     interfaces; `src/server/agent/` holds the declarative agent runtime.
+  - **Shared packages (`packages/`) depend one-way: `config → db → llm → auth`.**
+    Never import `@oops/auth`/`@oops/llm`/`@oops/db` from `@oops/config`, and
+    never create reverse edges between them; apps consume packages only via
+    their `exports` subpaths. Env access goes exclusively through
+    `@oops/config` domain getters (never raw `process.env` outside it).
   - Route Handlers validate input (zod), call server services, and return
     responses. They must stay short.
   - Shared UI helpers go in `src/lib/`; components in `src/components/`.
@@ -205,7 +211,7 @@ drizzle-kit load them from the app directory; root scripts forward with
 
 - **Secrets:** provider API keys (LLM, Seedream, Wanxiang) live only in
   `.env*` (gitignored). Access them exclusively through
-  `src/lib/config.ts`; never log secrets or echo them into prompts/errors.
+  `@oops/config` domain getters; never log secrets or echo them into prompts/errors.
 - **Auth:** cookie session with HttpOnly + Secure + SameSite=Lax. Every Route
   Handler must verify the session before touching DB or spawning tasks — call
   `requireUser` (`src/server/auth/require-user.ts`) and return 401 on null.
