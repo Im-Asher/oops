@@ -9,7 +9,7 @@ import {
   type MutableImagesModels,
 } from "@earendil-works/pi-ai";
 import { getImageConfig } from "@oops/config";
-import { findImageProvider } from "@/server/llm/catalog";
+import { findImageProvider } from "@oops/llm/catalog";
 
 // 常量来源改为模型目录（llm-assembly spec）；导出保持不变，消费方无感。
 // 兜底字面量仅为类型收窄，catalog.test 已锁条目存在性与取值一致。

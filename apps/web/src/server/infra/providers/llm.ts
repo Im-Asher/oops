@@ -7,8 +7,8 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import { qwenTokenPlanCnProvider } from "@earendil-works/pi-ai/providers/qwen-token-plan-cn";
-import type { LlmRole } from "@/server/llm/catalog";
-import { resolveTextModel, type AgentModelDeclaration } from "@/server/llm/resolver";
+import type { LlmRole } from "@oops/llm/catalog";
+import { resolveTextModel, type AgentModelDeclaration } from "@oops/llm/resolver";
 
 /**
  * 文本侧模型现状别名（Qwen Token Plan China）。

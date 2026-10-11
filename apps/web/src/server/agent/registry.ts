@@ -1,6 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { ModelCapability } from "@/server/llm/catalog";
-import type { AgentModelDeclaration } from "@/server/llm/resolver";
+import type { ModelCapability } from "@oops/llm/catalog";
+import type { AgentModelDeclaration } from "@oops/llm/resolver";
 import { toolRegistry, type ToolExecutionContext } from "./tools/registry";
 
 export interface AgentDefinition {

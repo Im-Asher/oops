@@ -216,12 +216,6 @@ importers:
 
   packages/llm:
     dependencies:
-      '@earendil-works/pi-agent-core':
-        specifier: 0.87.1
-        version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
-      '@earendil-works/pi-ai':
-        specifier: 0.87.1
-        version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
       '@oops/config':
         specifier: workspace:*
         version: link:../config
