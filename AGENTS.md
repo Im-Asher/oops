@@ -46,6 +46,10 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
   change makes a UX/product-principle decision, resolves a principle conflict,
   or would behave against a stated principle, update its affected sections
   **in the same change** (its own update rules live in §7 of that doc).
+- Milestone plans (version-keyed) live in `docs/milestones/<version>.md`; the
+  active one is `docs/milestones/v0.1.0.md`. A milestone is **not** a change
+  log — progress is tracked by archived changes and git; keep its phases,
+  decisions, and risk states in sync when the plan's direction changes.
 - Sync rules and deferred doc TODOs live in `IMPROVEMENT.md`; it is **not** a
   change log — doc-update history is tracked in git commits, never duplicated
   in a manual table. If docs and code conflict, code wins — fix the doc
