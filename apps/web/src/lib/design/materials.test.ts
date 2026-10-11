@@ -5,8 +5,10 @@ import { DESIGN_MATERIALS, findMaterial, materialElement } from "@/lib/design/ma
 
 describe("素材目录", () => {
   // 目录完整性：所有素材文件真实存在（守卫在测试侧，模块保持 client 安全）。
+  // 相对测试文件定位而非 process.cwd()——根聚合跑测（cwd=仓库根）同样成立。
+  const publicDir = join(import.meta.dirname, "../../../public");
   const allMaterialFilesExist = () =>
-    DESIGN_MATERIALS.every((material) => existsSync(join(process.cwd(), "public", material.src)));
+    DESIGN_MATERIALS.every((material) => existsSync(join(publicDir, material.src)));
 
   it("所有素材文件真实存在于 public/design-materials/", () => {
     expect(allMaterialFilesExist()).toBe(true);
