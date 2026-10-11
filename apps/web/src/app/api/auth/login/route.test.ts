@@ -5,10 +5,10 @@ const h = vi.hoisted(() => ({
   rateLimited: false,
 }));
 
-vi.mock("@/server/auth/authenticate", () => ({
+vi.mock("@oops/auth/authenticate", () => ({
   authenticate: h.authenticate,
 }));
-vi.mock("@/server/auth/rate-limit", () => ({
+vi.mock("@oops/auth/rate-limit", () => ({
   rateLimit: () => !h.rateLimited,
   clientIp: () => "test-ip",
 }));

@@ -5,7 +5,7 @@ import { agentRegistry } from "@/server/agent/registry";
 import { screenInput } from "@/server/agent/moderation";
 import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { createAssetRepo } from "@oops/db/asset.repo";
 import { createMessageRepo } from "@oops/db/message.repo";
 import { createSessionRepo } from "@oops/db/session.repo";

@@ -5,13 +5,13 @@ const h = vi.hoisted(() => ({
   rateLimited: false,
 }));
 
-vi.mock("@/server/auth/register", () => ({
+vi.mock("@oops/auth/register", () => ({
   registerUser: h.registerUser,
 }));
-vi.mock("@/server/auth/password", () => ({
+vi.mock("@oops/auth/password", () => ({
   hashPassword: vi.fn(async () => "HASH"),
 }));
-vi.mock("@/server/auth/rate-limit", () => ({
+vi.mock("@oops/auth/rate-limit", () => ({
   rateLimit: () => !h.rateLimited,
   clientIp: () => "test-ip",
 }));

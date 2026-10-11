@@ -1,4 +1,4 @@
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { agentRegistry } from "@/server/agent";
 import { resolvePresets } from "@/server/agent/presets";
 import { getMessages } from "next-intl/server";

@@ -4,7 +4,7 @@ import {
   type ProfilePatch,
   type UserGender,
 } from "@oops/db/user.repo";
-import { hashPassword, verifyPassword } from "@/server/auth/password";
+import { hashPassword, verifyPassword } from "@oops/auth/password";
 
 export interface ProfileData {
   username: string;

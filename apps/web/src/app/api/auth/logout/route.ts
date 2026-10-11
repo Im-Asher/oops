@@ -1,5 +1,5 @@
-import { clientIp, rateLimit } from "@/server/auth/rate-limit";
-import { clearSessionCookieHeader } from "@/server/auth/session-cookie";
+import { clientIp, rateLimit } from "@oops/auth/rate-limit";
+import { clearSessionCookieHeader } from "@oops/auth/session-cookie";
 
 /** 登出：立即过期会话 cookie；幂等，未登录调用同样成功。 */
 export async function POST(req: Request): Promise<Response> {

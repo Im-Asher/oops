@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { createUserRepo } from "@oops/db/user.repo";
 import { toProfile, updateProfile } from "@/server/profile/profile";
 

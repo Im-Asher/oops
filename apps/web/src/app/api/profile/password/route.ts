@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { clientIp, rateLimit } from "@/server/auth/rate-limit";
-import { requireUser } from "@/server/auth/require-user";
-import { sessionCookieHeader } from "@/server/auth/session-cookie";
+import { clientIp, rateLimit } from "@oops/auth/rate-limit";
+import { requireUser } from "@oops/auth/require-user";
+import { sessionCookieHeader } from "@oops/auth/session-cookie";
 import { getAuthConfig } from "@oops/config";
 import { changePassword } from "@/server/profile/profile";
 

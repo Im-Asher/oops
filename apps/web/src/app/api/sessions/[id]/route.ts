@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { agentRegistry } from "@/server/agent";
 import { loadSessionMessages } from "@/server/agent/transcript";
 import { createSessionRepo } from "@oops/db/session.repo";

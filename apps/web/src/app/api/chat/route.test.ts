@@ -36,7 +36,7 @@ vi.mock("@/server/infra/storage/s3", () => ({
     }),
   }),
 }));
-vi.mock("@/server/auth/require-user", () => ({
+vi.mock("@oops/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
 vi.mock("@oops/db/asset.repo", () => ({

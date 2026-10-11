@@ -8,7 +8,7 @@ const h = vi.hoisted(() => ({
   calls: { reference: 0, derived: 0, plain: 0 },
 }));
 
-vi.mock("@/server/auth/require-user", () => ({
+vi.mock("@oops/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
 }));
 

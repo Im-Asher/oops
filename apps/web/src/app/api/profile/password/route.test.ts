@@ -6,11 +6,11 @@ const h = vi.hoisted(() => ({
   rateLimited: false,
 }));
 
-vi.mock("@/server/auth/require-user", () => ({ requireUser: h.requireUser }));
+vi.mock("@oops/auth/require-user", () => ({ requireUser: h.requireUser }));
 vi.mock("@/server/profile/profile", () => ({
   changePassword: h.changePassword,
 }));
-vi.mock("@/server/auth/rate-limit", () => ({
+vi.mock("@oops/auth/rate-limit", () => ({
   rateLimit: () => !h.rateLimited,
   clientIp: () => "test-ip",
 }));

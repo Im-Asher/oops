@@ -15,7 +15,7 @@ vi.mock("@oops/db/user.repo", () => ({
     updatePassword: h.updatePassword,
   }),
 }));
-vi.mock("@/server/auth/password", () => ({
+vi.mock("@oops/auth/password", () => ({
   verifyPassword: h.verifyPassword,
   hashPassword: h.hashPassword,
 }));

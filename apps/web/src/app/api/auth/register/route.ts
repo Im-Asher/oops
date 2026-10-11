@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { getAuthConfig } from "@oops/config";
-import { hashPassword } from "@/server/auth/password";
-import { rateLimit, clientIp } from "@/server/auth/rate-limit";
-import { registerUser } from "@/server/auth/register";
-import { sessionCookieHeader } from "@/server/auth/session-cookie";
+import { hashPassword } from "@oops/auth/password";
+import { rateLimit, clientIp } from "@oops/auth/rate-limit";
+import { registerUser } from "@oops/auth/register";
+import { sessionCookieHeader } from "@oops/auth/session-cookie";
 
 const bodySchema = z.object({
   username: z

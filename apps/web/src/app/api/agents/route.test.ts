@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/server/auth/require-user", () => ({
+vi.mock("@oops/auth/require-user", () => ({
   requireUser: vi.fn(),
 }));
 
@@ -25,7 +25,7 @@ vi.mock("next-intl/server", () => ({
   getMessages: vi.fn(async () => (await import("../../../../messages/zh.json")).default),
 }));
 
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { GET } from "./route";
 
 describe("GET /api/agents", () => {

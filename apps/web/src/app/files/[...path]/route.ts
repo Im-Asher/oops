@@ -1,4 +1,4 @@
-import { requireUser } from "@/server/auth/require-user";
+import { requireUser } from "@oops/auth/require-user";
 import { buildAssetResponse } from "@/server/infra/storage/serve";
 import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
 
