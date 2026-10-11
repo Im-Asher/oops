@@ -1,6 +1,7 @@
 {
   "common": {
     "appTitle": "Oops Admin",
+    "logout": "退出登录",
     "gate": {
       "title": "需要先登录",
       "body": "管理端与 web 端共用同一登录会话。请先在 web 端（localhost:3000）登录管理员账号，再回到这里刷新即可进入。"
