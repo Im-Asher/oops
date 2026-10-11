@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/web:
     dependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.1141.0
