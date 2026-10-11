@@ -1,0 +1,16 @@
+{
+  "name": "oops",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @oops/web dev",
+    "build": "pnpm --filter @oops/web build",
+    "start": "pnpm --filter @oops/web start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @oops/web db:generate",
+    "db:migrate": "pnpm --filter @oops/web db:migrate"
+  },
+  "packageManager": "pnpm@10.32.1"
+}
