@@ -63,6 +63,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Framework      | Next.js 16 (App Router, `proxy.ts` not middleware)  |
 | Language       | TypeScript (strict)                                 |
 | UI             | shadcn/ui + AI Elements + Tailwind CSS v4           |
+| Admin UI       | Ant Design (apps/admin only — antd stack, no Tailwind) |
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
 | Database       | PostgreSQL via Drizzle ORM                          |
 | Rendering      | `playwright-core` + headless Chromium               |
@@ -73,12 +74,19 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 ## Project structure
 
 pnpm workspace monorepo. The web app lives in `apps/web/` (package
-`@oops/web`); `packages/` is reserved for shared packages (M0.2). Unless
+`@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
+M0.3 scaffold — antd-only UI stack, dev port 3001, guarded by the same
+`oops_session` cookie); `packages/` holds shared packages. Unless
 written with a repo-root prefix, all app paths in the sections below are
-**relative to `apps/web/`**.
+**relative to `apps/web/`** (admin paths use explicit `apps/admin/` prefixes).
 
 ```
 oops/                  # repo root = workspace orchestrator (scripts forward via pnpm --filter)
+├── apps/admin/        # admin console: antd-only stack (no Tailwind), Layout/Menu scaffold,
+│   │                  #   gate: proxy presence check + layout requireAdmin; dev port 3001
+│   ├── src/app/            # pages + Route Handlers (thin shell, same discipline as web)
+│   ├── src/i18n/           # next-intl assembly (zh single-locale, cookie mode like web)
+│   └── messages/           # next-intl dictionary (zh.json)
 ├── apps/web/          # the web app
 │   ├── src/
 │   │   ├── app/            # Thin routing shell: pages + Route Handlers only
@@ -108,7 +116,9 @@ imported from client code (`apps/web/src/app/**/page.tsx`, `apps/web/src/compone
 ```bash
 pnpm install            # Install dependencies (workspace root)
 pnpm dev                # Dev server (http://localhost:3000) — forwards to @oops/web
+pnpm --filter @oops/admin dev  # Admin dev server (http://localhost:3001)
 pnpm build              # Production build — forwards to @oops/web
+pnpm --filter @oops/admin build  # Admin production build
 pnpm start              # Start production server — forwards to @oops/web
 pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
 pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
