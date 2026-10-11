@@ -2,6 +2,11 @@
 
 > 面向电商客户的文生图 Web 系统：用户在聊天框中描述需求并上传商品素材，选择设计 Agent，产出商品详情长图、海报、氛围图等电商图片。
 
+> 仓库形态：pnpm workspace monorepo——web 应用位于 `apps/web/`（包 `@oops/web`），
+> `messages/`、`public/`、`drizzle/`、`.env.example`、`drizzle.config.ts`、`vitest.*` 均在其下；
+> 仓库根仅保留编排壳（`package.json` 脚本经 `pnpm --filter`/`-r` 转发、`pnpm-workspace.yaml`、
+> 单一 `pnpm-lock.yaml`）。除标注仓库根前缀外，本文的 `src/**` 等应用内路径均相对 `apps/web/`。
+
 ## 1. 总体架构
 
 一体化 Next.js 全栈应用（无独立后端），Route Handlers 承载 SSE 流与上传接口。
@@ -303,6 +308,8 @@ Schema 方言（pg）：`JSON` → `jsonb`；枚举列用 `pgEnum`；时间列�
 
 ```
 oops/
+├── apps/web/                       # web 应用包 @oops/web —— 下列 src/ 子树、messages/、public/、
+│   │                               #   drizzle/、.env.example、drizzle.config.ts、vitest.* 均位于其下
 ├── src/
 │   ├── proxy.ts                    # Edge 层引导（cookie 存在性 → 302 /login；非安全边界）
 │   ├── app/                        # 薄壳路由层（页面 + route.ts）
@@ -357,10 +364,9 @@ oops/
 │   ├── lib/                        # 客户端安全共享：config / utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
 │   └── types/                      # 共享 TypeScript 类型
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
-├── drizzle.config.ts               # drizzle-kit 配置（加载 .env.local）
-├── drizzle/                        # 生成的迁移 SQL（已提交）
-├── vitest.config.ts / vitest.setup.ts
-└── .env.example                    # 环境变量模板（.env* 均 gitignored）
+├── pnpm-workspace.yaml             # workspace 声明（apps/* + packages/*；packages/ M0.2 抽包填充）
+├── package.json                    # 根编排壳：dev/build/start/db:* 经 --filter、lint/typecheck/test 经 -r 转发
+└── pnpm-lock.yaml                  # workspace 单一锁文件
 ```
 
 **分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import

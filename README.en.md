@@ -23,7 +23,7 @@ Describe your needs, upload product assets, pick a design agent, and get product
 | 👥 **Who** | E-commerce sellers / operators (no design background), and developers who want plug-and-play AI image agents |
 | 🕐 **When** | Bulk imagery before product launch, rapid poster iteration for campaigns, filling in scene shots, A/B variations |
 | 🌍 **Where** | In the browser (`/home` landing page + full-screen `/canvas` workbench); self-hosted (Node 22+ / Docker) |
-| 🛠️ **How** | `pnpm install` → `docker compose up -d` → configure `.env.local` → `pnpm db:migrate` → `pnpm dev` |
+| 🛠️ **How** | `pnpm install` → `docker compose up -d` → configure `apps/web/.env.local` → `pnpm db:migrate` → `pnpm dev` |
 | 💰 **How much** | Pay-as-you-go LLM + image APIs; in-process task limits (image gen ×2 / screenshot ×1–2), zero extra middleware cost |
 
 ---
@@ -85,7 +85,7 @@ pnpm install
 docker compose up -d
 
 # 3️⃣ Configure environment (database / MinIO / LLM & image API keys)
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
 
 # 4️⃣ Initialize the database
 pnpm db:migrate

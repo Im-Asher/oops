@@ -23,7 +23,7 @@
 | 👥 **Who** 给谁用 | 电商卖家 / 运营人员（无设计背景），以及想低门槛接入 AI 生图能力的开发者 |
 | 🕐 **When** 何时用 | 上架前批量出图、大促海报快速迭代、场景图补齐、单品多版本比稿 |
 | 🌍 **Where** 在哪用 | 浏览器访问（首页 `/home` + 全屏 AI 画布 `/canvas`）；自托管部署（Node 22+ / Docker） |
-| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `.env.local` → `pnpm db:migrate` → `pnpm dev` |
+| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `apps/web/.env.local` → `pnpm db:migrate` → `pnpm dev` |
 | 💰 **How much** 花多少 | LLM + 生图 API 按量计费；进程内任务限并发（生图 2 / 截图 1~2），无额外中间件成本 |
 
 ---
@@ -87,7 +87,7 @@ pnpm install
 docker compose up -d
 
 # 3️⃣ 配置环境变量（数据库 / MinIO / LLM 与生图 API Key）
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
 
 # 4️⃣ 初始化数据库
 pnpm db:migrate
