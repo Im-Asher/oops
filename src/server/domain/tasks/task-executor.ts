@@ -197,6 +197,25 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
 });
 
 /**
+ * 渲染异常 → TaskError：unknown 类错误的根因在底层 cause（如浏览器启动失败），
+ * 截断摘要拼入 message 使任务落库可排查；timeout/invalid_html 消息自解释，不改写。
+ * cause 可能含内部路径等细节，故截断且仅 unknown 类拼接，避免全量进用户可见文案。
+ */
+export function renderTaskError(err: unknown): TaskError {
+  const detail = (v: unknown): string => {
+    const s = v instanceof Error ? v.message : String(v);
+    return s.length > 300 ? `${s.slice(0, 300)}…` : s;
+  };
+  if (err instanceof RenderError) {
+    if (err.kind === "unknown" && err.cause !== undefined) {
+      return new TaskError(`${err.message}：${detail(err.cause)}`, err.kind);
+    }
+    return new TaskError(err.message, err.kind);
+  }
+  return new TaskError(`渲染失败：${detail(err)}`, "unknown");
+}
+
+/**
  * render_html handler（html-rendering spec）：HTML 渲染 → 截图 → S3 → assets
  * 原子语义（任一步失败整体失败，不留半成品资产）；截图 base64 随 result 返回
  * 供工具回喂模型，落库时经 slimForDb 剔除。
@@ -214,10 +233,12 @@ registerTaskHandler("render_html", async (payload, ctx) => {
     const html2 = await inlineFileRefs(html);
     rendered = await renderHtml({ html: html2, width, height, signal: ctx.signal });
   } catch (err) {
-    if (err instanceof RenderError) {
-      throw new TaskError(err.message, err.kind);
+    // unknown 类（含非 RenderError 的管线异常）根因只在底层 cause：全量进服务端日志，
+    // 摘要经 renderTaskError 拼入任务错误供落库与 Agent 解释
+    if (!(err instanceof RenderError) || err.kind === "unknown") {
+      console.error("[render_html] 渲染失败:", err);
     }
-    throw new TaskError("渲染失败", "unknown");
+    throw renderTaskError(err);
   }
   const storage = createStorage(defaultS3Client);
   const assetRepo: AssetRepo = createAssetRepo();
