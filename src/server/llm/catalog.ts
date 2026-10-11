@@ -44,9 +44,11 @@ export const TEXT_PROVIDERS: readonly TextProviderEntry[] = [
     configEnvNames: ["QWEN_TOKEN_PLAN_CN_API_KEY"],
     models: [
       { id: "qwen3.8-max", capabilities: [] },
-      // vision 模型：海报 Agent 等声明 vision 能力时的供给条目；
-      // 部署需以 LLM_MAIN_MODEL 指向之（默认 main 保持 qwen3.8-max 零回归）。
-      { id: "qwen3-vl-plus", capabilities: ["vision"] },
+      // vision 模型：海报 Agent 等声明 vision 能力时的供给条目。id 必须是
+      // pi-ai qwen provider 模型数据中真实存在且带 image 输入的模型（冒烟验证：
+      // 不存在的 id 会在装配层报「未登记的聊天模型」）；部署需以 LLM_MAIN_MODEL
+      // 指向之（默认 main 保持 qwen3.8-max 零回归）。
+      { id: "qwen3.7-plus", capabilities: ["vision"] },
     ],
     roleDefaults: { main: "qwen3.8-max", summarizer: "qwen3.8-max" },
   },

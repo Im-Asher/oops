@@ -372,7 +372,8 @@ oops/
 > 浏览器实例进程内复用；渲染前把 `/files/` 引用内联为 data URI（沙箱默认断网，相对路径不可解析）。
 > 多模态上下文：声明 vision 能力的 Agent（海报设计师）将引用商品图以 `ImageContent` 注入本轮
 > LLM 输入（非 vision Agent 保持文本引用块），transcript 图片一律清洗为引用占位文本（无 base64 落库）；
-> 部署海报场景需 `LLM_MAIN_MODEL` 指向已登记的 vision 模型（qwen3-vl-plus）。
+> 部署海报场景需 `LLM_MAIN_MODEL` 指向已登记的 vision 模型（qwen3.7-plus；
+> 目录条目 id 必须是 pi-ai provider 模型数据中真实存在的模型）。
 > 领域聚合/任务状态机等按需演进（`task-executor` 已落地）。
 > 图片浏览/编辑已在 `chat/page.tsx` 的**画布工作台**承载（缩略图上屏 + 裁剪/滤镜/导出），不再单独规划 `gallery` 作品库页。
 

@@ -51,9 +51,9 @@ describe("vision 模型解析（真实 qwen 目录）", () => {
   it("env 指向已登记 vision 模型时声明满足", () => {
     const resolved = resolveTextModel("main", visionDecl, {
       ...baseEnv,
-      mainModel: "qwen3-vl-plus",
+      mainModel: "qwen3.7-plus",
     });
-    expect(resolved.modelId).toBe("qwen3-vl-plus");
+    expect(resolved.modelId).toBe("qwen3.7-plus");
   });
 
   it("默认纯文本模型不满足 vision 声明时 fail-fast（含能力名与模型）", () => {
