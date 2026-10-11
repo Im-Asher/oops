@@ -354,6 +354,20 @@ oops/
 │   ├── i18n/                       # next-intl 装配（client-safe）：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型
 │   ├── lib/                        # 客户端安全共享：utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
 │   └── types/                      # 共享 TypeScript 类型
+├── apps/admin/                     # 管理端应用包 @oops/admin（M0.3 scaffold）——antd-only 栈（无 Tailwind），
+│   │                               #   dev 端口 3001；门卫三层：proxy 存在性 → (console)/layout 全量校验 → 放行
+│   ├── src/
+│   │   ├── proxy.ts                # Edge 层引导（oops_session 存在性 → /gate；非安全边界）
+│   │   ├── app/
+│   │   │   ├── (console)/          # 门卫（requireAdminFromCookieHeader）+ AdminShell（Sider 六面菜单 +
+│   │   │   │                       #   头部身份/退出 form）+ 六面占位页（users/invite-codes/points/agents/models/audit）
+│   │   │   ├── gate/page.tsx       # 无 cookie 引导页（指路 web 端登录）
+│   │   │   ├── api/logout/route.ts # POST 清会话 cookie（Max-Age=0）+ 307 回 web 首页
+│   │   │   └── layout.tsx          # 文档壳（AntdRegistry + next-intl + ConfigProvider zhCN）
+│   │   ├── lib/guard-view.ts       # 门卫结果 → 视图分支映射（纯函数 + 单测三分支）
+│   │   ├── components/             # admin-shell（client）/ guard-notices（401/403）/ section-placeholder（RSC）
+│   │   └── i18n/                   # next-intl 装配（镜像 web，zh 单语 cookie 模式）
+│   └── messages/zh.json            # 词典（zh 源）
 ├── packages/                       # 共享包（TS 源码直出，Next transpilePackages；分层 config → db → llm → auth 单向禁逆）
 │   ├── config/                     # @oops/config：env schema 按域分组 + 域级 getter + parseEnv 全量入口
 │   ├── db/                         # @oops/db：Drizzle schema/仓储 + drizzle/ 迁移目录 + drizzle.config.ts 共址
