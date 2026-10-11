@@ -4,6 +4,7 @@
 // 必须标 "use client"：RSC 的 client-reference proxy 不透传复合组件静态属性
 // （Form.Item 等）——antd 复合组件一律在 client 组件中使用（task 3.1 布局同理）。
 import { Button, Form, Input, Result, Table } from "antd";
+import { useTranslations } from "next-intl";
 
 const columns = [
   { title: "ID", dataIndex: "id" },
@@ -17,9 +18,11 @@ const data = [
 ];
 
 export default function AdminHome() {
+  const t = useTranslations("common");
+
   return (
     <main style={{ padding: 24 }}>
-      <h1>Oops Admin</h1>
+      <h1>{t("appTitle")}</h1>
       <Table columns={columns} dataSource={data} pagination={false} size="small" />
       <Form layout="inline" style={{ marginTop: 24 }}>
         <Form.Item label="Keyword" name="keyword">
