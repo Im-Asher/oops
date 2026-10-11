@@ -16,10 +16,10 @@ Key characteristics:
   text & layout control); atmosphere/scene images use pure text-to-image APIs
   (Seedream / Wanxiang).
 - **Declarative agents** — every agent is a single config file under
-  `src/server/agent/definitions/` (system prompt + tool list). Adding an
+  `apps/web/src/server/agent/definitions/` (system prompt + tool list). Adding an
   agent requires **no** frontend or runtime code changes.
 - **All-in-one Next.js app** — no separate backend service. Route Handlers
-  stream agent events via SSE. Server-only code lives in `src/server/` and is
+  stream agent events via SSE. Server-only code lives in `apps/web/src/server/` and is
   protected from client imports by ESLint.
 - **Task-based generation** — all image work runs through an in-process task
   executor with concurrency limits; tasks are persisted and retryable.
@@ -68,44 +68,59 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Rendering      | `playwright-core` + headless Chromium               |
 | Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
 | i18n           | next-intl（无 URL 路由的 cookie 模式）— `messages/zh.json` + `en.json`，typed messages |
-| Package mgr    | pnpm 11                                             |
+| Package mgr    | pnpm 10                                             |
 
 ## Project structure
 
+pnpm workspace monorepo. The web app lives in `apps/web/` (package
+`@oops/web`); `packages/` is reserved for shared packages (M0.2). Unless
+written with a repo-root prefix, all app paths in the sections below are
+**relative to `apps/web/`**.
+
 ```
-src/
-├── app/            # Thin routing shell: pages + Route Handlers only
-├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
-│   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
-│   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
-│   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
-│   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
-├── components/     # React components (client)
-├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
-├── lib/            # Shared utilities (client-safe, 含 config)
-└── types/          # Shared TypeScript types
+oops/                  # repo root = workspace orchestrator (scripts forward via pnpm --filter)
+├── apps/web/          # the web app
+│   ├── src/
+│   │   ├── app/            # Thin routing shell: pages + Route Handlers only
+│   │   ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
+│   │   │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
+│   │   │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
+│   │   │   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
+│   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
+│   │   ├── components/     # React components (client)
+│   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
+│   │   ├── lib/            # Shared utilities (client-safe, 含 config)
+│   │   └── types/          # Shared TypeScript types
+│   ├── messages/      # next-intl 词典（zh.json + en.json）
+│   ├── public/  drizzle/  # 静态资源与 Drizzle migrations
+│   └── .env.local     # env files live HERE (loaded by Next + drizzle-kit from apps/web)
+├── packages/          # shared packages（M0.2 抽包 @oops/*，当前为空）
+├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
 
-**Import boundary (critical):** code under `src/server/` must never be
-imported from client code (`src/app/**/page.tsx`, `src/components/**`, or any
+**Import boundary (critical):** code under `apps/web/src/server/` must never be
+imported from client code (`apps/web/src/app/**/page.tsx`, `apps/web/src/components/**`, or any
 `"use client"` module). This is enforced via ESLint `no-restricted-imports`.
 
 ## Build and test commands
 
 ```bash
-pnpm install            # Install dependencies
-pnpm dev                # Dev server (http://localhost:3000)
-pnpm build              # Production build
-pnpm start              # Start production server
-pnpm lint               # ESLint (includes import-boundary rules)
-pnpm typecheck          # tsc --noEmit
-pnpm test               # Run unit tests (Vitest)
-pnpm db:generate        # Generate Drizzle migrations
-pnpm db:migrate         # Apply migrations (requires running Postgres + .env.local)
+pnpm install            # Install dependencies (workspace root)
+pnpm dev                # Dev server (http://localhost:3000) — forwards to @oops/web
+pnpm build              # Production build — forwards to @oops/web
+pnpm start              # Start production server — forwards to @oops/web
+pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
+pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
+pnpm test               # Run unit tests (Vitest) — pnpm -r test
+pnpm db:generate        # Generate Drizzle migrations — forwards to @oops/web
+pnpm db:migrate         # Apply migrations (requires running Postgres) — forwards to @oops/web
 ```
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
-`pnpm-lock.yaml` and must be committed.
+`pnpm-lock.yaml` (single workspace lockfile) and must be committed.
+Env files (`.env.local`, `.env.example`) live in `apps/web/` — Next.js and
+drizzle-kit load them from the app directory; root scripts forward with
+`pnpm --filter @oops/web <script>` so the cwd is always `apps/web/`.
 
 ## Code style guidelines
 
