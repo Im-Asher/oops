@@ -8,7 +8,7 @@ import {
   type ImagesOptions,
   type MutableImagesModels,
 } from "@earendil-works/pi-ai";
-import { IMAGE_ENDPOINT, IMAGE_MODELS, QWEN_TOKEN_PLAN_CN_API_KEY } from "@/lib/config";
+import { getImageConfig } from "@oops/config";
 import { findImageProvider } from "@/server/llm/catalog";
 
 // 常量来源改为模型目录（llm-assembly spec）；导出保持不变，消费方无感。
@@ -108,8 +108,9 @@ function buildProvider() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 90_000);
       try {
-        const apiKey = options?.apiKey ?? QWEN_TOKEN_PLAN_CN_API_KEY;
-        const res = await fetch(IMAGE_ENDPOINT, {
+        const { endpoint, qwenApiKey } = getImageConfig();
+        const apiKey = options?.apiKey ?? qwenApiKey;
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -215,7 +216,7 @@ export async function generateImage(
   args: { prompt: string; size: string; aspectRatio: string },
   signal?: AbortSignal,
 ): Promise<GenerateImageOutcome> {
-  if (!IMAGE_MODELS.includes(DASHSCOPE_IMAGE_MODEL)) {
+  if (!getImageConfig().models.includes(DASHSCOPE_IMAGE_MODEL)) {
     return {
       ok: false,
       error: { kind: "unknown", message: `未登记的图像模型：${DASHSCOPE_IMAGE_MODEL}`, retryable: false },

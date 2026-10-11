@@ -9,7 +9,6 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { OWNER_ID } from "@/lib/config";
 
 export const messageRole = pgEnum("message_role", [
   "user",
@@ -42,8 +41,8 @@ export const taskStatus = pgEnum("task_status", [
 
 export const sessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  // 认证延后：恒为 OWNER_ID，多租户预留
-  userId: text("user_id").notNull().default(OWNER_ID),
+  // 多租户：userId 必填无默认（repo 层全部显式传参）
+  userId: text("user_id").notNull(),
   agentId: text("agent_id"),
   title: text("title"),
   // compact 产物：LLM 生成的会话摘要（骨架式），与 summarizedUpTo 水位线配套
@@ -63,7 +62,7 @@ export const messages = pgTable("messages", {
   sessionId: uuid("session_id")
     .notNull()
     .references(() => sessions.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().default(OWNER_ID),
+  userId: text("user_id").notNull(),
   role: messageRole("role").notNull(),
   content: text("content").notNull().default(""),
   // 工具调用与结果（generate_image / render_html 等），结构化 JSON
@@ -78,7 +77,7 @@ export const messages = pgTable("messages", {
 
 export const assets = pgTable("assets", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().default(OWNER_ID),
+  userId: text("user_id").notNull(),
   sessionId: uuid("session_id").references(() => sessions.id, {
     onDelete: "set null",
   }),
@@ -101,7 +100,7 @@ export const assets = pgTable("assets", {
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().default(OWNER_ID),
+  userId: text("user_id").notNull(),
   sessionId: uuid("session_id").references(() => sessions.id, {
     onDelete: "set null",
   }),

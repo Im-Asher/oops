@@ -1,4 +1,4 @@
-import { getConfig } from "@/lib/config";
+import { getAuthConfig } from "@oops/config";
 import { createUserRepo } from "@/server/db/user.repo";
 import {
   parseSessionCookieValue,
@@ -12,7 +12,7 @@ import {
  */
 export async function requireUser(req: Request): Promise<string | null> {
   const raw = readSessionCookie(req.headers.get("cookie") ?? "");
-  const payload = parseSessionCookieValue(raw, getConfig().AUTH_SECRET);
+  const payload = parseSessionCookieValue(raw, getAuthConfig().authSecret);
   if (!payload) return null;
   const user = await createUserRepo().findById(payload.userId);
   if (!user || user.status !== "active") return null;

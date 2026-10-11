@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getConfig } from "@/lib/config";
+import { getAuthConfig } from "@oops/config";
 import { hashPassword } from "@/server/auth/password";
 import { rateLimit, clientIp } from "@/server/auth/rate-limit";
 import { registerUser } from "@/server/auth/register";
@@ -71,6 +71,6 @@ export async function POST(req: Request): Promise<Response> {
   }
   return Response.json(
     { user: { id: result.user.id, username: result.user.username } },
-    { status: 201, headers: { "set-cookie": sessionCookieHeader(result.user.id, getConfig().AUTH_SECRET) } },
+    { status: 201, headers: { "set-cookie": sessionCookieHeader(result.user.id, getAuthConfig().authSecret) } },
   );
 }

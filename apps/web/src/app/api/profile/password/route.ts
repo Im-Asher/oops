@@ -2,7 +2,7 @@ import { z } from "zod";
 import { clientIp, rateLimit } from "@/server/auth/rate-limit";
 import { requireUser } from "@/server/auth/require-user";
 import { sessionCookieHeader } from "@/server/auth/session-cookie";
-import { getConfig } from "@/lib/config";
+import { getAuthConfig } from "@oops/config";
 import { changePassword } from "@/server/profile/profile";
 
 const bodySchema = z.object({
@@ -75,7 +75,7 @@ export async function POST(req: Request): Promise<Response> {
       headers: {
         "set-cookie": sessionCookieHeader(
           userId,
-          getConfig().AUTH_SECRET,
+          getAuthConfig().authSecret,
           result.tokenVersion,
         ),
       },

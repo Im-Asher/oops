@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getConfig } from "@/lib/config";
+import { getAuthConfig } from "@oops/config";
 import { authenticate } from "@/server/auth/authenticate";
 import { rateLimit, clientIp } from "@/server/auth/rate-limit";
 import { sessionCookieHeader } from "@/server/auth/session-cookie";
@@ -46,7 +46,7 @@ export async function POST(req: Request): Promise<Response> {
       headers: {
         "set-cookie": sessionCookieHeader(
           auth.userId,
-          getConfig().AUTH_SECRET,
+          getAuthConfig().authSecret,
           auth.tokenVersion,
         ),
       },

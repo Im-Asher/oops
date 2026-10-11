@@ -6,20 +6,22 @@ import {
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
-import { getConfig } from "@/lib/config";
+import { getS3Config } from "@oops/config";
 
 /** 仅用到 S3Client 的子集，便于单元测试以假对象注入。 */
 export interface S3Like {
   send(command: unknown): Promise<unknown>;
 }
 
+const s3Config = getS3Config();
+
 export const defaultS3Client = new S3Client({
-  endpoint: getConfig().S3_ENDPOINT,
-  region: getConfig().S3_REGION,
-  forcePathStyle: getConfig().S3_FORCE_PATH_STYLE,
+  endpoint: s3Config.endpoint,
+  region: s3Config.region,
+  forcePathStyle: s3Config.forcePathStyle,
   credentials: {
-    accessKeyId: getConfig().S3_ACCESS_KEY,
-    secretAccessKey: getConfig().S3_SECRET_KEY,
+    accessKeyId: s3Config.accessKey,
+    secretAccessKey: s3Config.secretKey,
   },
 });
 
@@ -49,7 +51,7 @@ export interface Storage {
 }
 
 export function createStorage(client: S3Like = defaultS3Client): Storage {
-  const bucket = getConfig().S3_BUCKET;
+  const bucket = s3Config.bucket;
   return {
     async putObject(key, body, contentType) {
       await client.send(

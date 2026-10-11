@@ -1,5 +1,5 @@
 import { chromium, type Browser } from "playwright-core";
-import { RENDER_ALLOWED_HOSTS, RENDER_EXECUTABLE_PATH, RENDER_TIMEOUT_MS } from "@/lib/config";
+import { getRenderConfig } from "@oops/config";
 
 export interface RenderHtmlInput {
   html: string;
@@ -64,9 +64,10 @@ function withScriptCsp(html: string): string {
 let browserPromise: Promise<Browser> | null = null;
 
 function launchBrowser(): Promise<Browser> {
+  const { executablePath } = getRenderConfig();
   return chromium.launch({
     headless: true,
-    ...(RENDER_EXECUTABLE_PATH ? { executablePath: RENDER_EXECUTABLE_PATH } : {}),
+    ...(executablePath ? { executablePath } : {}),
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
   });
 }
@@ -96,8 +97,9 @@ async function getBrowser(): Promise<Browser> {
  */
 export async function renderHtml(input: RenderHtmlInput): Promise<RenderedPage> {
   const { html, width, height } = input;
-  const allowedHosts = input.allowedHosts ?? RENDER_ALLOWED_HOSTS;
-  const timeoutMs = input.timeoutMs ?? RENDER_TIMEOUT_MS;
+  const rc = getRenderConfig();
+  const allowedHosts = input.allowedHosts ?? rc.allowedHosts;
+  const timeoutMs = input.timeoutMs ?? rc.timeoutMs;
   assertNoScripts(html);
 
   const browser = await getBrowser();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IMAGE_MODELS } from "@/lib/config";
+import { getImageConfig } from "@oops/config";
 import {
   classifyImageGenError,
   DASHSCOPE_IMAGE_MODEL,
@@ -33,7 +33,7 @@ describe("classifyImageGenError", () => {
 
 describe("图像 provider 配置", () => {
   it("仅向白名单模型开放，未登记模型被拒绝", () => {
-    expect(IMAGE_MODELS).toContain(DASHSCOPE_IMAGE_MODEL);
+    expect(getImageConfig().models).toContain(DASHSCOPE_IMAGE_MODEL);
     const unknown = getImagesModels().getModel(DASHSCOPE_IMAGE_PROVIDER, "dall-e-3");
     expect(unknown).toBeUndefined();
   });

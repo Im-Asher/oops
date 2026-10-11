@@ -1,11 +1,10 @@
 import {
-  DEFAULT_TEXT_PROVIDER_ID,
   TEXT_PROVIDERS,
   type LlmRole,
   type ModelCapability,
   type TextProviderEntry,
 } from "./catalog";
-import { LLM_MAIN_MODEL, LLM_PROVIDER, LLM_SUMMARIZER_MODEL } from "@/lib/config";
+import { getLlmConfig } from "@oops/config";
 
 /** Agent 侧模型能力需求（AgentDefinition.models 的载荷）。 */
 export interface AgentModelRequirement {
@@ -45,10 +44,11 @@ export interface ResolvedTextModel {
 }
 
 function currentEnv(): ResolverEnv {
+  const c = getLlmConfig();
   return {
-    provider: LLM_PROVIDER ?? DEFAULT_TEXT_PROVIDER_ID,
-    mainModel: LLM_MAIN_MODEL,
-    summarizerModel: LLM_SUMMARIZER_MODEL,
+    provider: c.provider,
+    mainModel: c.mainModel,
+    summarizerModel: c.summarizerModel,
   };
 }
 

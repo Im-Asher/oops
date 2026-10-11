@@ -6,5 +6,4 @@ process.env.S3_REGION ??= "us-east-1";
 process.env.S3_ACCESS_KEY ??= "test";
 process.env.S3_SECRET_KEY ??= "test";
 process.env.S3_BUCKET ??= "oops-assets";
-process.env.OWNER_ID ??= "owner";
 process.env.AUTH_SECRET ??= "unit-test-secret-0123456789abcdef-unit-test";

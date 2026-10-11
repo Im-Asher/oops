@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { chromium } from "playwright-core";
 import { afterEach, describe, expect, it } from "vitest";
-import { RENDER_EXECUTABLE_PATH } from "@/lib/config";
+import { getRenderConfig } from "@oops/config";
 import { assertNoScripts, RenderError, renderHtml } from "./render-html";
 
 // Chromium 可执行文件缺失（playwright-core 不自带浏览器）时跳过渲染用例——
 // 这些用例依赖真实浏览器，本地/冒烟环境先 `pnpm dlx playwright install chromium`。
-const chromiumPath = RENDER_EXECUTABLE_PATH ?? chromium.executablePath();
+const chromiumPath = getRenderConfig().executablePath ?? chromium.executablePath();
 const hasChromium = Boolean(chromiumPath) && existsSync(chromiumPath);
 
 const FIXTURE_HTML = `<!doctype html><html><head><meta charset="utf-8">
