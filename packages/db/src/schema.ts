@@ -19,6 +19,9 @@ export const messageRole = pgEnum("message_role", [
 // disabled 用户的所有会话请求立即被拒（require-user 校验 status），无需等 cookie 过期
 export const userStatus = pgEnum("user_status", ["active", "disabled"]);
 
+// admin 经手工 SQL 授予（与邀请码发放同模式，无界面）；默认 user
+export const userRole = pgEnum("user_role", ["user", "admin"]);
+
 // 保密为默认值，避免 NULL 语义歧义
 export const userGender = pgEnum("user_gender", ["male", "female", "secret"]);
 
@@ -146,6 +149,7 @@ export const users = pgTable(
     // 改密踢下线水位：改密 +1，载荷版本不符的旧 cookie 立即失效
     tokenVersion: integer("token_version").notNull().default(0),
     status: userStatus("status").notNull().default("active"),
+    role: userRole("role").notNull().default("user"),
     // 注册所用邀请码（追溯发放来源）
     inviteCodeId: uuid("invite_code_id").references(() => inviteCodes.id, {
       onDelete: "set null",
