@@ -1,5 +1,5 @@
 import { createUserRepo } from "@oops/db/user.repo";
-import { requireUser } from "./require-user";
+import { requireUserFromCookieHeader } from "./require-user";
 
 /** 守卫判定结果：ok=放行（带 userId）；否则携带 HTTP 状态与人话文案。 */
 export type AdminGuardResult =
@@ -12,13 +12,14 @@ export type AdminGuardResult =
     };
 
 /**
- * 管理守卫原语（user-auth spec「管理员角色与管理守卫」）：
- * 未认证 401；已认证非 admin 403；admin 放行。
- * 组合 requireUser（验签/有效期/status/会话版本全量校验）+ role 判定；
- * role=admin 经手工 SQL 授予（与邀请码发放同模式）。本变更不接入任何路由。
+ * 管理守卫核心：cookie 头直入（RSC layout 无 Request 对象，admin-scaffold design D2）。
+ * 组合 requireUserFromCookieHeader（验签/有效期/status/会话版本全量校验）+ role 判定；
+ * ghost 用户（会话指向已删除用户）在 requireUser 层即拒（401），不进 role 判定。
  */
-export async function requireAdmin(req: Request): Promise<AdminGuardResult> {
-  const userId = await requireUser(req);
+export async function requireAdminFromCookieHeader(
+  cookieHeader: string | null,
+): Promise<AdminGuardResult> {
+  const userId = await requireUserFromCookieHeader(cookieHeader);
   if (!userId) {
     return {
       ok: false,
@@ -37,4 +38,12 @@ export async function requireAdmin(req: Request): Promise<AdminGuardResult> {
     };
   }
   return { ok: true, userId };
+}
+
+/**
+ * 管理守卫原语（user-auth spec「管理员角色与管理守卫」）：
+ * 未认证 401；已认证非 admin 403；admin 放行。委托 requireAdminFromCookieHeader。
+ */
+export async function requireAdmin(req: Request): Promise<AdminGuardResult> {
+  return requireAdminFromCookieHeader(req.headers.get("cookie"));
 }

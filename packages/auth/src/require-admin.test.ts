@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSessionCookieValue } from "./session-cookie";
-import { requireAdmin } from "./require-admin";
+import {
+  requireAdmin,
+  requireAdminFromCookieHeader,
+} from "./require-admin";
 
 vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: vi.fn(() => ({ findById: findByIdMock })),
@@ -68,5 +71,44 @@ describe("requireAdmin", () => {
     });
     const r = await requireAdmin(requestWithCookie(sessionCookie("owner")));
     expect(r).toEqual({ ok: true, userId: "owner" });
+  });
+});
+
+describe("requireAdminFromCookieHeader（cookie 头直达，RSC 无 Request 场景）", () => {
+  it("null 头返回 401 且不查库", async () => {
+    const r = await requireAdminFromCookieHeader(null);
+    expect(r).toMatchObject({ ok: false, status: 401 });
+    expect(findByIdMock).not.toHaveBeenCalled();
+  });
+
+  it("散装 cookie 头（含其他键）仍取到会话", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "owner",
+      status: "active",
+      tokenVersion: 0,
+      role: "admin",
+    });
+    const r = await requireAdminFromCookieHeader(
+      `other=1; oops_session=${sessionCookie("owner")}; extra=2`,
+    );
+    expect(r).toEqual({ ok: true, userId: "owner" });
+  });
+
+  it("会话失效头（验签失败）返回 401", async () => {
+    const r = await requireAdminFromCookieHeader("oops_session=garbage");
+    expect(r).toMatchObject({ ok: false, status: 401 });
+  });
+
+  it("非 admin 头返回 403", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "u1",
+      status: "active",
+      tokenVersion: 0,
+      role: "user",
+    });
+    const r = await requireAdminFromCookieHeader(
+      `oops_session=${sessionCookie("u1")}`,
+    );
+    expect(r).toMatchObject({ ok: false, status: 403 });
   });
 });
