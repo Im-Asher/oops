@@ -101,9 +101,10 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   │   └── types/          # Shared TypeScript types
 │   ├── messages/      # next-intl 词典（zh.json + en.json）
 │   ├── public/        # 静态资源
-│   └── .env.local     # env files live HERE (loaded by Next；drizzle-kit 经 @oops/db 反向指回此文件)
+│   └── .env.local     # web 专属层（同名键覆盖根共享层；NEXT_PUBLIC_* 等）
 ├── packages/          # shared packages：@oops/{config,db,llm,auth}（TS 源码直出 + transpilePackages；
 │                      #   包间分层 config → db → llm → auth 单向禁逆，app 只经 @oops/* exports 消费）
+├── .env.local / .env.example  # 根共享 env 层：DATABASE_URL / S3_* / AUTH_SECRET / LLM_* / RENDER_* / QWEN_*
 ├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
 
@@ -129,9 +130,13 @@ pnpm db:migrate         # Apply migrations (requires running Postgres) — forwa
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 `pnpm-lock.yaml` (single workspace lockfile) and must be committed.
-Env files (`.env.local`, `.env.example`) live in `apps/web/` — Next.js and
-drizzle-kit load them from the app directory; root scripts forward with
-`pnpm --filter @oops/web <script>` so the cwd is always `apps/web/`.
+Env 是**两层结构**：仓库根 `.env.local`（共享域键：DATABASE_URL / S3_* /
+AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键，
+同名覆盖根层）。构建/脚本入口统一经 `@oops/config` 的
+`loadAppEnv(workspaceRoot, appDir?)` 加载——Next 求值 config 前已 builtin
+加载 app 层，此处补加载根层用不覆盖语义，app 层始终最优先；脚本类入口
+（drizzle-kit 等）省略 appDir 只取根层。`.env.example` 同构分层（根 =
+共享键全清单；`.env*` gitignore 不入库）。
 
 ## Code style guidelines
 

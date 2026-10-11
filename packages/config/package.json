@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./load-env": "./src/load-env.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -12,6 +13,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "dotenv": "^18.0.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {

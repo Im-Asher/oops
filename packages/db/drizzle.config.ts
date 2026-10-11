@@ -1,10 +1,11 @@
-import { config } from "dotenv";
+import path from "node:path";
 import type { Config } from "drizzle-kit";
+import { loadAppEnv } from "@oops/config/load-env";
 
-// env 文件仍归 apps/web 所有（Next.js 约定），从包目录显式指过去；
-// 根脚本 db:generate/db:migrate 经 `pnpm --filter @oops/db` 进入本目录执行。
-config({ path: "../../apps/web/.env.local" });
-config({ path: "../../apps/web/.env" });
+// 两层 env：脚本类入口只加载根共享层（db 只消费 DATABASE_URL 等共享键）。
+// drizzle-kit 经 esbuild 转译后运行（import.meta.dirname 为 undefined），
+// 且根脚本 db:* 经 `pnpm --filter @oops/db` 进入本目录执行——cwd 恒为包目录。
+loadAppEnv(path.resolve(process.cwd(), "..", ".."));
 
 export default {
   schema: "./src/schema.ts",
