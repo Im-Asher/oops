@@ -20,7 +20,8 @@ export function loadAppEnv(workspaceRoot: string, appDir?: string): void {
 
   if (!appDir || appDir === workspaceRoot) return;
 
-  // 2) app 专属层：显式覆盖（app 最优先）
-  config({ path: path.join(appDir, ".env.local"), override: true });
+  // 2) app 专属层：显式覆盖（app 最优先）。层内先 .env 后 .env.local，
+  //    与 Next 优先级一致（.env.local 胜出，override:true 后加载者赢）。
   config({ path: path.join(appDir, ".env"), override: true });
+  config({ path: path.join(appDir, ".env.local"), override: true });
 }

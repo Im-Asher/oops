@@ -12,7 +12,8 @@ describe("POST /api/logout（退出闭环）", () => {
 
     expect(setCookie).toContain("oops_session=;");
     expect(setCookie).toMatch(/Max-Age=0/);
-    expect(res.status).toBe(307);
+    // 303 See Other：POST 后强制转 GET——307 保留 POST 会被 web 侧 405 拒。
+    expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("http://localhost:3000/");
   });
 });

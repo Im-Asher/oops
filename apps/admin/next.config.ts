@@ -15,8 +15,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: workspaceRoot,
   },
-  // workspace 内部包 TS 源码直出（无构建编排），由 Next 转译（照抄 web 四包清单）。
-  transpilePackages: ["@oops/config", "@oops/db", "@oops/auth", "@oops/llm"],
+  // workspace 内部包 TS 源码直出（无构建编排），由 Next 转译。
+  // admin 不依赖 @oops/llm（web 专属），不列。
+  transpilePackages: ["@oops/config", "@oops/db", "@oops/auth"],
 };
 
 const withNextIntl = createNextIntlPlugin();

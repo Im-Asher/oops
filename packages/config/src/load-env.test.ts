@@ -39,6 +39,13 @@ describe("loadAppEnv", () => {
     expect(process.env[KEY]).toBe("from-app");
   });
 
+  it("app 层内 .env.local 胜出 .env（与 Next 优先级一致）", () => {
+    writeFileSync(path.join(app, ".env"), `${KEY}=from-app-env\n`);
+    writeFileSync(path.join(app, ".env.local"), `${KEY}=from-app-local\n`);
+    loadAppEnv(root, app);
+    expect(process.env[KEY]).toBe("from-app-local");
+  });
+
   it("process.env 已有值不被根层覆盖（Next builtin 先行加载的语义）", () => {
     process.env[KEY] = "preinjected";
     writeFileSync(path.join(root, ".env.local"), `${KEY}=from-root\n`);

@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // proxy 跑 Edge 运行时：不能 import @oops/auth（session-cookie 依赖 node:crypto，
 // 非 edge-safe），cookie 名常量本地复制（web proxy 同款先例，改一侧必须同步另一侧）。
 // 这里只做存在性引导；全量校验（验签/有效期/用户状态/role）收敛在
-// src/app/layout.tsx 的 requireAdminFromCookieHeader（admin-scaffold design D2）。
+// src/app/(console)/layout.tsx 的 requireAdminFromCookieHeader（design D2）。
 const SESSION_COOKIE_NAME = "oops_session";
 
 /** 存在性判定（纯函数便于单测）：头中有 oops_session 且值非空。 */

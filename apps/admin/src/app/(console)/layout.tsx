@@ -10,8 +10,9 @@ import AdminShell from "@/components/admin-shell";
  * 布局层门卫（admin-scaffold design D2 全量校验位置）+ 布局骨架挂载点。
  * proxy 只做 cookie 存在性引导；此处做验签/有效期/用户存在且 active/
  * 会话版本/role 全量校验并分流渲染（expired/forbidden/放行）。
- * 放行分支顺路查库取管理员身份给头部展示（task 3.2）——同 layout 完成
- * 门卫与身份查询，避免每请求重复验签查库。
+ * 放行分支再查一次库取管理员身份给头部展示（task 3.2）——守卫内部各自
+ * 查库（require-user 状态/tv、require-admin role、此处身份），admin 内部
+ * 工具流量下可接受；M2 落真实管理 API 时收敛守卫返回 user 行一次查询。
  */
 export default async function ConsoleLayout({
   children,
