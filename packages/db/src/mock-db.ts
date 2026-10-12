@@ -38,6 +38,7 @@ export function makeMockDb(
       return [v];
     }
     if (op === "delete.where") return [];
+    if (op === "select.from") return state.selectResult; // 裸 count 类查询（无 where）
     if (op.endsWith(".offset")) return state.selectResult;
     if (op.endsWith(".where")) return state.selectResult;
     if (op.endsWith(".limit")) return state.selectResult;
