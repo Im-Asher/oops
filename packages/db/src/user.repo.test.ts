@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeMockDb } from "./mock-db";
-import { createUserRepo } from "./user.repo";
+import { createUserRepo, escapeLikePattern } from "./user.repo";
 
 describe("user repo", () => {
   it("findById filters by id", async () => {
@@ -67,6 +67,52 @@ describe("user repo", () => {
     expect(set.passwordHash).toBe("NEW_HASH");
     // tokenVersion 以 sql 片段下发，由数据库端原位 +1
     expect(typeof set.tokenVersion).toBe("object");
+    expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
+  });
+
+  it("escapeLikePattern escapes LIKE wildcards and backslash", () => {
+    expect(escapeLikePattern("100%")).toBe("100\\%");
+    expect(escapeLikePattern("a_b")).toBe("a\\_b");
+    expect(escapeLikePattern("back\\slash")).toBe("back\\\\slash");
+    expect(escapeLikePattern("alice")).toBe("alice");
+  });
+
+  it("listForAdmin counts first then pages in createdAt desc order", async () => {
+    const mock = makeMockDb({
+      selectResult: [{ count: 7 }, { id: "u1" }],
+    });
+    const page = await createUserRepo(mock.db).listForAdmin({
+      search: "ali",
+      page: 2,
+      pageSize: 5,
+    });
+    expect(page).toMatchObject({ total: 7, page: 2, pageSize: 5 });
+    expect(mock.state.calls[0]?.op).toBe("select.from.where");
+    expect(mock.state.calls.at(-1)?.op).toBe(
+      "select.from.where.orderBy.limit.offset",
+    );
+  });
+
+  it("listForAdmin without search lists all users with default paging", async () => {
+    const mock = makeMockDb({
+      selectResult: [{ count: 3 }, { id: "u1" }],
+    });
+    const page = await createUserRepo(mock.db).listForAdmin({});
+    expect(page.pageSize).toBe(20);
+    expect(mock.state.calls[0]?.op).toBe("select.from.where");
+    expect(mock.state.calls.at(-1)?.op).toBe(
+      "select.from.where.orderBy.limit.offset",
+    );
+  });
+
+  it("setStatus writes status and returns the row", async () => {
+    const mock = makeMockDb({
+      selectResult: [],
+      pendingValues: {},
+      pendingSet: undefined,
+    });
+    await createUserRepo(mock.db).setStatus("u1", "disabled");
+    expect(mock.state.lastSet).toEqual({ status: "disabled" });
     expect(mock.state.calls.at(-1)?.op).toBe("update.set.where.returning");
   });
 });
