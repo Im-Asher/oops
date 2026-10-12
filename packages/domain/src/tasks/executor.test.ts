@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TaskInput, TaskRepo } from "@oops/db/task.repo";
+import type { CreditGate } from "../credits/service";
 import {
   recoverInterruptedTasks,
   registerTaskHandler,
   submitAndWait,
+  TaskError,
 } from "./executor";
 
 function makeRepo(): TaskRepo {
@@ -42,14 +44,34 @@ function makeRepo(): TaskRepo {
   };
 }
 
+/** 直通闸门：任务行经注入 repo 创建、不冻结——core 机制单测与积分语义解耦。 */
+function makePassthroughGate(repo: TaskRepo): CreditGate {
+  return {
+    freezeForTask: async (input) => {
+      const t = await repo.create({
+        type: input.type as TaskInput["type"],
+        payload: input.payload,
+        sessionId: input.sessionId,
+        userId: input.userId,
+      });
+      return { taskId: t.id };
+    },
+    settle: vi.fn().mockResolvedValue(undefined),
+    release: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe("task-executor", () => {
-  it("运行处理器并返回结果，任务标记为 succeeded", async () => {
+  it("运行处理器并返回结果，任务标记为 succeeded，结算钩子被调用", async () => {
     registerTaskHandler("test_echo", async (p) => ({ echoed: p }));
     const repo = makeRepo();
-    const res = await submitAndWait("test_echo", { a: 1 }, { repo, userId: "u1" });
+    const gate = makePassthroughGate(repo);
+    const res = await submitAndWait("test_echo", { a: 1 }, { repo, userId: "u1", credits: gate });
     expect(res).toEqual({ echoed: { a: 1 } });
     expect((await repo.list())[0].status).toBe("succeeded");
     expect((await repo.list())[0].userId).toBe("u1");
+    expect(gate.settle).toHaveBeenCalledWith("t1");
+    expect(gate.release).not.toHaveBeenCalled();
   });
 
   it("handler ctx 透传 sessionId（资产回填会话，GC 依赖）", async () => {
@@ -58,26 +80,54 @@ describe("task-executor", () => {
       seen = ctx.sessionId;
       return { ok: true };
     });
-    await submitAndWait("test_ctx_session", {}, { repo: makeRepo(), sessionId: "s42", userId: "u1" });
+    const repo = makeRepo();
+    await submitAndWait("test_ctx_session", {}, {
+      repo,
+      sessionId: "s42",
+      userId: "u1",
+      credits: makePassthroughGate(repo),
+    });
     expect(seen).toBe("s42");
   });
 
-  it("处理器抛错时任务标记为 failed 并保留错误信息", async () => {
+  it("处理器抛错时任务标记为 failed 并调用释放钩子", async () => {
     registerTaskHandler("test_fail", async () => {
       throw new Error("boom");
     });
     const repo = makeRepo();
-    await expect(submitAndWait("test_fail", {}, { repo, userId: "u1" })).rejects.toThrow("boom");
+    const gate = makePassthroughGate(repo);
+    await expect(
+      submitAndWait("test_fail", {}, { repo, userId: "u1", credits: gate }),
+    ).rejects.toThrow("boom");
     expect((await repo.list())[0].status).toBe("failed");
+    expect(gate.release).toHaveBeenCalledWith("t1");
   });
 
-  it("重启清理：running 任务被标记为 failed", async () => {
+  it("闸门冻结失败（余额不足）直接抛 TaskError，无任务态更新", async () => {
     const repo = makeRepo();
-    const created = await repo.create({ type: "generate_image", userId: "u1" });
-    await repo.update(created.id, { status: "running" });
+    const gate: CreditGate = {
+      freezeForTask: async () => {
+        throw new TaskError("积分余额不足，无法发起该任务", "insufficient_credits");
+      },
+      settle: vi.fn(),
+      release: vi.fn(),
+    };
+    await expect(
+      submitAndWait("test_none", {}, { repo, userId: "u1", credits: gate }),
+    ).rejects.toMatchObject({ kind: "insufficient_credits" });
+    expect(gate.release).not.toHaveBeenCalled();
+    expect(gate.settle).not.toHaveBeenCalled();
+  });
+
+  it("重启清理：running 与 pending 孤儿任务都被标记为 failed", async () => {
+    const repo = makeRepo();
+    const running = await repo.create({ type: "generate_image", userId: "u1" });
+    const pending = await repo.create({ type: "generate_image", userId: "u1" });
+    await repo.update(running.id, { status: "running" });
     const count = await recoverInterruptedTasks(repo);
-    expect(count).toBe(1);
-    expect((await repo.get(created.id))?.status).toBe("failed");
+    expect(count).toBe(2);
+    expect((await repo.get(running.id))?.status).toBe("failed");
+    expect((await repo.get(pending.id))?.status).toBe("failed");
   });
 
   it("并发上限为 2", async () => {
@@ -91,8 +141,11 @@ describe("task-executor", () => {
       return "ok";
     });
     const repo = makeRepo();
+    const gate = makePassthroughGate(repo);
     await Promise.all(
-      Array.from({ length: 6 }, (_, i) => submitAndWait("test_conc", { i }, { repo, userId: "u1" })),
+      Array.from({ length: 6 }, (_, i) =>
+        submitAndWait("test_conc", { i }, { repo, userId: "u1", credits: gate }),
+      ),
     );
     expect(max).toBeLessThanOrEqual(2);
   });

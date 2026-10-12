@@ -1,4 +1,6 @@
 import { createTaskRepo, type TaskRepo } from "@oops/db/task.repo";
+import { defaultCreditGate, type CreditGate } from "../credits/service";
+import { TaskError } from "./task-error";
 
 /** 单任务超时（毫秒）。 */
 export const TASK_TIMEOUT_MS = 90_000;
@@ -13,15 +15,7 @@ export function isTaskType(v: string): v is TaskType {
   return (TASK_TYPES as readonly string[]).includes(v);
 }
 
-export class TaskError extends Error {
-  constructor(
-    message: string,
-    public readonly kind: string,
-  ) {
-    super(message);
-    this.name = "TaskError";
-  }
-}
+export { TaskError };
 
 export interface TaskHandlerContext {
   signal: AbortSignal;
@@ -77,23 +71,35 @@ export interface SubmitOptions {
   sessionId?: string;
   // 必传：任务与资产归属的真实用户（来自 require-user），无固定默认
   userId: string;
+  // 任务态更新仓储；任务行创建由 credits.freezeForTask 在事务内完成（见下）
   repo?: TaskRepo;
+  /**
+   * 积分闸门：任务创建 + 冻结同事务（缺余额即失败回滚，无任务行残留）。
+   * 缺省注入生产闸门（真实扣费）；单测传直通 stub 并配套 opts.repo。
+   */
+  credits?: CreditGate;
 }
 
-/** 提交任务并同步等待完成；失败时抛 TaskError，调用方据此回喂模型。 */
+/**
+ * 提交任务并同步等待完成。
+ * 终态与积分严格一致：succeeded → settle 退差；failed/canceled → release 释放；
+ * 进程崩溃的残余由启动 recover（标 failed）+ reconcile（释放泄漏冻结）兜底。
+ * 失败时抛 TaskError，调用方据此回喂模型。
+ */
 export async function submitAndWait(
   type: string,
   payload: unknown,
   opts: SubmitOptions,
 ): Promise<unknown> {
   const repo = opts.repo ?? createTaskRepo();
-  const created = await repo.create({
-    type: type as TaskType,
+  const gate = opts.credits ?? defaultCreditGate;
+  // 余额不足 / 定价缺失在此抛 TaskError，任务行随事务回滚，不存在免费或悬空任务
+  const { taskId } = await gate.freezeForTask({
+    userId: opts.userId,
+    type,
     payload,
     sessionId: opts.sessionId,
-    userId: opts.userId,
   });
-  const taskId = created.id;
   try {
     await acquire();
     await repo.update(taskId, { status: "running" });
@@ -112,6 +118,7 @@ export async function submitAndWait(
         sessionId: opts.sessionId,
       });
       await repo.update(taskId, { status: "succeeded", result: slimForDb(result) });
+      await gate.settle(taskId);
       return result;
     } finally {
       clearTimeout(timer);
@@ -121,16 +128,21 @@ export async function submitAndWait(
     const message =
       err instanceof TaskError ? err.message : (err as Error)?.message ?? "任务失败";
     await repo.update(taskId, { status: "failed", error: message });
+    await gate.release(taskId);
     throw err;
   }
 }
 
-/** 启动时清理：把上一次进程残留的 running 任务标记为 failed（interrupted）。 */
+/**
+ * 启动时清理：单实例下任何 pending/running 残留都是上一进程的孤儿
+ * （提交即进入 running，pending 只存在于毫秒级窗口），统一标记 failed；
+ * 对应冻结由 reconcileFrozen 一并释放。
+ */
 export async function recoverInterruptedTasks(repo: TaskRepo = createTaskRepo()): Promise<number> {
   const all = await repo.list();
-  const interrupted = all.filter((t) => t.status === "running");
-  for (const t of interrupted) {
+  const orphans = all.filter((t) => t.status === "running" || t.status === "pending");
+  for (const t of orphans) {
     await repo.update(t.id, { status: "failed", error: "interrupted-by-restart" });
   }
-  return interrupted.length;
+  return orphans.length;
 }

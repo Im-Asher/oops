@@ -1,9 +1,19 @@
-import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql, type ExtractTablesWithRelations } from "drizzle-orm";
+import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 import { db as defaultDb } from ".";
 import { creditLedger, creditPrices, tasks, users } from "./schema";
 import type { CreditLedgerEntry } from "./schema";
 
-export type DbClient = typeof defaultDb;
+/**
+ * 事务兼容客户端：连接池（NodePgDatabase）与事务（PgTransaction）的共同基类。
+ * 仓储方法只用 select/insert/update，基类签名已覆盖。
+ */
+export type DbClient = PgDatabase<
+  NodePgQueryResultHKT,
+  typeof import("./schema"),
+  ExtractTablesWithRelations<typeof import("./schema")>
+>;
 
 export interface FreezeInput {
   userId: string;
@@ -25,8 +35,8 @@ export interface CreditLedgerRepo {
    * + frozen 流水插入。调用方须在同一事务内完成任务创建，余额不足抛错整体回滚。
    */
   freeze(input: FreezeInput): Promise<CreditLedgerEntry>;
-  /** 结算退差：delta = 冻结额 − 实际成本（正退负补，可为 0），冻结条目转 settled。 */
-  settle(input: { userId: string; taskId: string; delta: number }): Promise<void>;
+  /** 结算：按任务定位冻结条目，退差 delta = 冻结额 − 实际成本（actualCost 缺省 = 冻结额），条目转 settled。 */
+  settle(input: { taskId: string; actualCost?: number }): Promise<void>;
   /** 按任务释放：返还全部冻结额 + 条目转 released + release 流水。 */
   releaseByTask(input: { taskId: string }): Promise<void>;
   /** 按条目释放（对账兜底用：任务可能已被删，taskId 被 FK 置空无法按任务定位）。 */
@@ -69,20 +79,28 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
       return entry;
     },
 
-    async settle({ userId, taskId, delta }) {
+    async settle({ taskId, actualCost }) {
+      const [entry] = await db
+        .select()
+        .from(creditLedger)
+        .where(and(eq(creditLedger.taskId, taskId), eq(creditLedger.status, "frozen")))
+        .limit(1);
+      if (!entry) return; // 无冻结条目（理论不可达）：幂等跳过，不产生流水
+      const frozen = -entry.amount; // amount 为负存冻结额
+      const delta = frozen - (actualCost ?? frozen);
       if (delta !== 0) {
         await db
           .update(users)
           .set({ creditBalance: sql`${users.creditBalance} + ${delta}` })
-          .where(eq(users.id, userId));
+          .where(eq(users.id, entry.userId));
         await db
           .insert(creditLedger)
-          .values({ userId, type: "settle", amount: delta, taskId });
+          .values({ userId: entry.userId, type: "settle", amount: delta, taskId });
       }
       await db
         .update(creditLedger)
         .set({ status: "settled" })
-        .where(and(eq(creditLedger.taskId, taskId), eq(creditLedger.status, "frozen")));
+        .where(eq(creditLedger.id, entry.id));
     },
 
     async releaseByTask({ taskId }) {

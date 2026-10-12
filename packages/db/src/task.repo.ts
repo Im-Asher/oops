@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import type { DbClient } from "./credit-ledger.repo";
 import { db as defaultDb } from ".";
 import { tasks, type Task } from "./schema";
 
@@ -23,7 +24,7 @@ export interface TaskRepo {
   list(sessionId?: string): Promise<Task[]>;
 }
 
-export function createTaskRepo(db: typeof defaultDb = defaultDb): TaskRepo {
+export function createTaskRepo(db: DbClient = defaultDb): TaskRepo {
   return {
     async create(input) {
       const [row] = await db

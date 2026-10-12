@@ -284,6 +284,9 @@ importers:
       '@types/node':
         specifier: ^20
         version: 20.19.43
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.0)
       typescript:
         specifier: ^5
         version: 5.9.3
