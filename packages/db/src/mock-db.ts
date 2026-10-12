@@ -10,10 +10,12 @@ export interface MockDbState {
   pendingSet: unknown;
   /** 最近一次 .set() 入参（returning 后不清空，供断言用） */
   lastSet: unknown;
+  /** 最近一次 .values() 入参（returning 后不清空，供断言用） */
+  lastValues: unknown;
   calls: { op: string; args: unknown[] }[];
 }
 
-const TERMINALS = new Set(["returning", "limit", "execute"]);
+const TERMINALS = new Set(["returning", "limit", "execute", "offset"]);
 
 export function makeMockDb(
   initial?: Partial<MockDbState>,
@@ -23,6 +25,7 @@ export function makeMockDb(
     pendingValues: initial?.pendingValues,
     pendingSet: initial?.pendingSet,
     lastSet: undefined,
+    lastValues: undefined,
     calls: [],
   };
 
@@ -35,9 +38,27 @@ export function makeMockDb(
       return [v];
     }
     if (op === "delete.where") return [];
+    if (op.endsWith(".offset")) return state.selectResult;
     if (op.endsWith(".where")) return state.selectResult;
     if (op.endsWith(".limit")) return state.selectResult;
     return [];
+  };
+
+  /** terminal 结算值：既是 Promise（可 await），也允许在其上继续链式（.limit().offset() 双 builder 链）。 */
+  const makeResolving = (op: string, args: unknown[]): any => {
+    const promise = Promise.resolve(resolve(op, args));
+    return new Proxy(promise, {
+      get(target, prop: string | symbol) {
+        if (prop === "then") {
+          return (target as Promise<unknown>).then.bind(target);
+        }
+        const nextOp = `${op}.${String(prop)}`;
+        if (TERMINALS.has(String(prop))) {
+          return (...a: unknown[]) => makeResolving(nextOp, a);
+        }
+        return build(nextOp);
+      },
+    });
   };
 
   const build = (op: string): any => {
@@ -50,13 +71,16 @@ export function makeMockDb(
             Promise.resolve(resolve(op, [])).then(cb);
         }
         if (TERMINALS.has(String(prop))) {
-          return (...args: unknown[]) => Promise.resolve(resolve(nextOp, args));
+          return (...args: unknown[]) => makeResolving(nextOp, args);
         }
         return build(nextOp);
       },
       apply(_t, _this, args: unknown[]) {
         if (op.endsWith(".values") || op.endsWith(".set")) {
           state.pendingValues = op.endsWith(".values") ? args[0] : state.pendingValues;
+          if (op.endsWith(".values")) {
+            state.lastValues = args[0];
+          }
           if (op.endsWith(".set")) {
             state.pendingSet = args[0];
             state.lastSet = args[0];
