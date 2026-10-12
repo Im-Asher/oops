@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import {
   CheckIcon,
   ClockIcon,
+  CoinsIcon,
   PanelRightCloseIcon,
   PencilIcon,
   XIcon,
@@ -54,9 +55,26 @@ export function ChatPanelHeader({
 }: ChatPanelHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  // 余额徽标（credits spec）：挂载拉取一次 profile；任务结算后刷新页面更新。
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = useTranslations("chat");
   const title = sessionTitle || (canRename ? t("untitledSession") : t("noSessionSelected"));
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { creditBalance?: number } | null) => {
+        if (!cancelled && d && typeof d.creditBalance === "number") {
+          setCreditBalance(d.creditBalance);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -124,6 +142,15 @@ export function ChatPanelHeader({
             </span>
             <span className="shrink-0 rounded bg-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-300">
               AI
+            </span>
+            <span
+              aria-label={t("balance")}
+              className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+              data-testid="credit-balance"
+              title={t("balance")}
+            >
+              <CoinsIcon className="size-3" />
+              {creditBalance ?? "—"}
             </span>
             <Button
               aria-label={t("renameSession")}

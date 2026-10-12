@@ -12,6 +12,7 @@
       "noFile": "缺少 file 字段",
       "noSession": "参考图上传需要 sessionId",
       "notFound": "会话不存在",
+      "insufficientCredits": "积分余额不足，无法生成",
       "invalidCredentials": "用户名或密码不正确",
       "usernameTaken": "用户名已存在",
       "inviteCodeInvalid": "邀请码无效或已被使用",
@@ -121,6 +122,7 @@
       "stoppedLine": "[已停止生成]",
       "connectionLost": "连接中断，请重试",
       "connectionLostCanvas": "连接中断，生成未完成",
+      "sendFailed": "发送失败，请重试",
       "regenerate": "重新生成：{prompt}",
       "regenerateLast": "重新生成上次的图片",
       "canvasImageName": "画布图片",
@@ -147,6 +149,7 @@
     "thinking": "思考中",
     "fileLink": "文件",
     "emptyPrompt": "选择 Agent 并描述你想要的商品/场景图。",
+    "balance": "积分余额",
     "composer": {
       "attachLanding": "添加附件",
       "attachReference": "上传参考图",
@@ -159,6 +162,7 @@
       "inputLabel": "消息输入",
       "placeholder": "描述你的设计需求…",
       "placeholderNeedSession": "先创建会话",
+      "placeholderNoCredits": "积分不足，已暂停生成",
       "selectAgent": "选择 Agent",
       "stop": "停止生成",
       "send": "发送"

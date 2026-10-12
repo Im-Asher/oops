@@ -19,6 +19,7 @@
       "noFile": "Missing the file field",
       "noSession": "Reference upload requires a sessionId",
       "notFound": "Session not found",
+      "insufficientCredits": "Insufficient credits to generate",
       "invalidCredentials": "Incorrect username or password",
       "usernameTaken": "Username already taken",
       "inviteCodeInvalid": "Invalid or already-used invite code",
@@ -121,6 +122,7 @@
       "stoppedLine": "[Stopped]",
       "connectionLost": "Connection lost, please retry",
       "connectionLostCanvas": "Connection lost; generation not completed",
+      "sendFailed": "Failed to send, please retry",
       "regenerate": "Regenerate: {prompt}",
       "regenerateLast": "Regenerate the last image",
       "canvasImageName": "Canvas image",
@@ -147,6 +149,7 @@
     "thinking": "Thinking",
     "fileLink": "File",
     "emptyPrompt": "Pick an agent and describe the product or scene image you want.",
+    "balance": "Credits balance",
     "composer": {
       "attachLanding": "Add attachments",
       "attachReference": "Upload reference image",
@@ -159,6 +162,7 @@
       "inputLabel": "Message input",
       "placeholder": "Describe what you want to create…",
       "placeholderNeedSession": "Create a session first",
+      "placeholderNoCredits": "Out of credits — generation paused",
       "selectAgent": "Select agent",
       "stop": "Stop generating",
       "send": "Send"

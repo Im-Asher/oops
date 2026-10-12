@@ -50,6 +50,8 @@ interface ComposerProps {
   /** landing 待传附件 chip（跳转后在画布侧真实上传）。 */
   pendingFiles?: ComposerPendingFile[];
   onRemovePendingFile?: (id: string) => void;
+  /** 积分耗尽（/api/chat 402 后）：整输入区禁用直至刷新/恢复余额。 */
+  creditsExhausted?: boolean;
 }
 
 /**
@@ -77,12 +79,15 @@ export function Composer({
   variant,
   pendingFiles,
   onRemovePendingFile,
+  creditsExhausted,
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const t = useTranslations("chat.composer");
   // landing 形态下会话在跳转后由画布创建，首页输入不设门槛。
   const sessionReady = variant === "landing" || hasSession;
+  // 积分耗尽优先于会话门槛展示（余额恢复需刷新或后台发放，禁用语义更明确）。
+  const gateReady = sessionReady && !creditsExhausted;
   // landing 语境下无「会话」概念，附件钮文案随之调整。
   const attachLabel = onAttach
     ? variant === "landing"
@@ -158,7 +163,7 @@ export function Composer({
         aria-label={t("inputLabel")}
         ref={textareaRef}
         className={`field-sizing-content ${variant === "landing" ? "max-h-60 min-h-15" : "max-h-80 min-h-20"} resize-none border-0 bg-transparent p-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:ring-0`}
-        disabled={busy || !sessionReady}
+        disabled={busy || !gateReady}
         onBlur={() => {
           composingRef.current = false;
         }}
@@ -183,7 +188,13 @@ export function Composer({
           e.preventDefault();
           onSend();
         }}
-        placeholder={sessionReady ? t("placeholder") : t("placeholderNeedSession")}
+        placeholder={
+          creditsExhausted
+            ? t("placeholderNoCredits")
+            : sessionReady
+              ? t("placeholder")
+              : t("placeholderNeedSession")
+        }
         rows={1}
         value={value}
       />
@@ -245,7 +256,7 @@ export function Composer({
           <Button
             aria-label={t("send")}
             className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
-            disabled={busy || !sessionReady || !value.trim()}
+            disabled={busy || !gateReady || !value.trim()}
             onClick={onSend}
             size="icon-sm"
           >

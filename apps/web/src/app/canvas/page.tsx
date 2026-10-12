@@ -388,6 +388,10 @@ function ChatPageInner() {
     text: string;
     tone: "progress" | "error";
   } | null>(null);
+  // 生成闸门（credits spec）：/api/chat 402 后 composer 整体禁用 + 内联提示，
+  // 独立于 directSendStatus（直发完成回调会清后者）；刷新页面或重试乐观重置。
+  const [creditsExhausted, setCreditsExhausted] = useState(false);
+  const [creditGateError, setCreditGateError] = useState<string | null>(null);
   useEffect(() => {
     // 入队：同值不重复（地址栏清理后路由状态归零，不会再触发）；
     // nonce 变化视为新一次直发（同文案连发场景）。
@@ -684,6 +688,10 @@ function ChatPageInner() {
   async function runRound(sessionId: string, text: string, roundRefs: string[]) {
     const slot = slots[sessionId];
     if (!slot || !text || slot.busy) return;
+    // 乐观重置闸门禁用：重试路径（失败卡）可在余额恢复后无需刷新直接再发；
+    // 仍不足则被下方 402 处理重新禁用。
+    setCreditsExhausted(false);
+    setCreditGateError(null);
     updateSlot(sessionId, (s) => ({ ...s, busy: true }));
     // 本轮画布占位卡记账：SSE error/断流时统一收尾置失败。
     const roundPlaceholders: string[] = [];
@@ -730,6 +738,23 @@ function ChatPageInner() {
         ...(roundRefs.length ? { referenceAssetIds: roundRefs } : {}),
       }),
     });
+
+    // 非 2xx（此前静默失败）：错误体按 code 渲染词典文案并落聊天错误行；
+    // 402 积分不足额外禁用 composer + 输入框上方内联提示（credits spec）。
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as {
+        error?: { code?: string; message?: string };
+      } | null;
+      const message = apiErrorMessage(err?.error, tApi, err?.error?.message ?? t("page.sendFailed"));
+      if (err?.error?.code === "INSUFFICIENT_CREDITS") {
+        setCreditsExhausted(true);
+        setCreditGateError(message);
+      }
+      appendText(`\n${t("page.errorLine", { message })}`);
+      updateSlot(sessionId, (s) => ({ ...s, busy: false }));
+      void loadSessions();
+      return;
+    }
 
     if (!res.body) {
       updateSlot(sessionId, (s) => ({ ...s, busy: false }));
@@ -1111,7 +1136,8 @@ function ChatPageInner() {
           onStop={stopGeneration}
           reference={composerReference}
           selectedAssetId={selectedCanvasItem?.assetId ?? null}
-          statusLine={directSendStatus}
+          creditsExhausted={creditsExhausted}
+          statusLine={directSendStatus ?? (creditGateError ? { text: creditGateError, tone: "error" as const } : null)}
           sessionTitle={sessions.find((s) => s.id === currentId)?.title ?? ""}
         />
       </div>

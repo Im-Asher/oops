@@ -32,6 +32,7 @@ const CODE_KEYS = {
   INVALID_REFERENCE: "invalidReference",
   TOO_LARGE: "tooLarge",
   UNSUPPORTED_TYPE: "unsupportedType",
+  INSUFFICIENT_CREDITS: "insufficientCredits",
 } as const satisfies Record<string, keyof Messages["common"]["apiErrors"]>;
 
 export type ApiErrorCode = keyof typeof CODE_KEYS;

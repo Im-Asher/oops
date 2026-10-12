@@ -46,6 +46,8 @@ interface ChatPanelProps {
   onAttach?: () => void;
   /** 直发衔接状态行（进度/错误）；null 即不展示。 */
   statusLine?: { text: string; tone: "progress" | "error" } | null;
+  /** 积分耗尽（/api/chat 402 后）：composer 整体禁用直至余额恢复。 */
+  creditsExhausted?: boolean;
 }
 
 /**
@@ -78,6 +80,7 @@ export function ChatPanel({
   focusSignal,
   onAttach,
   statusLine,
+  creditsExhausted,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
   return (
@@ -119,6 +122,7 @@ export function ChatPanel({
           hasSession={hasSession}
           focusSignal={focusSignal}
           onAttach={onAttach}
+          creditsExhausted={creditsExhausted}
           onChange={onInputChange}
           onAgentChange={onAgentChange}
           onSend={onSend}
