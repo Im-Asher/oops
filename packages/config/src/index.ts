@@ -30,6 +30,11 @@ const authShape = {
     .min(32, "AUTH_SECRET 需至少 32 字符（生成：openssl rand -base64 32）"),
 };
 
+/** 跨端引导域（WEB_APP_URL）：admin 登出等跳转 web 的基地址。 */
+const webShape = {
+  WEB_APP_URL: z.string().url("WEB_APP_URL 必须是完整 URL").optional(),
+};
+
 /** S3 兼容对象存储域（全部后端专属，缺失即存储子系统不可用）。 */
 const s3Shape = {
   S3_ENDPOINT: z.string().url("S3_ENDPOINT 必须是完整 URL"),
@@ -95,6 +100,7 @@ const renderShape = {
 
 const coreSchema = z.object(coreShape);
 const authSchema = z.object(authShape);
+const webSchema = z.object(webShape);
 const s3Schema = z.object(s3Shape);
 const llmSchema = z.object(llmShape);
 const imageSchema = z.object(imageShape);
@@ -103,6 +109,7 @@ const renderSchema = z.object(renderShape);
 const envSchema = z.object({
   ...coreShape,
   ...authShape,
+  ...webShape,
   ...s3Shape,
   ...llmShape,
   ...imageShape,
@@ -138,6 +145,16 @@ export interface AuthConfig {
 export function getAuthConfig(env: Env = process.env): AuthConfig {
   const v = authSchema.parse(env);
   return { authSecret: v.AUTH_SECRET };
+}
+
+export interface WebAppConfig {
+  webAppUrl: string;
+}
+
+/** 跨端引导域（WEB_APP_URL）；缺省 dev 默认 localhost:3000。 */
+export function getWebAppConfig(env: Env = process.env): WebAppConfig {
+  const v = webSchema.parse(env);
+  return { webAppUrl: v.WEB_APP_URL ?? "http://localhost:3000" };
 }
 
 export interface S3Config {
