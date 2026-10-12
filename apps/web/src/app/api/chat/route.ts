@@ -6,6 +6,7 @@ import { screenInput } from "@/server/agent/moderation";
 import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { requireUser } from "@oops/auth/require-user";
+import { creditsService } from "@oops/domain/credits/service";
 import { createAssetRepo } from "@oops/db/asset.repo";
 import { createMessageRepo } from "@oops/db/message.repo";
 import { createSessionRepo } from "@oops/db/session.repo";
@@ -62,6 +63,16 @@ export async function POST(req: Request): Promise<Response> {
   const userId = await requireUser(req);
   if (!userId) {
     return Response.json({ error: { code: "UNAUTHENTICATED", message: "请先登录" } }, { status: 401 });
+  }
+
+  // 生成闸门（credits spec）：余额 ≤ 0 在入口整面板拒绝（402），避免落库消息后才失败。
+  // 正确性边界仍由冻结时条件 UPDATE 硬校验兜底，此处仅是体验层预检。
+  const gate = await creditsService.checkGate(userId);
+  if (!gate.ok) {
+    return Response.json(
+      { error: { code: "INSUFFICIENT_CREDITS", message: "积分余额不足，无法生成" } },
+      { status: 402 },
+    );
   }
 
   let body: unknown;

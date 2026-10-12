@@ -102,8 +102,8 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   ├── messages/      # next-intl 词典（zh.json + en.json）
 │   ├── public/        # 静态资源
 │   └── .env.local     # web 专属层（同名键覆盖根共享层；NEXT_PUBLIC_* 等）
-├── packages/          # shared packages：@oops/{config,db,llm,auth}（TS 源码直出 + transpilePackages；
-│                      #   包间分层 config → db → llm → auth 单向禁逆，app 只经 @oops/* exports 消费）
+├── packages/          # shared packages：@oops/{config,db,domain,llm,auth}（TS 源码直出 + transpilePackages；
+│                      #   包间分层 config → db → {domain,llm} → auth 单向禁逆，app 只经 @oops/* exports 消费）
 ├── .env.local / .env.example  # 根共享 env 层：DATABASE_URL / S3_* / AUTH_SECRET / LLM_* / RENDER_* / QWEN_*
 ├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
@@ -147,11 +147,15 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
     Pure domain logic belongs in `src/server/domain/`; infrastructure
     (providers/storage/db/render) lives in `src/server/infra/` behind
     interfaces; `src/server/agent/` holds the declarative agent runtime.
-  - **Shared packages (`packages/`) depend one-way: `config → db → llm → auth`.**
+  - **Shared packages (`packages/`) depend one-way: `config → db → {domain, llm} → auth`.**
     Never import `@oops/auth`/`@oops/llm`/`@oops/db` from `@oops/config`, and
     never create reverse edges between them; apps consume packages only via
     their `exports` subpaths. Env access goes exclusively through
     `@oops/config` domain getters (never raw `process.env` outside it).
+    `@oops/domain` holds pure domain services (credits ledger + task executor
+    core) on top of `@oops/db`; web-specific task handlers stay in
+    `apps/web/src/server/domain/tasks/handlers.ts` and register via the
+    `import "@/server/agent"` side-effect chain.
   - Route Handlers validate input (zod), call server services, and return
     responses. They must stay short.
   - Shared UI helpers go in `src/lib/`; components in `src/components/`.
@@ -197,6 +201,11 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
 ## Testing instructions
 
 - Framework: **Vitest** (unit) with tests co-located or under `src/**/*.test.ts`.
+- Integration tests that need real Postgres are gated behind
+  `RUN_PG_TESTS=1` + `DATABASE_URL` (e.g. `packages/domain/src/credits/credits.int.test.ts`:
+  concurrent freeze atomicity, tx rollback, leak reconciliation). They skip
+  silently in the default `pnpm test` run; run them explicitly before touching
+  ledger/freeze semantics.
 - What to test:
   - **Unit (required for new logic):** agent registry loading, tool input
     schemas, services with mocked providers (image generation, render),

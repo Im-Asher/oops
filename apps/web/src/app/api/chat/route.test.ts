@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   assetRows: [] as { id: string; userId: string; sessionId: string; storageKey: string; prompt: string | null; mimeType: string }[],
   visionAgent: false,
   storageBytes: [137, 80, 78, 71] as number[],
+  gateOpen: true,
 }));
 
 vi.mock("@/server/agent", () => ({ default: {} }));
@@ -38,6 +39,11 @@ vi.mock("@/server/infra/storage/s3", () => ({
 }));
 vi.mock("@oops/auth/require-user", () => ({
   requireUser: vi.fn(async () => h.userId),
+}));
+vi.mock("@oops/domain/credits/service", () => ({
+  creditsService: {
+    checkGate: async () => ({ ok: h.gateOpen, balance: h.gateOpen ? 100 : 0 }),
+  },
 }));
 vi.mock("@oops/db/asset.repo", () => ({
   createAssetRepo: () => ({
@@ -108,6 +114,7 @@ describe("POST /api/chat", () => {
     h.runAgentArgs = [];
     h.messageCreates = [];
     h.assetRows = [];
+    h.gateOpen = true;
   });
 
   it("未认证返回 401，不触发任何下游", async () => {
@@ -116,6 +123,15 @@ describe("POST /api/chat", () => {
     const res = await post("画一颗苹果");
     expect(res.status).toBe(401);
     expect(h.runAgentCalls).toBe(0);
+  });
+
+  it("余额不足返回 402，不落消息不触发 agent", async () => {
+    h.gateOpen = false;
+    const res = await post("画一颗苹果");
+    expect(res.status).toBe(402);
+    expect((await res.json()).error.code).toBe("INSUFFICIENT_CREDITS");
+    expect(h.runAgentCalls).toBe(0);
+    expect(h.messageCreates).toHaveLength(0);
   });
 
   it("入口敏感词初筛：命中黑名单直接 400，不进入 LLM", async () => {

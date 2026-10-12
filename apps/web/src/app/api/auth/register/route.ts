@@ -4,6 +4,7 @@ import { hashPassword } from "@oops/auth/password";
 import { rateLimit, clientIp } from "@oops/auth/rate-limit";
 import { registerUser } from "@oops/auth/register";
 import { sessionCookieHeader } from "@oops/auth/session-cookie";
+import { creditsService } from "@oops/domain/credits/service";
 
 const bodySchema = z.object({
   username: z
@@ -68,6 +69,12 @@ export async function POST(req: Request): Promise<Response> {
         ? { status: 409, code: "USERNAME_TAKEN", message: "用户名已存在" }
         : { status: 400, code: "INVITE_CODE_INVALID", message: "邀请码无效或已被使用" };
     return Response.json({ error: { code, message } }, { status });
+  }
+  // 注册赠送初始积分：best-effort，失败仅记日志不阻断登录（路由级调用，不建 auth→domain 包依赖边）
+  try {
+    await creditsService.grantInitialCredits(result.user.id);
+  } catch (err) {
+    console.error("[register] 初始积分发放失败:", err);
   }
   return Response.json(
     { user: { id: result.user.id, username: result.user.username } },

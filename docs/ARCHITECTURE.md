@@ -100,16 +100,20 @@ export const atmosphereDesigner = defineAgent({
 
 ```
 generate_image({ prompt, size, aspectRatio })
-  → 写 tasks 表 (pending)
-  → 进程内 executor（单例，并发 2，单任务超时 90s；重启后 running 标记 failed）
+  → 生成闸门预检（/api/chat：余额 ≤ 0 → 402 整面板拒绝）
+  → 事务内写 tasks 表 (pending) + 积分冻结（按 credit_prices 定价扣减余额 + frozen 流水）
+  → 进程内 executor（单例，并发 2，单任务超时 90s；重启后 pending/running 标记 failed）
   → 调 DashScope Token Plan 万相 wan2.7-image（POST multimodal-generation，同步返回 base64）
   → provider 内把返回图下载/转 base64 → 写入对象存储 → assets 表落库
   → task 流转 pending → running → succeeded/failed
+  → 终态结算：succeeded → settle（退差多退少补，frozen 条目转 settled）
+              failed/canceled/重启清理 → release（全额返还，条目转 released）
 ```
 
 - Playwright 截图同样任务化（CPU/内存密集，并发限 1~2）。
-- 进程重启后 pending 任务标记失败（MVP 不做恢复队列）。
-- 未来多实例：executor 替换为 BullMQ + Redis，Service 接口不变。
+- 进程重启后 pending/running 任务标记失败，启动对账（`reconcileFrozen`）释放任务已
+  终态/不存在的残余冻结条目（崩溃窗口兜底）。
+- 未来多实例：executor 替换为 BullMQ + Redis，Service 接口不变（冻结/结算语义不变）。
 
 **Agent 工具层两种语义：**
 
@@ -259,6 +263,7 @@ users          用户      id(uuid), username(text, lower(username) 唯一索引
                         gender(user_gender enum, 默认 secret), bio(text?),
                         token_version(int, 改密踢下线水位),
                         status(user_status enum active|disabled), invite_code_id(uuid?→invite_codes),
+                        credit_balance(int, 物化余额, == sum(credit_ledger.amount) 不变量),
                         created_at
 invite_codes   邀请码    code(text 主键), max_uses(int, 默认 1), used_count(int, 默认 0),
                         expires_at(timestamptz?), note(text?), created_at
@@ -274,6 +279,12 @@ assets         素材/作品 id(uuid), user_id, session_id?(→sessions, set nul
 tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(enum),
                         status(enum), payload(jsonb, 默认 {}), result(jsonb?),
                         error(text?), created_at, updated_at
+credit_ledger  积分流水  id(uuid), user_id, type(enum grant|freeze|settle|release|adjust),
+                        amount(int, 带符号 = 余额变动; freeze 为负), status(enum?, 仅 freeze 条目),
+                        task_id?(→tasks, set null), note(text?), created_at
+                        （append-only 账本；不变量 balance == sum(amount)）
+credit_prices  任务定价  key(text 主键 generate_image|render_html), credits(int),
+                        updated_at（seed：生图 10 / 渲染 5，后台编辑归 M2.3）
 ```
 
 枚举取值：
@@ -284,6 +295,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 - `asset_kind`：`image` / `json` / `other` / `edited`
 - `task_type`：`generate_image` / `render_html` / `export`
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
+- `credit_ledger_type`：`grant` / `freeze` / `settle` / `release` / `adjust`
+- `credit_ledger_status`：`frozen` / `settled` / `released`（仅 freeze 条目持有）
 
 > 注：`chat-image-gen` 已落地：① `chat_sessions` 新增 `agent_id` 列（迁移 `0001`）；
 > ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
@@ -297,6 +310,8 @@ tasks          生成任务  id(uuid), user_id, session_id?(→sessions), type(e
 > `summarized_up_to`（compact 水位线，迁移 `0003`），存量数据零回填（见 5.1）。
 > `user-auth` 新增 `users` / `invite_codes` 表与 `user_status` 枚举（迁移 `0004`）；
 > `add-user-profile-and-logout` 为 `users` 增 `oops_id` / `gender` / `bio` / `token_version` 与 `user_gender` 枚举（迁移 `0005`，存量行 `oops_id` 已回填）；
+> `add-credits-domain` 新增 `credit_ledger` / `credit_prices` 表、两组枚举与 `users.credit_balance`
+> 物化列（迁移 `0007`，seed 定价 生图 10 / 渲染 5，存量用户回填 100 分 grant 流水）。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
@@ -341,7 +356,7 @@ oops/
 │   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
 │   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider
 │   │   ├── domain/
-│   │   │   └── tasks/task-executor.ts # 进程内任务执行器（并发 2 / 超时 90s / 重启清理）
+│   │   │   └── tasks/handlers.ts    # generate_image / render_html 任务处理器（经 @oops/domain/tasks 执行器跑）
 │   │   └── agent/                  # 声明式 Agent 运行时
 │   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts / compact.ts
 │   │       ├── definitions/        # 各 Agent 定义 + prompts/<id>.md（含 compact 摘要骨架）
@@ -368,9 +383,10 @@ oops/
 │   │   ├── components/             # admin-shell（client）/ guard-notices（401/403）/ section-placeholder（RSC）
 │   │   └── i18n/                   # next-intl 装配（镜像 web，zh 单语 cookie 模式）
 │   └── messages/zh.json            # 词典（zh 源）
-├── packages/                       # 共享包（TS 源码直出，Next transpilePackages；分层 config → db → llm → auth 单向禁逆）
+├── packages/                       # 共享包（TS 源码直出，Next transpilePackages；分层 config → db → {domain,llm} → auth 单向禁逆）
 │   ├── config/                     # @oops/config：env schema 按域分组 + 域级 getter + parseEnv 全量入口
 │   ├── db/                         # @oops/db：Drizzle schema/仓储 + drizzle/ 迁移目录 + drizzle.config.ts 共址
+│   ├── domain/                     # @oops/domain：积分账本服务（credits/）+ 任务执行器 core（tasks/，并发/注册/终态结算钩子）
 │   ├── llm/                        # @oops/llm：模型目录 catalog + 角色 resolver（llm-assembly）
 │   └── auth/                       # @oops/auth：password / session / require-user / require-admin / register / authenticate / rate-limit
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
@@ -396,7 +412,7 @@ oops/
 
 ## 9. 演进路径（超出 MVP 范围，按需启动）
 
-- **多租户 SaaS**：注册/登录与用户级数据隔离已落地，后续补配额/积分、团队与组织隔离。
+- **多租户 SaaS**：注册/登录与用户级数据隔离已落地；积分计费（预扣冻结 + 终态结算）已落地，后续补团队与组织隔离。
 - **多实例部署**：存储为 S3 兼容（env 可切云上后端）、DB 为 Postgres（无状态），应用可水平扩展；task executor 换 BullMQ + Redis 即可去单例限制（存储 / DB 不再是扩展瓶颈）。
 - **Agent 市场**：AgentRegistry 已是配置驱动，可平移到 DB 存储开放自定义。
 - **局部重绘/抠图**：作为新工具加入 ToolRegistry，Agent 按需引用。

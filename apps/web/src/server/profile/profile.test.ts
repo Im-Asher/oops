@@ -54,6 +54,7 @@ describe("toProfile", () => {
       displayName: "小明",
       gender: "female",
       bio: "做电商图的",
+      creditBalance: 100,
     });
   });
 });

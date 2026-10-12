@@ -12,6 +12,8 @@ export interface ProfileData {
   displayName: string | null;
   gender: UserGender;
   bio: string | null;
+  // 物化余额（只读展示：聊天面板余额徽标数据源）
+  creditBalance: number;
 }
 
 /** username/oopsId 只读；其余字段经 PATCH 可改。 */
@@ -22,6 +24,7 @@ export function toProfile(user: User): ProfileData {
     displayName: user.displayName,
     gender: user.gender,
     bio: user.bio,
+    creditBalance: user.creditBalance,
   };
 }
 
