@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSessionCookieValue } from "./session-cookie";
-import { requireUser } from "./require-user";
+import { requireUser, requireUserRowFromCookieHeader } from "./require-user";
 
 vi.mock("@oops/db/user.repo", () => ({
   createUserRepo: vi.fn(() => ({ findById: findByIdMock })),
@@ -108,5 +108,36 @@ describe("requireUser", () => {
     await expect(requireUser(requestWithCookie("forged.value"))).resolves.toBeNull();
     await expect(requireUser(requestWithCookie(undefined))).resolves.toBeNull();
     expect(findByIdMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("requireUserRowFromCookieHeader（admin 守卫单查询原语）", () => {
+  it("valid session returns the full user row with exactly one DB query", async () => {
+    findByIdMock.mockResolvedValue({
+      id: "owner",
+      status: "active",
+      tokenVersion: 1,
+      role: "admin",
+    });
+    const value = createSessionCookieValue(
+      { userId: "owner", exp: 1_800_000_000, tv: 1 },
+      SECRET,
+    );
+    const row = await requireUserRowFromCookieHeader(
+      requestWithCookie(value).headers.get("cookie"),
+    );
+    expect(row).toMatchObject({ id: "owner", role: "admin" });
+    expect(findByIdMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalid session returns null without leaking rows", async () => {
+    findByIdMock.mockResolvedValue({ id: "u1", status: "disabled", tokenVersion: 0 });
+    const value = createSessionCookieValue(
+      { userId: "u1", exp: 1_800_000_000 },
+      SECRET,
+    );
+    await expect(
+      requireUserRowFromCookieHeader(requestWithCookie(value).headers.get("cookie")),
+    ).resolves.toBeNull();
   });
 });

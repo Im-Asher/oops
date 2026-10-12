@@ -1,5 +1,4 @@
-import { createUserRepo } from "@oops/db/user.repo";
-import { requireUserFromCookieHeader } from "./require-user";
+import { requireUserRowFromCookieHeader } from "./require-user";
 
 /** 守卫判定结果：ok=放行（带 userId）；否则携带 HTTP 状态与人话文案。 */
 export type AdminGuardResult =
@@ -13,14 +12,15 @@ export type AdminGuardResult =
 
 /**
  * 管理守卫核心：cookie 头直入（RSC layout 无 Request 对象，admin-scaffold design D2）。
- * 组合 requireUserFromCookieHeader（验签/有效期/status/会话版本全量校验）+ role 判定；
+ * requireUserRowFromCookieHeader 单次查询完成验签/有效期/status/会话版本校验并带出 User 行，
+ * role 判定直接用该行——守卫全程恰好一次查库（M2 task 2.1 收敛，替代旧两查）；
  * ghost 用户（会话指向已删除用户）在 requireUser 层即拒（401），不进 role 判定。
  */
 export async function requireAdminFromCookieHeader(
   cookieHeader: string | null,
 ): Promise<AdminGuardResult> {
-  const userId = await requireUserFromCookieHeader(cookieHeader);
-  if (!userId) {
+  const user = await requireUserRowFromCookieHeader(cookieHeader);
+  if (!user) {
     return {
       ok: false,
       status: 401,
@@ -28,8 +28,7 @@ export async function requireAdminFromCookieHeader(
       message: "请先登录",
     };
   }
-  const user = await createUserRepo().findById(userId);
-  if (user?.role !== "admin") {
+  if (user.role !== "admin") {
     return {
       ok: false,
       status: 403,
@@ -37,7 +36,7 @@ export async function requireAdminFromCookieHeader(
       message: "需要管理员权限",
     };
   }
-  return { ok: true, userId };
+  return { ok: true, userId: user.id };
 }
 
 /**

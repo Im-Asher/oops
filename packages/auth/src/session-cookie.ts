@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "./session-constants";
 
-export const SESSION_COOKIE_NAME = "oops_session";
-/** 30 天固定有效期，不滑动（design D5） */
-export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+// 常量本体在 session-constants.ts（Edge-safe）；此处 re-export 维持既有导入面
+export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS };
 
 export interface SessionPayload {
   userId: string;

@@ -1,25 +1,33 @@
 import { getAuthConfig } from "@oops/config";
 import { createUserRepo } from "@oops/db/user.repo";
+import type { User } from "@oops/db/schema";
 import {
   parseSessionCookieValue,
   readSessionCookie,
 } from "./session-cookie";
 
 /**
- * 核心认证判定：cookie 头 → userId | null。
+ * 核心认证判定（返回完整 User 行）：cookie 头 → User | null。
  * 验签 → 验有效期（parse 内含）→ 查 users 确认存在、active 且会话版本一致。
- * requireUser（Request 入口）与 admin 守卫共用此核心。
+ * requireUserFromCookieHeader（只要 id）与 admin 守卫（要 role）共用此单查询实现。
  */
-export async function requireUserFromCookieHeader(
+export async function requireUserRowFromCookieHeader(
   cookieHeader: string | null,
-): Promise<string | null> {
+): Promise<User | null> {
   const raw = readSessionCookie(cookieHeader ?? "");
   const payload = parseSessionCookieValue(raw, getAuthConfig().authSecret);
   if (!payload) return null;
   const user = await createUserRepo().findById(payload.userId);
   if (!user || user.status !== "active") return null;
   if (user.tokenVersion !== payload.tv) return null;
-  return user.id;
+  return user;
+}
+
+/** cookie 头 → userId | null（requireUser 与 web 端共用入口）。 */
+export async function requireUserFromCookieHeader(
+  cookieHeader: string | null,
+): Promise<string | null> {
+  return (await requireUserRowFromCookieHeader(cookieHeader))?.id ?? null;
 }
 
 /**
