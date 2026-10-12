@@ -47,8 +47,20 @@
         "description": "模型目录与角色级配置将在 M2 上线，此处预留占位。"
       },
       "audit": {
-        "title": "监控与审计",
-        "description": "监控指标与操作审计流水将在 M2 上线，此处预留占位。"
+        "title": "操作审计",
+        "description": "管理端全部写操作的审计流水，支持按操作者、动作、对象与时间范围过滤。",
+        "filterOperator": "操作者 ID",
+        "filterAction": "动作",
+        "filterTarget": "对象类型",
+        "query": "查询",
+        "reset": "重置",
+        "columnTime": "时间",
+        "columnOperator": "操作者",
+        "columnAction": "动作",
+        "columnTarget": "对象",
+        "columnNote": "备注",
+        "loadFailed": "加载审计流水失败",
+        "noData": "暂无审计记录"
       }
     }
   }
