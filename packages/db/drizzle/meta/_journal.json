@@ -50,6 +50,13 @@
       "when": 1791713816707,
       "tag": "0006_premium_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791802371174,
+      "tag": "0007_narrow_sunfire",
+      "breakpoints": true
     }
   ]
 }

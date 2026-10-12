@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -41,6 +42,58 @@ export const taskStatus = pgEnum("task_status", [
   "failed",
   "canceled",
 ]);
+
+// —— 积分域（M1）——
+
+// 流水类型：grant 发放 / freeze 预扣 / settle 终态退差或补差 / release 冻结释放 / adjust 后台调整
+export const creditLedgerType = pgEnum("credit_ledger_type", [
+  "grant",
+  "freeze",
+  "settle",
+  "release",
+  "adjust",
+]);
+
+// 生命周期仅用于 freeze 条目（frozen → settled | released）；其余类型为 null。
+// 状态翻转不改写 amount——append-only，对账恒等式 balance == sum(amount) 依赖这一点。
+export const creditLedgerStatus = pgEnum("credit_ledger_status", [
+  "frozen",
+  "settled",
+  "released",
+]);
+
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(),
+    type: creditLedgerType("type").notNull(),
+    // 带符号整数 = 余额变动量（freeze 为负，release/settle 退差为正）
+    amount: integer("amount").notNull(),
+    status: creditLedgerStatus("status"),
+    // 生成类条目关联任务；grant/adjust 无任务为 null
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("credit_ledger_user_idx").on(t.userId),
+    index("credit_ledger_task_idx").on(t.taskId),
+    index("credit_ledger_frozen_idx").on(t.userId, t.status),
+  ],
+);
+
+// 定价表：key = 任务类型（generate_image | render_html），credits = 单价（分）
+// M1 只读；后台编辑界面是 M2.3，上线前直接改库
+export const creditPrices = pgTable("credit_prices", {
+  key: text("key").primaryKey(),
+  credits: integer("credits").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 export const sessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -150,6 +203,9 @@ export const users = pgTable(
     tokenVersion: integer("token_version").notNull().default(0),
     status: userStatus("status").notNull().default("active"),
     role: userRole("role").notNull().default("user"),
+    // 物化余额（缓存面）：真相在 credit_ledger 流水，恒等式 balance == sum(ledger.amount)；
+    // 全部写入必须走 ledger 同事务（repo 层），禁止裸 UPDATE 此列
+    creditBalance: integer("credit_balance").notNull().default(0),
     // 注册所用邀请码（追溯发放来源）
     inviteCodeId: uuid("invite_code_id").references(() => inviteCodes.id, {
       onDelete: "set null",
@@ -171,3 +227,5 @@ export type Asset = typeof assets.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InviteCode = typeof inviteCodes.$inferSelect;
+export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
+export type CreditPrice = typeof creditPrices.$inferSelect;
