@@ -180,9 +180,52 @@ export const inviteCodes = pgTable("invite_codes", {
   maxUses: integer("max_uses").notNull().default(1),
   usedCount: integer("used_count").notNull().default(0),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // 作废标记（M2 邀请码管理）：作废保留原 expiresAt 语义；注册校验链要求 IS NULL
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
   // 发放对象备注（无管理界面，码靠 SQL 手工插入）
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// —— 管理域（M2）——
+
+// 管理端全写操作审计（append-only，repo 层不暴露 update/delete）：
+// who（adminUserId）/ what（action + targetType/targetId）/ when（createdAt）/ 前后值（before/after 结构化）
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // 操作者 = 执行写操作的管理员 users.id；管理员被删后审计仍须可读 → 不设外键
+    adminUserId: text("admin_user_id").notNull(),
+    // 动作类型：text + 应用层常量（动作集随管理面增长，pgEnum 改型需 DDL）
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    // 批量生成等面向集合的动作可无单一对象
+    targetId: text("target_id"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("admin_audit_log_admin_idx").on(t.adminUserId, t.createdAt),
+    index("admin_audit_log_target_idx").on(t.targetType, t.targetId),
+    index("admin_audit_log_created_idx").on(t.createdAt),
+  ],
+);
+
+// 配置 overlay（配置三层链第一层）：生效配置 = app_config ?? env ?? 代码目录兜底，DB 有值即赢
+export const appConfig = pgTable("app_config", {
+  // 类型化键空间：agent.<agentId>.enabled / model.<providerId>.<modelId>.enabled / model.roleDefaults.<role>
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  // 最后操作者（管理员 users.id）；完整变更史在 admin_audit_log
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
@@ -229,3 +272,5 @@ export type User = typeof users.$inferSelect;
 export type InviteCode = typeof inviteCodes.$inferSelect;
 export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
 export type CreditPrice = typeof creditPrices.$inferSelect;
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type AppConfig = typeof appConfig.$inferSelect;

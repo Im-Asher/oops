@@ -57,6 +57,13 @@
       "when": 1791802371174,
       "tag": "0007_narrow_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791813185687,
+      "tag": "0008_groovy_lady_bullseye",
+      "breakpoints": true
     }
   ]
 }
