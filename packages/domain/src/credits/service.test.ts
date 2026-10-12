@@ -32,6 +32,10 @@ function makeLedger(overrides: Partial<CreditLedgerRepo> = {}): CreditLedgerRepo
     getBalance: vi.fn().mockResolvedValue(5),
     getPrice: vi.fn().mockResolvedValue(10),
     listLeakedFrozen: vi.fn().mockResolvedValue([]),
+    listLedger: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+    listPrices: vi.fn().mockResolvedValue([]),
+    setPrice: vi.fn().mockResolvedValue({ key: "k", credits: 0 }),
+    reconcileBalances: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as unknown as CreditLedgerRepo;
 }
@@ -241,6 +245,95 @@ describe("credits service", () => {
         before: { balance: 40 },
         after: { balance: 75, delta: 35 },
       });
+    });
+  });
+
+  describe("setTaskPrice（M2 task 5.2）", () => {
+    it("改价：事务内读 before → upsert → 审计 pricing.update（前后单价）", async () => {
+      const txLedger = makeLedger({
+        getPrice: vi.fn().mockResolvedValueOnce(10).mockResolvedValue(10),
+        setPrice: vi.fn().mockResolvedValue({ key: "generate_image", credits: 15 }),
+      });
+      const svc = createCreditsService(passthroughDeps(makeTxRepos({ ledger: txLedger })));
+
+      await svc.setTaskPrice({ key: "generate_image", credits: 15, adminId: "admin-op", note: "涨价" });
+      expect(txLedger.setPrice).toHaveBeenCalledWith("generate_image", 15);
+      expect(capturedAuditInputs).toEqual([
+        {
+          adminUserId: "admin-op",
+          action: "pricing.update",
+          targetType: "credit_price",
+          targetId: "generate_image",
+          before: { credits: 10 },
+          after: { credits: 15 },
+          note: "涨价",
+        },
+      ]);
+    });
+
+    it("新建价目：before 为 null 的审计", async () => {
+      const txLedger = makeLedger({
+        getPrice: vi.fn().mockResolvedValue(null),
+        setPrice: vi.fn().mockResolvedValue({ key: "render_html", credits: 5 }),
+      });
+      const svc = createCreditsService(passthroughDeps(makeTxRepos({ ledger: txLedger })));
+
+      await svc.setTaskPrice({ key: "render_html", credits: 5, adminId: "admin-op" });
+      expect(capturedAuditInputs[0]).toMatchObject({
+        action: "pricing.update",
+        targetId: "render_html",
+        before: { credits: null },
+        after: { credits: 5 },
+      });
+    });
+
+    it("非法单价（负数/非整数）：拒绝不触库不落审计", async () => {
+      const txLedger = makeLedger();
+      const svc = createCreditsService(passthroughDeps(makeTxRepos({ ledger: txLedger })));
+
+      await expect(
+        svc.setTaskPrice({ key: "k", credits: -1, adminId: "a" }),
+      ).rejects.toMatchObject({ kind: "pricing_invalid" });
+      await expect(
+        svc.setTaskPrice({ key: "k", credits: 1.5, adminId: "a" }),
+      ).rejects.toMatchObject({ kind: "pricing_invalid" });
+      expect(txLedger.setPrice).not.toHaveBeenCalled();
+      expect(capturedAuditInputs).toEqual([]);
+    });
+
+    it("改价后新任务按新价冻结：freezeForTask 读取改后价（mock 层断言）", async () => {
+      // setPrice 写入后 getPrice 返回新值（同一 repo 实例）；freezeForTask 每次实时读价
+      let currentPrice = 10;
+      const txLedger = makeLedger({
+        getPrice: vi.fn().mockImplementation(async () => currentPrice),
+        setPrice: vi.fn().mockImplementation(async (_key: string, credits: number) => {
+          currentPrice = credits;
+          return { key: "generate_image", credits };
+        }),
+        freeze: vi.fn().mockResolvedValue({ id: "l1" }),
+      });
+      const tasksRepo = {
+        create: vi.fn().mockResolvedValue({ id: "t-new" }),
+        setStatus: vi.fn(),
+        appendEvent: vi.fn(),
+      };
+      const svc = createCreditsService({
+        // freezeForTask 读价走顶层 ledger，须与事务内 repo 同源（同一 currentPrice 闭包）
+        ledger: txLedger,
+        ...passthroughDeps({ ledger: txLedger, tasks: tasksRepo as unknown as TaskRepo }),
+      });
+
+      // 旧价 10 → 冻结 10
+      await svc.freezeForTask({ userId: "u1", type: "generate_image", payload: {} });
+      expect(txLedger.freeze).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "u1", price: 10 }),
+      );
+      // 改价为 15 → 新任务冻结 15
+      await svc.setTaskPrice({ key: "generate_image", credits: 15, adminId: "admin-op" });
+      await svc.freezeForTask({ userId: "u1", type: "generate_image", payload: {} });
+      expect(txLedger.freeze).toHaveBeenLastCalledWith(
+        expect.objectContaining({ price: 15 }),
+      );
     });
   });
 });

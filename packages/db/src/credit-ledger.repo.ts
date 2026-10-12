@@ -1,9 +1,21 @@
-import { and, eq, gte, inArray, isNull, or, sql, type ExtractTablesWithRelations } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+  type ExtractTablesWithRelations,
+} from "drizzle-orm";
 import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 import { db as defaultDb } from ".";
 import { creditLedger, creditPrices, tasks, users } from "./schema";
-import type { CreditLedgerEntry } from "./schema";
+import type { CreditLedgerEntry, CreditPrice } from "./schema";
 
 /**
  * 事务兼容客户端：连接池（NodePgDatabase）与事务（PgTransaction）的共同基类。
@@ -50,6 +62,30 @@ export interface CreditLedgerRepo {
   getBalance(userId: string): Promise<number>;
   getPrice(key: string): Promise<number | null>;
   listLeakedFrozen(): Promise<LeakedFrozen[]>;
+  /** 积分流水查询（createdAt 倒序分页）：用户/类型/时间范围过滤，管理台流水页用。 */
+  listLedger(input: {
+    userId?: string;
+    type?: "freeze" | "settle" | "release" | "grant" | "adjust";
+    from?: Date;
+    to?: Date;
+    page: number;
+    pageSize: number;
+  }): Promise<{ items: CreditLedgerEntry[]; total: number; page: number; pageSize: number }>;
+  /** 全部价目（按 key 排序），定价编辑页清单。 */
+  listPrices(): Promise<CreditPrice[]>;
+  /**
+   * 改价（upsert）：key 不存在即新建价目。返回 upsert 后行；审计 before 值由
+   * 调用方（domain service）先行 getPrice 取得，保持读写分离。
+   */
+  setPrice(key: string, credits: number): Promise<CreditPrice>;
+  /**
+   * 恒等式对账：balance == Σ(该用户全部流水金额)。全量用户拉取 + JS 比对
+   * （管理台用户量级小；leftJoin 聚合会漏「无流水但余额非 0」的不一致用户）。
+   * 只返回不一致清单，空数组即「全部一致」。
+   */
+  reconcileBalances(): Promise<
+    Array<{ userId: string; username: string; balance: number; ledgerSum: number }>
+  >;
 }
 
 /** 任务终态（冻结不再合法停留的状态）；pending/running 属正常冻结期。 */
@@ -178,6 +214,67 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
             ),
           ),
         );
+    },
+
+    async listLedger({ userId, type, from, to, page, pageSize }) {
+      // 先 count 后分页（同 listForAdmin 双查询序）；过滤条件全部可选按 and 组合
+      const filters = [
+        userId ? eq(creditLedger.userId, userId) : undefined,
+        type ? eq(creditLedger.type, type) : undefined,
+        from ? gte(creditLedger.createdAt, from) : undefined,
+        to ? lte(creditLedger.createdAt, to) : undefined,
+      ].filter((f) => f !== undefined);
+      const where = filters.length > 0 ? and(...filters) : undefined;
+
+      // 条件链：无过滤时不走 where（op 序保持可断言）
+      const countBase = db.select({ count: sql<number>`count(*)::int` }).from(creditLedger);
+      const [countRow] = await (where ? countBase.where(where) : countBase);
+      const rowsBase = db.select().from(creditLedger);
+      const items = await (where ? rowsBase.where(where) : rowsBase)
+        .orderBy(desc(creditLedger.createdAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+      return { items, total: countRow?.count ?? 0, page, pageSize };
+    },
+
+    async listPrices() {
+      return db.select().from(creditPrices).orderBy(asc(creditPrices.key));
+    },
+
+    async setPrice(key, credits) {
+      const [row] = await db
+        .insert(creditPrices)
+        .values({ key, credits })
+        .onConflictDoUpdate({
+          target: creditPrices.key,
+          set: { credits, updatedAt: new Date() },
+        })
+        .returning();
+      return row;
+    },
+
+    async reconcileBalances() {
+      // 全量用户 + 按 userId 聚合流水（两条独立查询 + JS 比对，避免 correlated
+      // 聚合的 text/uuid 转换坑），无流水用户的 ledgerSum 记 0
+      const allUsers = await db
+        .select({ id: users.id, username: users.username, balance: users.creditBalance })
+        .from(users);
+      const sums = await db
+        .select({
+          userId: creditLedger.userId,
+          sum: sql<number>`sum(${creditLedger.amount})::int`,
+        })
+        .from(creditLedger)
+        .groupBy(creditLedger.userId);
+      const sumByUser = new Map(sums.map((s) => [s.userId, s.sum]));
+      return allUsers
+        .filter((u) => u.balance !== (sumByUser.get(u.id) ?? 0))
+        .map((u) => ({
+          userId: u.id,
+          username: u.username,
+          balance: u.balance,
+          ledgerSum: sumByUser.get(u.id) ?? 0,
+        }));
     },
   };
 

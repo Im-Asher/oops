@@ -58,6 +58,12 @@ export interface CreditsService extends CreditGate {
    * 事务整体回滚（无流水无审计）；delta=0 直接拒绝。
    */
   adjustCredits(input: AdjustCreditsInput): Promise<{ balance: number }>;
+  /**
+   * 后台任务定价修改（M2 task 5.2）：同事务 upsert credit_prices + 审计
+   * （pricing.update，before 为改前单价，新建价目时 before 为 null）。
+   * freezeForTask 每次实时 getPrice，改价后新任务即按新价冻结。
+   */
+  setTaskPrice(input: { key: string; credits: number; adminId: string; note?: string }): Promise<void>;
   /** 启动对账：释放「仍 frozen 但任务已终态/不存在」的泄漏冻结，返回处理条数。 */
   reconcileFrozen(): Promise<number>;
 }
@@ -159,6 +165,31 @@ export function createCreditsService(deps: CreditsServiceDeps = {}): CreditsServ
         },
       );
       return { balance: result.balance };
+    },
+
+    setTaskPrice: async (input) => {
+      if (!Number.isInteger(input.credits) || input.credits < 0) {
+        throw new TaskError("单价须为非负整数（分）", "pricing_invalid");
+      }
+      await withAudit<{ before: number | null }>(
+        (fn) => runTx(fn),
+        (r) => ({
+          adminUserId: input.adminId,
+          action: "pricing.update",
+          targetType: "credit_price",
+          targetId: input.key,
+          before: { credits: r.before },
+          after: { credits: input.credits },
+          note: input.note,
+        }),
+        async (tx) => {
+          const { ledger: txLedger } = makeTxRepos(tx);
+          // before 在事务内读取，避免与并发改价竞态产生失真审计
+          const before = await txLedger.getPrice(input.key);
+          await txLedger.setPrice(input.key, input.credits);
+          return { before };
+        },
+      );
     },
 
     reconcileFrozen: async () => {

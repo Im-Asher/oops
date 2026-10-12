@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@oops/db";
 import { createCreditLedgerRepo, InsufficientCreditsError } from "@oops/db/credit-ledger.repo";
 import { createTaskRepo } from "@oops/db/task.repo";
-import { adminAuditLog, creditLedger, tasks, users } from "@oops/db/schema";
+import { adminAuditLog, creditLedger, creditPrices, tasks, users } from "@oops/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { creditsService } from "./service";
 import { TaskError } from "../tasks/task-error";
@@ -167,5 +167,71 @@ describe.skipIf(!shouldRun)("credits integration (real PG)", () => {
     // 守恒：余额变动完全由流水解释（无流水 set 会破坏守恒——本用例窗口内无此类操作）
     const [k2] = await db.select({ k: balanceDiff }).from(users).where(eq(users.id, userId));
     expect(k2.k).toBe(k1.k);
+  });
+
+  it("setTaskPrice：真库 upsert 新建/更新价目，审计 pricing.update 落 before/after 单价", async () => {
+    // 新建价目：before 为 null
+    await creditsService.setTaskPrice({ key: "int_test_price", credits: 7, adminId: "admin-int" });
+    await expect(ledger.getPrice("int_test_price")).resolves.toBe(7);
+    // 更新：before 取到改前值
+    await creditsService.setTaskPrice({
+      key: "int_test_price",
+      credits: 9,
+      adminId: "admin-int",
+      note: "涨价",
+    });
+    await expect(ledger.getPrice("int_test_price")).resolves.toBe(9);
+    const rows = await db
+      .select()
+      .from(adminAuditLog)
+      .where(
+        and(eq(adminAuditLog.action, "pricing.update"), eq(adminAuditLog.targetId, "int_test_price")),
+      );
+    expect(rows).toHaveLength(2);
+    expect(rows[0].before).toEqual({ credits: null });
+    expect(rows[0].after).toEqual({ credits: 7 });
+    expect(rows[1].before).toEqual({ credits: 7 });
+    expect(rows[1].after).toEqual({ credits: 9 });
+    expect(rows[1].note).toBe("涨价");
+    // 清理：价目 key 不含 userId，显式删除审计与价目行
+    await db.delete(adminAuditLog).where(eq(adminAuditLog.targetId, "int_test_price"));
+    await db.delete(creditPrices).where(eq(creditPrices.key, "int_test_price"));
+  });
+
+  it("reconcileBalances：绕过账本改余额被命中并给出双值；零流水用户保持一致", async () => {
+    // 本文件早前用例有无流水 set（历史偏差），不假设初始一致：以首次扫描取
+    // 该用户流水合计为基线，断言「人为改余额后 hit 的双值」这一增量事实
+    const scan1 = await ledger.reconcileBalances();
+    const hit1 = scan1.find((m) => m.userId === userId);
+    const sum1 = hit1 ? hit1.ledgerSum : (await ledger.getBalance(userId)); // 无 hit = sum == balance
+
+    // 直接 UPDATE 余额（绕过账本，模拟对账要抓的真实偏差）
+    await db
+      .update(users)
+      .set({ creditBalance: sum1 + 999 })
+      .where(eq(users.id, userId));
+    const scan2 = await ledger.reconcileBalances();
+    const hit2 = scan2.find((m) => m.userId === userId);
+    expect(hit2).toBeDefined();
+    expect(hit2?.username).toBe(`credits-int-${userId.slice(0, 8)}`);
+    expect(hit2?.balance).toBe(sum1 + 999);
+    expect(hit2?.ledgerSum).toBe(sum1); // set 不写流水，合计不变
+
+    // 零流水零余额用户走一致路径（sumByUser 缺省 0 分支），不出现
+    const cleanId = crypto.randomUUID();
+    await db.insert(users).values({
+      id: cleanId,
+      username: `credits-int-clean-${cleanId.slice(0, 8)}`,
+      oopsId: cleanId.replaceAll("-", "").slice(0, 8),
+      passwordHash: "x",
+      displayName: "credits-int-clean",
+      creditBalance: 0,
+    });
+    try {
+      const scan3 = await ledger.reconcileBalances();
+      expect(scan3.find((m) => m.userId === cleanId)).toBeUndefined();
+    } finally {
+      await db.delete(users).where(eq(users.id, cleanId));
+    }
   });
 });

@@ -18,7 +18,10 @@ export interface MockDbState {
 const TERMINALS = new Set(["returning", "limit", "execute", "offset"]);
 
 export function makeMockDb(
-  initial?: Partial<MockDbState>,
+  initial?: Partial<MockDbState> & {
+    /** 可选：select 类查询按此队列逐次出队（多形状双查询测试用）；缺省回放 selectResult */
+    selectQueue?: unknown[][];
+  },
 ): { db: any; state: MockDbState } {
   const state: MockDbState = {
     selectResult: initial?.selectResult ?? [],
@@ -28,6 +31,10 @@ export function makeMockDb(
     lastValues: undefined,
     calls: [],
   };
+  let selectCursor = 0;
+  // selectQueue 模式：每次 select 结算出队一项（各查询可返回不同形状）
+  const takeSelect = (): unknown[] =>
+    initial?.selectQueue ? (initial.selectQueue[selectCursor++] ?? []) : state.selectResult;
 
   const resolve = (op: string, args: unknown[]): unknown => {
     state.calls.push({ op, args });
@@ -38,10 +45,12 @@ export function makeMockDb(
       return [v];
     }
     if (op === "delete.where") return [];
-    if (op === "select.from") return state.selectResult; // 裸 count 类查询（无 where）
-    if (op.endsWith(".offset")) return state.selectResult;
-    if (op.endsWith(".where")) return state.selectResult;
-    if (op.endsWith(".limit")) return state.selectResult;
+    if (op === "select.from") return takeSelect(); // 裸 count 类查询（无 where）
+    if (op.endsWith(".orderBy")) return takeSelect(); // 全清单类查询
+    if (op.endsWith(".groupBy")) return takeSelect(); // 聚合类查询
+    if (op.endsWith(".offset")) return takeSelect();
+    if (op.endsWith(".where")) return takeSelect();
+    if (op.endsWith(".limit")) return takeSelect();
     return [];
   };
 

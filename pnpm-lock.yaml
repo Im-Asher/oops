@@ -32,6 +32,9 @@ importers:
       '@oops/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@oops/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       antd:
         specifier: ^6.6.5
         version: 6.6.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
