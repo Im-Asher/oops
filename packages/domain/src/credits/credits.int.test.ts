@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@oops/db";
 import { createCreditLedgerRepo, InsufficientCreditsError } from "@oops/db/credit-ledger.repo";
 import { createTaskRepo } from "@oops/db/task.repo";
-import { creditLedger, tasks, users } from "@oops/db/schema";
-import { eq } from "drizzle-orm";
+import { adminAuditLog, creditLedger, tasks, users } from "@oops/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import { creditsService } from "./service";
 import { TaskError } from "../tasks/task-error";
 
@@ -35,6 +35,7 @@ describe.skipIf(!shouldRun)("credits integration (real PG)", () => {
     // 先删从表再删主行：ledger/task 的 user_id 无 FK，任务 task_id FK 置空不阻塞
     await db.delete(creditLedger).where(eq(creditLedger.userId, userId));
     await db.delete(tasks).where(eq(tasks.userId, userId));
+    await db.delete(adminAuditLog).where(eq(adminAuditLog.targetId, userId));
     await db.delete(users).where(eq(users.id, userId));
   });
 
@@ -115,5 +116,56 @@ describe.skipIf(!shouldRun)("credits integration (real PG)", () => {
     }
     const after = (await ledger.listLeakedFrozen()).filter((l) => l.userId === userId);
     expect(after).toHaveLength(0);
+  });
+
+  it("adjustCredits 并发扣减不超扣：余额 100 两个并发 -80 恰好成功 1 个", async () => {
+    await db.update(users).set({ creditBalance: 100 }).where(eq(users.id, userId));
+    const attempts = Array.from({ length: 2 }, () =>
+      creditsService.adjustCredits({
+        userId,
+        delta: -80,
+        note: "并发扣减冒烟",
+        adminId: crypto.randomUUID(),
+      }),
+    );
+    const results = await Promise.allSettled(attempts);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter(
+      (r) => r.status === "rejected" && r.reason instanceof InsufficientCreditsError,
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    await expect(ledger.getBalance(userId)).resolves.toBe(20);
+  });
+
+  it("adjustCredits 审计同事务：成功落 credits.adjust（before/after 余额），失败无审计行", async () => {
+    const rows = await db
+      .select()
+      .from(adminAuditLog)
+      .where(and(eq(adminAuditLog.action, "credits.adjust"), eq(adminAuditLog.targetId, userId)));
+    expect(rows).toHaveLength(1); // 上一用例两笔尝试只落成功那笔
+    expect(rows[0].before).toMatchObject({ balance: 100 });
+    expect(rows[0].after).toMatchObject({ balance: 20, delta: -80 });
+    expect(rows[0].note).toBe("并发扣减冒烟");
+  });
+
+  it("流水恒等式：adjust 后余额变化 == 流水金额，且 balance−Σ流水 守恒", async () => {
+    const balanceDiff = sql<number>`(${users.creditBalance} - coalesce((
+      select sum(${creditLedger.amount})::int from ${creditLedger}
+      where ${creditLedger.userId} = ${userId}
+    ), 0))::int`;
+    const [k1] = await db.select({ k: balanceDiff }).from(users).where(eq(users.id, userId));
+    const before = await ledger.getBalance(userId);
+    await creditsService.adjustCredits({
+      userId,
+      delta: 37,
+      note: "恒等式",
+      adminId: crypto.randomUUID(),
+    });
+    const after = await ledger.getBalance(userId);
+    expect(after - before).toBe(37);
+    // 守恒：余额变动完全由流水解释（无流水 set 会破坏守恒——本用例窗口内无此类操作）
+    const [k2] = await db.select({ k: balanceDiff }).from(users).where(eq(users.id, userId));
+    expect(k2.k).toBe(k1.k);
   });
 });

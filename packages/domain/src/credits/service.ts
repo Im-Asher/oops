@@ -5,11 +5,21 @@ import {
   type CreditLedgerRepo,
   type DbClient,
 } from "@oops/db/credit-ledger.repo";
+import { withAudit } from "@oops/db/admin-audit.repo";
 import { createTaskRepo, type TaskRepo } from "@oops/db/task.repo";
 import { TaskError } from "../tasks/task-error";
 
 /** 新用户初始积分（分）；0007 迁移的存量回填额须与此一致。 */
 export const INITIAL_GRANT_CREDITS = 100;
+
+/** 后台积分调整入参：delta 带符号（正=发放，负=扣减），0 无意义拒绝。 */
+export interface AdjustCreditsInput {
+  userId: string;
+  delta: number;
+  /** 运营备注（必填，进审计顶层 note） */
+  note: string;
+  adminId: string;
+}
 
 /**
  * 任务类型 → 定价表 key。当前一一对应；未来按量/按尺寸定价时在此细分，
@@ -42,6 +52,12 @@ export interface CreditsService extends CreditGate {
   checkGate(userId: string): Promise<{ ok: boolean; balance: number }>;
   /** 注册初始积分（grant 流水）；后台调整（adjust）走 M2 运营路径。 */
   grantInitialCredits(userId: string): Promise<void>;
+  /**
+   * 后台积分调整（M2 task 5.1）：同事务 adjust 流水 + 条件 UPDATE 余额 + 审计
+   * （credits.adjust，before/after 余额）。delta<0 余额不足抛 InsufficientCreditsError
+   * 事务整体回滚（无流水无审计）；delta=0 直接拒绝。
+   */
+  adjustCredits(input: AdjustCreditsInput): Promise<{ balance: number }>;
   /** 启动对账：释放「仍 frozen 但任务已终态/不存在」的泄漏冻结，返回处理条数。 */
   reconcileFrozen(): Promise<number>;
 }
@@ -105,12 +121,45 @@ export function createCreditsService(deps: CreditsServiceDeps = {}): CreditsServ
     },
 
     grantInitialCredits: (userId) =>
-      ledger.adjust({
-        userId,
-        amount: INITIAL_GRANT_CREDITS,
-        type: "grant",
-        note: "registration",
-      }),
+      ledger
+        .adjust({
+          userId,
+          amount: INITIAL_GRANT_CREDITS,
+          type: "grant",
+          note: "registration",
+        })
+        .then(() => undefined),
+
+    adjustCredits: async (input) => {
+      if (!Number.isInteger(input.delta) || input.delta === 0) {
+        throw new TaskError("调整额度须为非零整数（分）", "adjust_amount_invalid");
+      }
+      const result = await withAudit<{ before: number; balance: number }>(
+        (fn) => runTx(fn),
+        (r) => ({
+          adminUserId: input.adminId,
+          action: "credits.adjust",
+          targetType: "user",
+          targetId: input.userId,
+          before: { balance: r.before },
+          after: { balance: r.balance, delta: input.delta },
+          note: input.note,
+        }),
+        async (tx) => {
+          const { ledger: txLedger } = makeTxRepos(tx);
+          const before = await txLedger.getBalance(input.userId);
+          // 负 delta 余额不足在此抛 InsufficientCreditsError：事务回滚，审计随业务一起不落
+          const balance = await txLedger.adjust({
+            userId: input.userId,
+            amount: input.delta,
+            type: "adjust",
+            note: input.note,
+          });
+          return { before, balance };
+        },
+      );
+      return { balance: result.balance };
+    },
 
     reconcileFrozen: async () => {
       const leaks = await ledger.listLeakedFrozen();

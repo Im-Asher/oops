@@ -41,8 +41,12 @@ export interface CreditLedgerRepo {
   releaseByTask(input: { taskId: string }): Promise<void>;
   /** 按条目释放（对账兜底用：任务可能已被删，taskId 被 FK 置空无法按任务定位）。 */
   releaseEntry(entryId: string): Promise<void>;
-  /** 发放 / 后台调整：带符号金额流水 + 余额无条件增减。 */
-  adjust(input: { userId: string; amount: number; type: "grant" | "adjust"; note?: string }): Promise<void>;
+  /**
+   * 发放 / 后台调整：带符号金额流水 + 余额增减。负数走条件 UPDATE
+   * （行锁 + WHERE 余额充足，0 行即不足抛 InsufficientCreditsError，与 freeze 同构防超扣）；
+   * 返回调整后余额，供审计 after 值复用。
+   */
+  adjust(input: { userId: string; amount: number; type: "grant" | "adjust"; note?: string }): Promise<number>;
   getBalance(userId: string): Promise<number>;
   getPrice(key: string): Promise<number | null>;
   listLeakedFrozen(): Promise<LeakedFrozen[]>;
@@ -116,11 +120,24 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
     releaseEntry: (entryId) => releaseEntry(entryId),
 
     async adjust({ userId, amount, type, note }) {
-      await db
-        .update(users)
-        .set({ creditBalance: sql`${users.creditBalance} + ${amount}` })
-        .where(eq(users.id, userId));
+      // 负数 = 扣减：条件 UPDATE 防超扣（与 freeze 同一并发正确性边界）
+      const updated =
+        amount < 0
+          ? await db
+              .update(users)
+              .set({ creditBalance: sql`${users.creditBalance} + ${amount}` })
+              .where(and(eq(users.id, userId), gte(users.creditBalance, -amount)))
+              .returning({ balance: users.creditBalance })
+          : await db
+              .update(users)
+              .set({ creditBalance: sql`${users.creditBalance} + ${amount}` })
+              .where(eq(users.id, userId))
+              .returning({ balance: users.creditBalance });
+      if (updated.length === 0) {
+        throw new InsufficientCreditsError();
+      }
       await db.insert(creditLedger).values({ userId, type, amount, note });
+      return updated[0].balance;
     },
 
     async getBalance(userId) {
