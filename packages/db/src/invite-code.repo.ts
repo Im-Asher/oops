@@ -1,16 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
-import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import type { PgTransaction } from "drizzle-orm/pg-core";
 import { db as defaultDb } from ".";
 import { inviteCodes, type InviteCode } from "./schema";
+import type { DbClient } from "./credit-ledger.repo";
 
-/** 事务句柄与普通 client 的结构并集：注册流程需要在同一事务内跨仓储操作。 */
-type SchemaModule = typeof import("./schema");
-export type DbClient =
-  | typeof defaultDb
-  | PgTransaction<NodePgQueryResultHKT, SchemaModule, ExtractTablesWithRelations<SchemaModule>>;
+export type { DbClient, InviteCode };
 
 export interface InviteCodeRepo {
   findById(id: string): Promise<InviteCode | undefined>;
