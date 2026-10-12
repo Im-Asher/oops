@@ -32,10 +32,14 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
   const q = parsed.data;
-  const result = await createUserRepo().listForAdmin({
+  const { items, ...rest } = await createUserRepo().listForAdmin({
     search: q.search,
     page: q.page,
     pageSize: q.pageSize,
   });
-  return Response.json(result);
+  // 剥离口令哈希：管理列表展示面不含敏感字段
+  return Response.json({
+    ...rest,
+    items: items.map(({ passwordHash: _hash, ...safe }) => safe),
+  });
 }

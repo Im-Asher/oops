@@ -59,8 +59,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // 只用 cleanup：antd 静态 message 的模块级容器不能手动摘除（同 invite-codes-view.test 注释）
   cleanup();
-  document.body.innerHTML = "";
   vi.unstubAllGlobals();
 });
 

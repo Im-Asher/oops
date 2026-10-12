@@ -38,7 +38,8 @@ describe("PATCH /api/admin/users/[id]/status", () => {
     setStatusMock.mockReset();
     recordMock.mockReset();
     vi.mocked(requireAdmin).mockResolvedValue({ ok: true, userId: "admin-op" });
-    setStatusMock.mockResolvedValue({ ...USER, status: "disabled" });
+    // 仓储返回含 passwordHash，响应须剥离
+    setStatusMock.mockResolvedValue({ ...USER, status: "disabled", passwordHash: "scrypt$secret" });
   });
 
   it("未认证 401 / 非 admin 403，不执行业务", async () => {
@@ -68,10 +69,11 @@ describe("PATCH /api/admin/users/[id]/status", () => {
     expect(recordMock).not.toHaveBeenCalled();
   });
 
-  it("停用成功：审计含真实前后状态，返回更新后用户", async () => {
+  it("停用成功：审计含真实前后状态，返回更新后用户（无哈希）", async () => {
     findByIdMock.mockResolvedValue(USER);
     const res = await call("admin-op", "u1", { status: "disabled" });
     expect(res.status).toBe(200);
+    // toEqual 严格比对：passwordHash 被剥离则通过
     expect(await res.json()).toEqual({ user: { ...USER, status: "disabled" } });
     expect(recordMock).toHaveBeenCalledWith({
       adminUserId: "admin-op",

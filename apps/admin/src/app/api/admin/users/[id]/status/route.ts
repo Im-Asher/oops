@@ -66,5 +66,6 @@ export async function PATCH(
       { status: 404 },
     );
   }
-  return Response.json({ user: updated });
+  const { passwordHash: _hash, ...safeUser } = updated;
+  return Response.json({ user: safeUser });
 }

@@ -11,7 +11,7 @@ import { requireAdmin } from "@oops/auth";
 import { GET } from "./route";
 
 const FIXTURE = {
-  items: [{ id: "u1", username: "alice", status: "active" }],
+  items: [{ id: "u1", username: "alice", status: "active", passwordHash: "scrypt$secret" }],
   total: 1,
   page: 1,
   pageSize: 20,
@@ -54,7 +54,11 @@ describe("GET /api/admin/users（用户列表）", () => {
       new Request("http://localhost/api/admin/users?search=ali&page=2&pageSize=5"),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(FIXTURE);
+    // 响应剥离 passwordHash，其余字段原样透传
+    expect(await res.json()).toEqual({
+      ...FIXTURE,
+      items: [{ id: "u1", username: "alice", status: "active" }],
+    });
     expect(listForAdminMock).toHaveBeenCalledWith({
       search: "ali",
       page: 2,
