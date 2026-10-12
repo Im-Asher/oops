@@ -48,7 +48,7 @@ const FIXTURE = {
   pageSize: 20,
 };
 
-describe("GET /api/audit（审计查询）", () => {
+describe("GET /api/admin/audit（审计查询）", () => {
   beforeEach(() => {
     vi.mocked(requireAdmin).mockReset();
     listMock.mockReset();
@@ -62,7 +62,7 @@ describe("GET /api/audit（审计查询）", () => {
       code: "UNAUTHORIZED",
       message: "请先登录",
     });
-    const res = await GET(new Request("http://localhost/api/audit"));
+    const res = await GET(new Request("http://localhost/api/admin/audit"));
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe("UNAUTHORIZED");
@@ -76,7 +76,7 @@ describe("GET /api/audit（审计查询）", () => {
       code: "FORBIDDEN",
       message: "需要管理员权限",
     });
-    const res = await GET(new Request("http://localhost/api/audit"));
+    const res = await GET(new Request("http://localhost/api/admin/audit"));
     expect(res.status).toBe(403);
     expect(listMock).not.toHaveBeenCalled();
   });
@@ -85,7 +85,7 @@ describe("GET /api/audit（审计查询）", () => {
     vi.mocked(requireAdmin).mockResolvedValue({ ok: true, userId: "admin1" });
     const res = await GET(
       new Request(
-        "http://localhost/api/audit?action=credits.adjust&targetType=user&from=2026-01-01T00:00:00.000Z&page=2&pageSize=5",
+        "http://localhost/api/admin/audit?action=credits.adjust&targetType=user&from=2026-01-01T00:00:00.000Z&page=2&pageSize=5",
       ),
     );
     expect(res.status).toBe(200);
@@ -105,7 +105,7 @@ describe("GET /api/audit（审计查询）", () => {
 
   it("无过滤参数：默认第一页 20 条", async () => {
     vi.mocked(requireAdmin).mockResolvedValue({ ok: true, userId: "admin1" });
-    await GET(new Request("http://localhost/api/audit"));
+    await GET(new Request("http://localhost/api/admin/audit"));
     expect(listMock).toHaveBeenCalledWith({
       adminUserId: undefined,
       action: undefined,
@@ -121,7 +121,7 @@ describe("GET /api/audit（审计查询）", () => {
   it("非法动作枚举返回 400 INVALID_QUERY", async () => {
     vi.mocked(requireAdmin).mockResolvedValue({ ok: true, userId: "admin1" });
     const res = await GET(
-      new Request("http://localhost/api/audit?action=not_an_action"),
+      new Request("http://localhost/api/admin/audit?action=not_an_action"),
     );
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: { code: string } };

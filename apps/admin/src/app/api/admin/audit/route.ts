@@ -21,7 +21,7 @@ const querySchema = z.object({
 });
 
 /**
- * GET /api/audit：审计流水过滤分页查询（createdAt 倒序）。
+ * GET /api/admin/audit：审计流水过滤分页查询（createdAt 倒序）。
  * 管理端 API 三分支与页面同构：未认证 401 / 非 admin 403 / 放行查询。
  */
 export async function GET(req: Request): Promise<Response> {

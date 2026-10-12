@@ -77,7 +77,7 @@ export default function AuditView() {
     }
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
-    const res = await fetch(`/api/audit?${params.toString()}`);
+    const res = await fetch(`/api/admin/audit?${params.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as AuditPage;
   }, [applied, page, pageSize]);
