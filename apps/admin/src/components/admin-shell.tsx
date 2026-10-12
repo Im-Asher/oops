@@ -4,7 +4,8 @@
 // 必须为 client 组件：Menu 选中态/路由跳转需浏览器交互；antd 复合组件
 // 静态属性在 RSC client-reference proxy 上不可访问（1.2 spike 纪律）。
 import type { ReactNode } from "react";
-import { Button, Layout, Menu } from "antd";
+import { ConfigProvider, Button, Layout, Menu } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -33,7 +34,8 @@ export default function AdminShell({
   ];
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <ConfigProvider locale={zhCN}>
+      <Layout style={{ minHeight: "100vh" }}>
       <Sider theme="dark" width={208}>
         <div
           style={{
@@ -74,6 +76,7 @@ export default function AdminShell({
         </Header>
         <Content style={{ padding: 24 }}>{children}</Content>
       </Layout>
-    </Layout>
+      </Layout>
+    </ConfigProvider>
   );
 }
