@@ -21,7 +21,7 @@ const h = vi.hoisted(() => ({
   assetRow: undefined as FakeAsset | undefined,
 }));
 
-vi.mock("@/server/domain/tasks/task-executor", () => ({
+vi.mock("@oops/domain/tasks/executor", () => ({
   submitAndWait: vi.fn(
     async (type: string, payload: Record<string, unknown>, opts: Record<string, unknown>) => {
       if (h.submitThrows) throw new Error("渲染超过 30000ms 未完成");

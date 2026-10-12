@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
     root: workspaceRoot,
   },
   // workspace 内部包 TS 源码直出（无构建编排），由 Next 转译。
-  transpilePackages: ["@oops/config", "@oops/db", "@oops/auth", "@oops/llm"],
+  transpilePackages: ["@oops/config", "@oops/db", "@oops/domain", "@oops/auth", "@oops/llm"],
 };
 
 const withNextIntl = createNextIntlPlugin();

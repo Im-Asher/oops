@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
-import { submitAndWait } from "@/server/domain/tasks/task-executor";
+import { submitAndWait } from "@oops/domain/tasks/executor";
 import { createAssetRepo } from "@oops/db/asset.repo";
 import type { ToolDefinition } from "./registry";
 

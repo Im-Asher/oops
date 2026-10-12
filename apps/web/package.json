@@ -15,6 +15,7 @@
     "@oops/auth": "workspace:*",
     "@oops/config": "workspace:*",
     "@oops/db": "workspace:*",
+    "@oops/domain": "workspace:*",
     "@oops/llm": "workspace:*",
     "@earendil-works/pi-agent-core": "0.87.1",
     "@earendil-works/pi-ai": "0.87.1",
