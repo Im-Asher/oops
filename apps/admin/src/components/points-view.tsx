@@ -457,7 +457,7 @@ export default function PointsView() {
               precision={0}
               placeholder={t("fieldDelta")}
               style={{ width: 150 }}
-              addonBefore="±"
+              prefix="±"
             />
           </Form.Item>
           <Form.Item name="note" rules={[{ required: true, whitespace: true }]}>
