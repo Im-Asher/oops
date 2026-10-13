@@ -1,5 +1,6 @@
 import { requireAdmin } from "@oops/auth";
-import { db, getTaskDashboardStats } from "@oops/db";
+import { db } from "@oops/db";
+import { getTaskDashboardStats } from "@oops/db/task.repo";
 
 export const dynamic = "force-dynamic";
 

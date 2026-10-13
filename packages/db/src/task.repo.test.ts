@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { makeMockDb } from "./mock-db";
 import { getTaskDashboardStats } from "./task.repo";
 
-const NOW = Date.parse("2026-10-13T12:00:00Z");
-
 describe("getTaskDashboardStats（M2 task 7.1）", () => {
   it("聚合口径：状态分布全量映射；失败率=failed/终态；均耗时=终态行均值", async () => {
     const mock = makeMockDb({

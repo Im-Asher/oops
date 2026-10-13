@@ -6,10 +6,8 @@ const { requireAdminMock, statsMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@oops/auth", () => ({ requireAdmin: requireAdminMock }));
-vi.mock("@oops/db", () => ({
-  db: Symbol("db"),
-  getTaskDashboardStats: statsMock,
-}));
+vi.mock("@oops/db", () => ({ db: Symbol("db") }));
+vi.mock("@oops/db/task.repo", () => ({ getTaskDashboardStats: statsMock }));
 
 import { GET } from "./route";
 
