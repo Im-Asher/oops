@@ -140,7 +140,7 @@ export default function DashboardView() {
               <Statistic
                 title={t(`status_${status}`)}
                 value={data?.statusCounts[status] ?? 0}
-                valueStyle={status === "failed" ? { color: "#cf1322" } : undefined}
+                styles={{ content: status === "failed" ? { color: "#cf1322" } : undefined }}
               />
             </Card>
           </Col>
@@ -152,7 +152,7 @@ export default function DashboardView() {
             title={t("failureRate")}
             value={rate === null || rate === undefined ? "—" : (rate * 100).toFixed(1)}
             suffix={rate === null || rate === undefined ? "" : "%"}
-            valueStyle={rate !== null && rate !== undefined && rate > 0.2 ? { color: "#cf1322" } : undefined}
+            styles={{ content: rate !== null && rate !== undefined && rate > 0.2 ? { color: "#cf1322" } : undefined }}
           />
           <Statistic
             title={t("avgDuration")}
