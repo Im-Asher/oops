@@ -16,10 +16,10 @@ Key characteristics:
   text & layout control); atmosphere/scene images use pure text-to-image APIs
   (Seedream / Wanxiang).
 - **Declarative agents** — every agent is a single config file under
-  `src/server/agent/definitions/` (system prompt + tool list). Adding an
+  `apps/web/src/server/agent/definitions/` (system prompt + tool list). Adding an
   agent requires **no** frontend or runtime code changes.
 - **All-in-one Next.js app** — no separate backend service. Route Handlers
-  stream agent events via SSE. Server-only code lives in `src/server/` and is
+  stream agent events via SSE. Server-only code lives in `apps/web/src/server/` and is
   protected from client imports by ESLint.
 - **Task-based generation** — all image work runs through an in-process task
   executor with concurrency limits; tasks are persisted and retryable.
@@ -46,6 +46,10 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
   change makes a UX/product-principle decision, resolves a principle conflict,
   or would behave against a stated principle, update its affected sections
   **in the same change** (its own update rules live in §7 of that doc).
+- Milestone plans (version-keyed) live in `docs/milestones/<version>.md`; the
+  active one is `docs/milestones/v0.1.0.md`. A milestone is **not** a change
+  log — progress is tracked by archived changes and git; keep its phases,
+  decisions, and risk states in sync when the plan's direction changes.
 - Sync rules and deferred doc TODOs live in `IMPROVEMENT.md`; it is **not** a
   change log — doc-update history is tracked in git commits, never duplicated
   in a manual table. If docs and code conflict, code wins — fix the doc
@@ -59,49 +63,82 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Framework      | Next.js 16 (App Router, `proxy.ts` not middleware)  |
 | Language       | TypeScript (strict)                                 |
 | UI             | shadcn/ui + AI Elements + Tailwind CSS v4           |
+| Admin UI       | Ant Design (apps/admin only — antd stack, no Tailwind) |
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
 | Database       | PostgreSQL via Drizzle ORM                          |
 | Rendering      | `playwright-core` + headless Chromium               |
 | Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
 | i18n           | next-intl（无 URL 路由的 cookie 模式）— `messages/zh.json` + `en.json`，typed messages |
-| Package mgr    | pnpm 11                                             |
+| Package mgr    | pnpm 10                                             |
 
 ## Project structure
 
+pnpm workspace monorepo. The web app lives in `apps/web/` (package
+`@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
+antd-only UI stack, dev port 3001, guarded by the same `oops_session` cookie;
+six management surfaces live since M2: users / invite codes / credits ops /
+agent toggles / model config / dashboard+audit); `packages/` holds shared
+packages. Unless
+written with a repo-root prefix, all app paths in the sections below are
+**relative to `apps/web/`** (admin paths use explicit `apps/admin/` prefixes).
+
 ```
-src/
-├── app/            # Thin routing shell: pages + Route Handlers only
-├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
-│   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
-│   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
-│   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
-│   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
-├── components/     # React components (client)
-├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
-├── lib/            # Shared utilities (client-safe, 含 config)
-└── types/          # Shared TypeScript types
+oops/                  # repo root = workspace orchestrator (scripts forward via pnpm --filter)
+├── apps/admin/        # admin console: antd-only stack (no Tailwind), Layout/Menu scaffold,
+│   │                  #   gate: proxy presence check + layout requireAdmin; dev port 3001
+│   ├── src/app/            # pages + Route Handlers (thin shell, same discipline as web)
+│   ├── src/i18n/           # next-intl assembly (zh single-locale, cookie mode like web)
+│   └── messages/           # next-intl dictionary (zh.json)
+├── apps/web/          # the web app
+│   ├── src/
+│   │   ├── app/            # Thin routing shell: pages + Route Handlers only
+│   │   ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
+│   │   │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
+│   │   │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
+│   │   │   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
+│   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
+│   │   ├── components/     # React components (client)
+│   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
+│   │   ├── lib/            # Shared utilities (client-safe)
+│   │   └── types/          # Shared TypeScript types
+│   ├── messages/      # next-intl 词典（zh.json + en.json）
+│   ├── public/        # 静态资源
+│   └── .env.local     # web 专属层（同名键覆盖根共享层；NEXT_PUBLIC_* 等）
+├── packages/          # shared packages：@oops/{config,db,domain,llm,auth}（TS 源码直出 + transpilePackages；
+│                      #   包间分层 config → db → {domain,llm} → auth 单向禁逆，app 只经 @oops/* exports 消费）
+├── .env.local / .env.example  # 根共享 env 层：DATABASE_URL / S3_* / AUTH_SECRET / LLM_* / RENDER_* / QWEN_*
+├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
 
-**Import boundary (critical):** code under `src/server/` must never be
-imported from client code (`src/app/**/page.tsx`, `src/components/**`, or any
+**Import boundary (critical):** code under `apps/web/src/server/` must never be
+imported from client code (`apps/web/src/app/**/page.tsx`, `apps/web/src/components/**`, or any
 `"use client"` module). This is enforced via ESLint `no-restricted-imports`.
 
 ## Build and test commands
 
 ```bash
-pnpm install            # Install dependencies
-pnpm dev                # Dev server (http://localhost:3000)
-pnpm build              # Production build
-pnpm start              # Start production server
-pnpm lint               # ESLint (includes import-boundary rules)
-pnpm typecheck          # tsc --noEmit
-pnpm test               # Run unit tests (Vitest)
-pnpm db:generate        # Generate Drizzle migrations
-pnpm db:migrate         # Apply migrations (requires running Postgres + .env.local)
+pnpm install            # Install dependencies (workspace root)
+pnpm dev                # Dev server (http://localhost:3000) — forwards to @oops/web
+pnpm --filter @oops/admin dev  # Admin dev server (http://localhost:3001)
+pnpm build              # Production build — forwards to @oops/web
+pnpm --filter @oops/admin build  # Admin production build
+pnpm start              # Start production server — forwards to @oops/web
+pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
+pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
+pnpm test               # Run unit tests (Vitest) — pnpm -r test
+pnpm db:generate        # Generate Drizzle migrations — forwards to @oops/db
+pnpm db:migrate         # Apply migrations (requires running Postgres) — forwards to @oops/db
 ```
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
-`pnpm-lock.yaml` and must be committed.
+`pnpm-lock.yaml` (single workspace lockfile) and must be committed.
+Env 是**两层结构**：仓库根 `.env.local`（共享域键：DATABASE_URL / S3_* /
+AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键，
+同名覆盖根层）。构建/脚本入口统一经 `@oops/config` 的
+`loadAppEnv(workspaceRoot, appDir?)` 加载——Next 求值 config 前已 builtin
+加载 app 层，此处补加载根层用不覆盖语义，app 层始终最优先；脚本类入口
+（drizzle-kit 等）省略 appDir 只取根层。`.env.example` 同构分层（根 =
+共享键全清单；`.env*` gitignore 不入库）。
 
 ## Code style guidelines
 
@@ -112,6 +149,15 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
     Pure domain logic belongs in `src/server/domain/`; infrastructure
     (providers/storage/db/render) lives in `src/server/infra/` behind
     interfaces; `src/server/agent/` holds the declarative agent runtime.
+  - **Shared packages (`packages/`) depend one-way: `config → db → {domain, llm} → auth`.**
+    Never import `@oops/auth`/`@oops/llm`/`@oops/db` from `@oops/config`, and
+    never create reverse edges between them; apps consume packages only via
+    their `exports` subpaths. Env access goes exclusively through
+    `@oops/config` domain getters (never raw `process.env` outside it).
+    `@oops/domain` holds pure domain services (credits ledger + task executor
+    core) on top of `@oops/db`; web-specific task handlers stay in
+    `apps/web/src/server/domain/tasks/handlers.ts` and register via the
+    `import "@/server/agent"` side-effect chain.
   - Route Handlers validate input (zod), call server services, and return
     responses. They must stay short.
   - Shared UI helpers go in `src/lib/`; components in `src/components/`.
@@ -157,6 +203,11 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 ## Testing instructions
 
 - Framework: **Vitest** (unit) with tests co-located or under `src/**/*.test.ts`.
+- Integration tests that need real Postgres are gated behind
+  `RUN_PG_TESTS=1` + `DATABASE_URL` (e.g. `packages/domain/src/credits/credits.int.test.ts`:
+  concurrent freeze atomicity, tx rollback, leak reconciliation). They skip
+  silently in the default `pnpm test` run; run them explicitly before touching
+  ledger/freeze semantics.
 - What to test:
   - **Unit (required for new logic):** agent registry loading, tool input
     schemas, services with mocked providers (image generation, render),
@@ -186,7 +237,7 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 
 - **Secrets:** provider API keys (LLM, Seedream, Wanxiang) live only in
   `.env*` (gitignored). Access them exclusively through
-  `src/lib/config.ts`; never log secrets or echo them into prompts/errors.
+  `@oops/config` domain getters; never log secrets or echo them into prompts/errors.
 - **Auth:** cookie session with HttpOnly + Secure + SameSite=Lax. Every Route
   Handler must verify the session before touching DB or spawning tasks — call
   `requireUser` (`src/server/auth/require-user.ts`) and return 401 on null.
@@ -218,6 +269,19 @@ Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 - **Content compliance:** text-to-image providers perform their own content
   moderation; surface provider rejections to the user verbatim (via the
   agent), and keep an entry-level keyword screen before LLM calls.
+- **Admin console (`apps/admin`):** every admin Route Handler must call
+  `requireAdmin` (`@oops/auth`, checks `users.role=admin` on top of the
+  session) and return structured 401/403 — same discipline as `requireUser`.
+  **Every admin write = business write + audit row in the SAME transaction**
+  (`admin_audit_log`, who / what / when / before / after); a write path
+  without audit is a defect, not a shortcut. Runtime config lives in the
+  3-layer chain `app_config overlay → env → catalog defaults` (`@oops/llm`
+  runtime-config: 30s TTL cache + in-process generation bump + fail-open on
+  overlay read errors); admin writes overlay + bumps, web converges within
+  30s. The admin-side agent list is a static convention
+  (`apps/admin/src/lib/agent-catalog.ts`) — the web agent registry is not
+  importable across processes; adding/removing an agent requires updating
+  both (duty note lives in that file).
 - **Error handling:** return structured errors to clients; never leak stack
   traces, SQL, or internal paths in responses. Log server-side with request IDs.
 
