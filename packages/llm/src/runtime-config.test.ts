@@ -5,6 +5,7 @@ import {
   resolveAgentEnabled,
   resolveModelEnabled,
   resolveRoleDefault,
+  resolveRoleDefaultLayers,
 } from "./runtime-config";
 
 function makeReader(overrides: Record<string, unknown> = {}): OverlayReader & { calls: number } {
@@ -179,5 +180,35 @@ describe("runtime-config resolver（M2 task 6.1）", () => {
       modelId: "qwen3.8-max",
       source: "overlay",
     });
+  });
+
+  it("resolveRoleDefaultLayers 暴露三层原始值：overlay/env（含未登记原始值）/catalog", async () => {
+    vi.stubEnv("LLM_PROVIDER", "qwen-token-plan-cn");
+    // 三层齐备：env 未登记（ghost）仍展示原始值，effective 走 overlay
+    vi.stubEnv("LLM_MAIN_MODEL", "ghost");
+    const reader = makeReader({
+      "model.roleDefaults.main": { providerId: "qwen-token-plan-cn", modelId: "qwen3.7-plus" },
+    });
+    const layers = await resolveRoleDefaultLayers("main", reader);
+    expect(layers.effective).toEqual({
+      providerId: "qwen-token-plan-cn",
+      modelId: "qwen3.7-plus",
+      source: "overlay",
+    });
+    expect(layers.overlay).toEqual({ providerId: "qwen-token-plan-cn", modelId: "qwen3.7-plus" });
+    expect(layers.env).toBe("ghost");
+    expect(layers.catalog).toBe("qwen3.8-max");
+
+    // 无 overlay 无 env：effective=catalog，overlay/env 为 null
+    vi.unstubAllEnvs();
+    const bare = await resolveRoleDefaultLayers("summarizer", makeReader());
+    expect(bare.effective).toEqual({
+      providerId: "qwen-token-plan-cn",
+      modelId: "qwen3.8-max",
+      source: "catalog",
+    });
+    expect(bare.overlay).toBeNull();
+    expect(bare.env).toBeNull();
+    expect(bare.catalog).toBe("qwen3.8-max");
   });
 });

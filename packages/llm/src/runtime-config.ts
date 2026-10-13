@@ -120,6 +120,16 @@ export async function resolveModelEnabled(
   return { enabled: true, source: "catalog" };
 }
 
+export interface RoleDefaultLayers {
+  effective: RoleDefaultResolution;
+  /** overlay 原始值（无/脏值 → null） */
+  overlay: { providerId: string; modelId: string } | null;
+  /** env 覆盖原始值（LLM_<ROLE>_MODEL 未设置 → null；未登记模型保留原始值供展示） */
+  env: string | null;
+  /** 目录 roleDefaults 原始值 */
+  catalog: string;
+}
+
 /**
  * 角色默认模型三层解析：
  * 1. overlay `{ providerId, modelId }` 且模型已登记 → 即赢；
@@ -127,22 +137,21 @@ export async function resolveModelEnabled(
  *    执行路径的 fail-fast 语义由 resolveTextModel 保证）；
  * 3. 目录 roleDefaults；env.provider 未登记属于部署错误，抛 unknown_provider。
  */
-export async function resolveRoleDefault(
+export async function resolveRoleDefaultLayers(
   role: LlmRole,
   reader: OverlayReader,
-): Promise<RoleDefaultResolution> {
+): Promise<RoleDefaultLayers> {
   const key = `model.roleDefaults.${role}`;
   const overlay = await readOverlayCached([key], reader);
   const overlayValue = overlay.get(key);
-  if (isRoleDefaultOverlay(overlayValue) && isModelRegistered(overlayValue.providerId, overlayValue.modelId)) {
-    return { providerId: overlayValue.providerId, modelId: overlayValue.modelId, source: "overlay" };
-  }
+  const overlayLayer =
+    isRoleDefaultOverlay(overlayValue) &&
+    isModelRegistered(overlayValue.providerId, overlayValue.modelId)
+      ? { providerId: overlayValue.providerId, modelId: overlayValue.modelId }
+      : null;
 
   const config = getLlmConfig();
   const envModel = role === "main" ? config.mainModel : config.summarizerModel;
-  if (envModel && isModelRegistered(config.provider, envModel)) {
-    return { providerId: config.provider, modelId: envModel, source: "env" };
-  }
 
   const provider = TEXT_PROVIDERS.find((p) => p.providerId === config.provider);
   if (!provider) {
@@ -151,9 +160,26 @@ export async function resolveRoleDefault(
       "unknown_provider",
     );
   }
-  return {
-    providerId: provider.providerId,
-    modelId: provider.roleDefaults[role],
-    source: "catalog",
-  };
+
+  let effective: RoleDefaultResolution;
+  if (overlayLayer) {
+    effective = { ...overlayLayer, source: "overlay" };
+  } else if (envModel && isModelRegistered(config.provider, envModel)) {
+    effective = { providerId: config.provider, modelId: envModel, source: "env" };
+  } else {
+    effective = {
+      providerId: provider.providerId,
+      modelId: provider.roleDefaults[role],
+      source: "catalog",
+    };
+  }
+  return { effective, overlay: overlayLayer, env: envModel ?? null, catalog: provider.roleDefaults[role] };
+}
+
+/** 生效值便捷入口（详见 resolveRoleDefaultLayers）。 */
+export async function resolveRoleDefault(
+  role: LlmRole,
+  reader: OverlayReader,
+): Promise<RoleDefaultResolution> {
+  return (await resolveRoleDefaultLayers(role, reader)).effective;
 }
