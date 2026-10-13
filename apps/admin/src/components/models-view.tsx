@@ -311,7 +311,7 @@ export default function ModelsView() {
     <div>
       {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
       <Card size="small" title={t("roleDefaultsTitle")} style={{ marginBottom: 24 }}>
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           {renderRoleCard("main")}
           {renderRoleCard("summarizer")}
         </Space>
