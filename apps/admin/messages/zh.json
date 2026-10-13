@@ -141,7 +141,26 @@
       },
       "agents": {
         "title": "Agent 开关",
-        "description": "各 Agent 的启停开关将在 M2 上线，此处预留占位。"
+        "description": "注册 Agent 的生效启停态与来源层；写 overlay 并落审计，30 秒内全局生效。",
+        "columnName": "名称",
+        "columnId": "Agent ID",
+        "columnEnabled": "生效状态",
+        "columnSource": "来源层",
+        "columnAction": "操作",
+        "enabledOn": "启用",
+        "enabledOff": "停用",
+        "sourceOverlay": "后台配置",
+        "sourceEnv": "环境变量",
+        "sourceCatalog": "默认",
+        "effectiveHint": "本端即时生效；web 端 30 秒内生效",
+        "confirmEnable": "确认启用该 Agent？",
+        "confirmDisable": "确认停用该 Agent？停用后用户将无法选用。",
+        "confirmOk": "确认",
+        "confirmCancel": "取消",
+        "toggleDone": "已更新",
+        "toggleFailed": "操作失败，请重试",
+        "agentUnknown": "未登记的 Agent",
+        "loadFailed": "加载 Agent 清单失败"
       },
       "models": {
         "title": "模型配置",

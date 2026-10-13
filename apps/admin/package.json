@@ -16,6 +16,7 @@
     "@oops/config": "workspace:*",
     "@oops/db": "workspace:*",
     "@oops/domain": "workspace:*",
+    "@oops/llm": "workspace:*",
     "antd": "^6.6.5",
     "dayjs": "^1.11.23",
     "next": "16.3.6",
