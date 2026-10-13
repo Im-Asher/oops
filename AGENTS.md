@@ -75,8 +75,10 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 
 pnpm workspace monorepo. The web app lives in `apps/web/` (package
 `@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
-M0.3 scaffold — antd-only UI stack, dev port 3001, guarded by the same
-`oops_session` cookie); `packages/` holds shared packages. Unless
+antd-only UI stack, dev port 3001, guarded by the same `oops_session` cookie;
+six management surfaces live since M2: users / invite codes / credits ops /
+agent toggles / model config / dashboard+audit); `packages/` holds shared
+packages. Unless
 written with a repo-root prefix, all app paths in the sections below are
 **relative to `apps/web/`** (admin paths use explicit `apps/admin/` prefixes).
 
@@ -267,6 +269,19 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
 - **Content compliance:** text-to-image providers perform their own content
   moderation; surface provider rejections to the user verbatim (via the
   agent), and keep an entry-level keyword screen before LLM calls.
+- **Admin console (`apps/admin`):** every admin Route Handler must call
+  `requireAdmin` (`@oops/auth`, checks `users.role=admin` on top of the
+  session) and return structured 401/403 — same discipline as `requireUser`.
+  **Every admin write = business write + audit row in the SAME transaction**
+  (`admin_audit_log`, who / what / when / before / after); a write path
+  without audit is a defect, not a shortcut. Runtime config lives in the
+  3-layer chain `app_config overlay → env → catalog defaults` (`@oops/llm`
+  runtime-config: 30s TTL cache + in-process generation bump + fail-open on
+  overlay read errors); admin writes overlay + bumps, web converges within
+  30s. The admin-side agent list is a static convention
+  (`apps/admin/src/lib/agent-catalog.ts`) — the web agent registry is not
+  importable across processes; adding/removing an agent requires updating
+  both (duty note lives in that file).
 - **Error handling:** return structured errors to clients; never leak stack
   traces, SQL, or internal paths in responses. Log server-side with request IDs.
 

@@ -260,13 +260,15 @@ deep-merge 到 zh 之上（缺失 key 回落中文而非裸 key）。根 layout 
 users          用户      id(uuid), username(text, lower(username) 唯一索引),
                         oops_id(text, 8 位去易混短 ID, 唯一索引, 注册时生成不可改),
                         password_hash(text, scrypt, 不存明文), display_name(text?),
+                        role(user_role enum user|admin, 后台管理权限),
                         gender(user_gender enum, 默认 secret), bio(text?),
                         token_version(int, 改密踢下线水位),
                         status(user_status enum active|disabled), invite_code_id(uuid?→invite_codes),
                         credit_balance(int, 物化余额, == sum(credit_ledger.amount) 不变量),
                         created_at
 invite_codes   邀请码    code(text 主键), max_uses(int, 默认 1), used_count(int, 默认 0),
-                        expires_at(timestamptz?), note(text?), created_at
+                        expires_at(timestamptz?), note(text?), created_at,
+                        revoked_at(timestamptz?, 后台作废水位；非空即注册被拒)
 chat_sessions  会话      id(uuid), user_id(text→users.id), agent_id(uuid?), title(text?),
                         summary(text?, compact 摘要), summarized_up_to(uuid?, 摘要水位线),
                         created_at, updated_at
@@ -285,6 +287,17 @@ credit_ledger  积分流水  id(uuid), user_id, type(enum grant|freeze|settle|re
                         （append-only 账本；不变量 balance == sum(amount)）
 credit_prices  任务定价  key(text 主键 generate_image|render_html), credits(int),
                         updated_at（seed：生图 10 / 渲染 5，后台编辑归 M2.3）
+admin_audit_log
+              管理审计  id(uuid), admin_user_id(text→users.id 逻辑引用, 不设外键——
+                        管理员被删后审计仍可读), action(text, 应用层常量),
+                        target_type(text), target_id(text?), before(jsonb?),
+                        after(jsonb?), note(text?), created_at
+                        （append-only；全部 admin 写操作与其业务写入同事务落审计）
+app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
+                        updated_at（类型化键空间：`agent.<agentId>.enabled` /
+                        `model.<providerId>.<modelId>.enabled`(bool) /
+                        `model.roleDefaults.<role>`({providerId,modelId})，
+                        zod 校验写入；是配置三层链的 DB overlay 层）
 ```
 
 枚举取值：
@@ -312,6 +325,27 @@ credit_prices  任务定价  key(text 主键 generate_image|render_html), credit
 > `add-user-profile-and-logout` 为 `users` 增 `oops_id` / `gender` / `bio` / `token_version` 与 `user_gender` 枚举（迁移 `0005`，存量行 `oops_id` 已回填）；
 > `add-credits-domain` 新增 `credit_ledger` / `credit_prices` 表、两组枚举与 `users.credit_balance`
 > 物化列（迁移 `0007`，seed 定价 生图 10 / 渲染 5，存量用户回填 100 分 grant 流水）。
+> `add-admin-console` 新增 `admin_audit_log` / `app_config` 表与 `invite_codes.revoked_at`
+> 列（迁移 `0008`）；`users.role` 在更早的抽包阶段加入（迁移 `0006`）。
+> 审计动作用 text + 应用层常量（不用 pgEnum——动作集随管理面增长，改型需 DDL）。
+
+### 7.1 管理面（admin console）
+
+独立应用 `apps/admin`（antd 栈，dev 端口 3001），与 web 共享同一 `oops_session`
+HMAC cookie；页面由 proxy 存在性检查 + layout `requireAdmin` 双层守卫。六张管理面：
+用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板。
+
+- **API 纪律**：每个 Route Handler 先 `requireAdmin`（401/403 结构化错误），输入 zod
+  校验；**全部写操作 = 业务写入 + 同事务审计**（who / what / when / before / after），
+  绝无绕过审计的写路径；只读看板（dashboard）零写路由。
+- **配置三层链**（`@oops/llm` runtime-config）：`app_config overlay → env → 目录默认`
+  逐层回落，解析结果带来源层标注（overlay/env/catalog）；30s 模块级 TTL 缓存 +
+  写侧进程内代数 bump（admin 端写后本进程即时生效，web 端 ≤30s 收敛）；overlay
+  读失败 fail-open 回落下层且失败结果不缓存。消费点：Agent 启停（web 侧过滤注册表）、
+  模型启停、角色默认模型（main / summarizer）。
+- **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`user.status_change` / `invite.create` /
+  `invite.revoke` / `credits.adjust` / `pricing.update` / `agent.toggle` / `model.config`
+  （同时覆盖模型启停与角色默认模型）；审计可按动作 / 目标 / 操作者检索。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
