@@ -46,6 +46,12 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
   change makes a UX/product-principle decision, resolves a principle conflict,
   or would behave against a stated principle, update its affected sections
   **in the same change** (its own update rules live in §7 of that doc).
+- `docs/DESIGN.md` is the design-token source of truth (four layers: primitive →
+  semantic → brand → component; light/dark; per-surface rules). Any change to
+  color / type / radius / shadow / motion must land there first, then be
+  mirrored into `globals.css` (web, Tailwind v4 `@theme inline`) **and** the
+  antd `ConfigProvider` token map in `apps/admin/src/app/layout.tsx` — the two
+  apps consume tokens through different mechanisms and drift silently.
 - Milestone plans (version-keyed) live in `docs/milestones/<version>.md`; the
   active one is `docs/milestones/v0.1.0.md`. A milestone is **not** a change
   log — progress is tracked by archived changes and git; keep its phases,
