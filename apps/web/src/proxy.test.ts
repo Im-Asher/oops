@@ -22,9 +22,9 @@ describe("proxy 路由保护", () => {
     expect(proxy(req("/canvas", withSession)).status).toBe(200);
   });
 
-  it("根路径：已登录去 /home，未登录去 /login", () => {
+  it("根路径：未登录看落地页（放行）；已登录去 /home", () => {
+    expect(proxy(req("/")).status).toBe(200);
     expect(proxy(req("/", withSession)).headers.get("location")).toBe("http://localhost/home");
-    expect(proxy(req("/")).headers.get("location")).toBe("http://localhost/login");
   });
 
   it("已登录访问登录/注册页：跳首页；未登录放行", () => {

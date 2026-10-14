@@ -32,9 +32,10 @@ export default function proxy(req: NextRequest): NextResponse {
     return isAuthed ? NextResponse.next() : json401();
   }
 
-  // 首页归宿：`/` 重定向到首页（已登录）/ 登录页（未认证）
+  // 落地页公开：未登录访客直接看营销页；已登录用户不被营销页打断（归宿仍是 /home）。
+  // 公开性仅限页面本身 —— /api/*、/files/*、/upload 的 401 边界不受影响（上面已拦截）。
   if (pathname === "/") {
-    return NextResponse.redirect(new URL(isAuthed ? "/home" : "/login", req.url));
+    return isAuthed ? NextResponse.redirect(new URL("/home", req.url)) : NextResponse.next();
   }
 
   // 登录/注册页公开；已登录访问则进首页
