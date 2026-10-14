@@ -17,7 +17,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* 指向 layout.tsx 注入的 Geist 变量；此前写成自引用（var(--font-sans)），
+     计算值阶段失效导致全站拉丁文回落到浏览器初始 serif。见 docs/DESIGN.md B3.3 */
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
