@@ -5,6 +5,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 
+import { ANTD_THEME_TOKEN } from "@/lib/theme";
+
 export const metadata: Metadata = {
   title: "Oops Admin",
   description: "Oops operations console",
@@ -19,7 +21,7 @@ export default function AdminRootLayout({ children }: { children: ReactNode }) {
       <body>
         <AntdRegistry>
           <NextIntlClientProvider>
-            <ConfigProvider locale={zhCN}>{children}</ConfigProvider>
+            <ConfigProvider locale={zhCN} theme={{ token: ANTD_THEME_TOKEN }}>{children}</ConfigProvider>
           </NextIntlClientProvider>
         </AntdRegistry>
       </body>
