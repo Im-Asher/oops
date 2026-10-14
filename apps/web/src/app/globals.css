@@ -247,6 +247,52 @@
   color: transparent;
 }
 
+/* D2 / spec：落地页强制亮色单主题——无切换入口，也不受 html.dark 影响。
+   显式覆盖语义层为 :root 同款亮色值，访客持久化的暗色偏好渗不进 / 子树；
+   值与 :root 一字不差，语义层换色（Step 3）时两处需同步。 */
+.landing-root {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+/* B7.1.9：入场 = 12px 上移 + 淡入，200ms 单档节奏；全页至多 6 个元素、级差 ≤80ms；
+   无循环动画。reduced-motion 下退化为直接呈现（不保留位移与缩放）。 */
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.landing-rise {
+  animation: landing-rise var(--duration-base) var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
