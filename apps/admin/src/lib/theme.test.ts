@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -11,15 +11,23 @@ import { ANTD_THEME_TOKEN } from "./theme";
  * 两应用消费 token 的机制不同（antd ConfigProvider vs Tailwind @theme），
  * 靠人工记忆同步必然分叉；此测试把「同值」变成硬约束。
  */
-const here = dirname(fileURLToPath(import.meta.url));
-const webGlobalsCss = readFileSync(
-  resolve(here, "../../../../apps/web/src/app/globals.css"),
-  "utf-8",
-);
 
-/** 从 web 的 globals.css 里取出某个自定义属性的字面值。 */
+/** 从本文件向上找 pnpm-workspace.yaml 锚定仓库根，避免与目录层级耦合。 */
+function repoRoot(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i += 1) {
+    if (existsSync(resolve(dir, "pnpm-workspace.yaml"))) return dir;
+    dir = dirname(dir);
+  }
+  throw new Error("未找到 pnpm-workspace.yaml，无法定位仓库根");
+}
+
+const webGlobalsCss = readFileSync(resolve(repoRoot(), "apps/web/src/app/globals.css"), "utf-8");
+
+/** 从 web 的 globals.css 里取出某个自定义属性的字面值（锚定行首，避免误读注释）。 */
 function cssVar(name: string): string {
-  const match = webGlobalsCss.match(new RegExp(`${name.replace(/-/g, "\\-")}:\\s*([^;]+);`));
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = webGlobalsCss.match(new RegExp(`^\\s*${escaped}:\\s*([^;]+);`, "m"));
   if (!match) throw new Error(`web globals.css 未声明 ${name}`);
   return match[1].trim().toLowerCase();
 }

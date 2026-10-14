@@ -109,7 +109,7 @@ Cyan — brand secondary; **atmosphere and focus only**.
 | `--brand-cyan-600` | `#009aa2` | Borders, large text (≥24px/600) |
 | `--brand-cyan-700` | `#007a81` | **Cyan text step**: 5.1:1 with white ✓ |
 
-Bridge blue — gradient midpoint so violet→cyan does not pass through mud: `#4a5cf0`.
+Bridge blue — gradient midpoint so violet→cyan does not pass through mud: `--brand-blue-500: #4a5cf0`.
 
 ### B2.2 Neutral Ramp — Cool Gray with a Whisper of Violet `[proposed]`
 
@@ -166,9 +166,9 @@ Coral `#ff7059` is demoted to a **decoration-only third color**: large fills and
 ### B2.5 Brand Tokens `[proposed]`
 
 ```
---brand-gradient        linear-gradient(135deg, #7d2ae8 0%, #4a5cf0 52%, #007a81 100%)
+--brand-gradient        linear-gradient(135deg, var(--brand-violet-500) 0%, var(--brand-blue-500) 52%, var(--brand-cyan-700) 100%)   — token composition only; raw hex in the gradient is forbidden
 --brand-gradient-text   same, with background-clip:text (landing hero titles only)
---brand-blob-1/2/3      var(--brand-violet-100) / var(--brand-cyan-100) / #4a5cf0 @ 12%   (organic landing background shapes)
+--brand-blob-1/2/3      var(--brand-violet-100) / var(--brand-cyan-100) / var(--brand-blue-500) — the blue is consumed at 12% alpha at the use site   (organic landing background shapes)
 --brand-shadow          0 2px 8px rgb(125 42 232 / .20); hover 0 4px 14px / .28
 ```
 

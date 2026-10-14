@@ -24,6 +24,7 @@ describe("globals.css 设计 token 契约", () => {
     const expected = [
       ...[50, 100, 300, 500, 600, 700].map((s) => `--brand-violet-${s}`),
       ...[50, 100, 500, 600, 700].map((s) => `--brand-cyan-${s}`),
+      "--brand-blue-500",
       ...[50, 100, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950].map((s) => `--brand-ink-${s}`),
     ];
     const missing = expected.filter((t) => !tokens.has(t));
@@ -84,5 +85,28 @@ describe("globals.css 设计 token 契约", () => {
     // 自引用会让计算值失效：font-family 落回浏览器初始 serif（DESIGN.md B3.3）
     expect(css).not.toMatch(/--font-sans:\s*var\(--font-sans\)/);
     expect(css).toMatch(/--font-sans:\s*var\(--font-geist-sans\)/);
+  });
+
+  it("每个品牌色阶档位都有 @theme 别名（缺一个，Step 2 的工具类就会静默失效）", () => {
+    const ramps = [...css.matchAll(/--brand-(violet|cyan|blue|ink)-(\d+):/g)].map(
+      (m) => `--color-brand-${m[1]}-${m[2]}: var(--brand-${m[1]}-${m[2]})`,
+    );
+    const missing = [...new Set(ramps)].filter((alias) => !css.includes(alias));
+    expect(missing).toEqual([]);
+  });
+
+  it("Step 2 依赖的四个 @utility 已注册（删掉任何一个，落地页以 unknown utility 报错）", () => {
+    for (const name of ["rounded-media", "rounded-pill", "bg-brand-gradient", "text-brand-gradient"]) {
+      expect(css).toMatch(new RegExp(`@utility ${name}\\s*\\{`));
+    }
+  });
+
+  it("品牌渐变只经 token 组合，无裸 hex（改品牌色时渐变不会静默过期）", () => {
+    const gradient = css.match(/--brand-gradient:\s*([^;]+);/)?.[1] ?? "";
+    expect(gradient).toMatch(/linear-gradient/);
+    expect(gradient).toContain("var(--brand-violet-500)");
+    expect(gradient).toContain("var(--brand-blue-500)");
+    expect(gradient).toContain("var(--brand-cyan-700)");
+    expect(gradient).not.toMatch(/#[0-9a-f]{3,8}/i);
   });
 });
