@@ -22,6 +22,40 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  /* 得意黑：Canva Bold 的中文对应物，用于落地页大标题；单字重，层级靠字号/字距/色深 */
+  --font-display: "Smiley Sans", ui-sans-serif, system-ui, sans-serif;
+  /* 霞鹜文楷：仅设计编辑器画布内的文档字体（B3.1），与 UI 字族分离 */
+  --font-editorial: "LXGW WenKai", serif;
+
+  /* Layer 1 别名：只为了生成工具类（bg-brand-violet-500 等），值一律回指 :root 单一来源 */
+  --color-brand-violet-50: var(--brand-violet-50);
+  --color-brand-violet-100: var(--brand-violet-100);
+  --color-brand-violet-300: var(--brand-violet-300);
+  --color-brand-violet-500: var(--brand-violet-500);
+  --color-brand-violet-600: var(--brand-violet-600);
+  --color-brand-violet-700: var(--brand-violet-700);
+  --color-brand-cyan-50: var(--brand-cyan-50);
+  --color-brand-cyan-100: var(--brand-cyan-100);
+  --color-brand-cyan-500: var(--brand-cyan-500);
+  --color-brand-cyan-600: var(--brand-cyan-600);
+  --color-brand-cyan-700: var(--brand-cyan-700);
+  --color-brand-ink-50: var(--brand-ink-50);
+  --color-brand-ink-100: var(--brand-ink-100);
+  --color-brand-ink-200: var(--brand-ink-200);
+  --color-brand-ink-300: var(--brand-ink-300);
+  --color-brand-ink-400: var(--brand-ink-400);
+  --color-brand-ink-500: var(--brand-ink-500);
+  --color-brand-ink-600: var(--brand-ink-600);
+  --color-brand-ink-700: var(--brand-ink-700);
+  --color-brand-ink-800: var(--brand-ink-800);
+  --color-brand-ink-850: var(--brand-ink-850);
+  --color-brand-ink-900: var(--brand-ink-900);
+  --color-brand-ink-950: var(--brand-ink-950);
+
+  /* 形状/渐变/投影的语义别名：@theme 不覆盖这些命名空间，用 @utility 直接挂工具类，
+     值回指 :root 的单一来源，避免出现 --radius-media: var(--radius-media) 这类自引用。 */
+  --shadow-brand: var(--brand-shadow);
+  --shadow-brand-hover: var(--brand-shadow-hover);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -93,6 +127,62 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ---- Layer 1 ·品牌色阶（docs/DESIGN.md B2.1 / B2.2）------------------------
+     统一带 --brand- 前缀：Tailwind 内置 --color-violet-500 是 #8d54ff，与本品牌紫
+     （#7d2ae8）不同；不加前缀则两者可能同时出现在同一屏。色阶为固定值，不随主题变化，
+     角色映射由 Layer 2 语义层承担。 */
+  --brand-violet-50: #f6f0fe;
+  --brand-violet-100: #ece0fd;
+  --brand-violet-300: #c09df8;
+  --brand-violet-500: #7d2ae8;
+  --brand-violet-600: #6a1fd0;
+  --brand-violet-700: #571aab;
+
+  --brand-cyan-50: #e6f9fa;
+  --brand-cyan-100: #c4f0f2;
+  /* 500 仅作装饰/渐变终点：白字对比度 2.15:1，不可承载文字 */
+  --brand-cyan-500: #00c4cc;
+  --brand-cyan-600: #009aa2;
+  /* 700 为青色文字档：白字 5.1:1 */
+  --brand-cyan-700: #007a81;
+
+  --brand-ink-50: #f7f6fa;
+  --brand-ink-100: #eeecf4;
+  --brand-ink-200: #e2e0ea;
+  --brand-ink-300: #c3c0cf;
+  --brand-ink-400: #9b98ad;
+  --brand-ink-500: #77748a;
+  --brand-ink-600: #565469;
+  --brand-ink-700: #3a3846;
+  --brand-ink-800: #262430;
+  --brand-ink-850: #1d1c26;
+  --brand-ink-900: #16151d;
+  --brand-ink-950: #0d0c12;
+
+  /* ---- Layer 3 · 品牌 token（B2.5）---------------------------------------- */
+  /* 渐变浅端压到 --brand-cyan-700：白字需过 AA（见 B2.4） */
+  --brand-gradient: linear-gradient(135deg, #7d2ae8 0%, #4a5cf0 52%, #007a81 100%);
+  --brand-blob-1: #ece0fd;
+  --brand-blob-2: #c4f0f2;
+  --brand-blob-3: #4a5cf0;
+  --brand-shadow: 0 2px 8px rgb(125 42 232 / 0.2);
+  --brand-shadow-hover: 0 4px 14px rgb(125 42 232 / 0.28);
+
+  /* ---- Layer 4 · 形状 / 投影 / 动效（B4/ B5 / B6）------------------------- */
+  /* 圆角沿用既有 --radius 刻度派生，仅补媒体块与胶囊两档 */
+  --radius-media: 28px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(13 12 18 / 0.06);
+  --shadow-2: 0 4px 12px rgb(13 12 18 / 0.08);
+  --shadow-pop: 0 8px 24px rgb(13 12 18 / 0.12);
+  /* 200ms 为基线（PRODUCT_DESIGN 原则五：统一的动效节奏），另两档仅供微反馈与大位移 */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
@@ -128,6 +218,23 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* 圆角刻度的两档新增（B4）；既有 sm…4xl 由 --radius 派生，不动 */
+@utility rounded-media {
+  border-radius: var(--radius-media);
+}
+@utility rounded-pill {
+  border-radius: var(--radius-pill);
+}
+/* 品牌渐变：只允许主 CTA 与落地页大标题使用（B2.5 四处落点之二） */
+@utility bg-brand-gradient {
+  background-image: var(--brand-gradient);
+}
+@utility text-brand-gradient {
+  background-image: var(--brand-gradient);
+  background-clip: text;
+  color: transparent;
 }
 
 @layer base {
