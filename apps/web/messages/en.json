@@ -68,19 +68,22 @@
         "name": "Atmosphere designer",
         "job": "Lifestyle & scene images",
         "detail": "Staging, lighting, product placement — your product inside a real-life setting",
-        "pick": "Best for: new arrivals, detail-page heroes"
+        "pick": "Best for: new arrivals, detail-page heroes",
+        "sampleAlt": "A coffee cup on a sunlit wooden table — lifestyle scene image"
       },
       "poster": {
         "name": "Poster designer",
         "job": "Marketing posters",
         "detail": "Rendered by a real layout engine — headlines and offers stay readable",
-        "pick": "Best for: campaigns, holidays, social ads"
+        "pick": "Best for: campaigns, holidays, social ads",
+        "sampleAlt": "Skincare serum promo poster with clearly laid-out headline, price and selling points"
       },
       "photographer": {
         "name": "Product photographer",
         "job": "Product shots",
         "detail": "Clean white-background shots, close-ups, multiple angles",
-        "pick": "Best for: listing images, marketplace compliance"
+        "pick": "Best for: listing images, marketplace compliance",
+        "sampleAlt": "Red apple product shot on a white background"
       }
     },
     "how": {
