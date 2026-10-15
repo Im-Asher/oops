@@ -53,7 +53,7 @@ export function DesignHandles({
     >
       {HANDLES.map((handle) => (
         <div
-          className="absolute rounded-full border border-violet-500 bg-white shadow-sm"
+          className="absolute rounded-full border border-[var(--brand-violet-500)] bg-white shadow-sm"
           data-handle={handle}
           key={handle}
           onPointerDown={(event) => {
@@ -76,7 +76,7 @@ export function DesignHandles({
         style={{ pointerEvents: "none", top: `${-30 / viewScale}px` }}
       >
         <div
-          className="rounded-full border border-violet-500 bg-white shadow-sm"
+          className="rounded-full border border-[var(--brand-violet-500)] bg-white shadow-sm"
           data-handle="rotate"
           onPointerDown={(event) => {
             event.stopPropagation();
@@ -90,7 +90,7 @@ export function DesignHandles({
           }}
         />
         <div
-          className="bg-violet-400"
+          className="bg-[var(--brand-violet-500)]"
           style={{ height: 16 / viewScale, width: 1.5 / viewScale }}
         />
       </div>

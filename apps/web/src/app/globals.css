@@ -192,6 +192,8 @@
   --shadow-1: 0 1px 2px rgb(13 12 18 / 0.06);
   --shadow-2: 0 4px 12px rgb(13 12 18 / 0.08);
   --shadow-pop: 0 8px 24px rgb(13 12 18 / 0.12);
+  /* 舞台点阵色（B2.6 舞台区禁品牌色，中性点随主题翻转） */
+  --stage-dot: rgb(13 12 18 / 0.08);
   /* 200ms 为基线（PRODUCT_DESIGN 原则五：统一的动效节奏），另两档仅供微反馈与大位移 */
   --duration-fast: 120ms;
   --duration-base: 200ms;
@@ -236,6 +238,7 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: var(--brand-ink-800);
   --sidebar-ring: var(--brand-cyan-500);
+  --stage-dot: rgb(255 255 255 / 0.07);
 }
 
 /* 圆角刻度的两档新增（B4）；既有 sm…4xl 由 --radius 派生，不动 */

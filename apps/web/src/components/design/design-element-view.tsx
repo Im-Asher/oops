@@ -138,7 +138,7 @@ export function DesignElementView({
 }) {
   return (
     <div
-      className={`absolute ${selected ? "outline-2 outline-violet-400 outline-solid" : ""} ${
+      className={`absolute ${selected ? "outline-2 outline-[var(--brand-violet-500)] outline-solid" : ""} ${
         element.type === "image" ? "overflow-hidden" : ""
       }`}
       data-design-element={element.id}

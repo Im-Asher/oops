@@ -134,4 +134,27 @@ describe("globals.css 设计 token 契约", () => {
     const drift = [...landing].filter(([k, v]) => root.get(k) !== v).map(([k]) => k);
     expect(drift).toEqual([]);
   });
+
+  it("B2.6/B2.1：canvas 与 design 组件不再使用 Tailwind 内置紫，点阵走 --stage-dot", () => {
+    const chromeFiles = [
+      "../components/canvas/canvas-stage.tsx",
+      "../components/design/design-canvas.tsx",
+      "../components/design/design-handles.tsx",
+      "../components/design/design-element-view.tsx",
+      "../components/design/design-materials-panel.tsx",
+      "../components/design/design-text-panel.tsx",
+      "../components/design/design-template-panel.tsx",
+      "../components/design/design-right-panel.tsx",
+    ];
+    for (const rel of chromeFiles) {
+      const src = readFileSync(resolve(here, rel), "utf-8");
+      // chrome 允许品牌紫，但必须走 --brand- token（B2.1 命名规则）；Tailwind 内置紫撞名禁用
+      expect(src).not.toMatch(/(?:bg|border|ring|outline|text|from|to|via)-violet-\d/);
+    }
+    expect(tokens.has("--stage-dot")).toBe(true);
+    const stage = readFileSync(resolve(here, chromeFiles[0]!), "utf-8");
+    expect(stage).toContain("var(--stage-dot)");
+    // 点阵不允许硬编码色值（品牌色渗入舞台的隐蔽通道）
+    expect(stage).not.toMatch(/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+/);
+  });
 });

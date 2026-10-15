@@ -60,7 +60,7 @@ export function DesignTextPanel({
         {TEXT_PRESETS.map((preset) => (
           <button
             aria-label={t(`presets.${preset.id}.name`)}
-            className="block rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-violet-400"
+            className="block rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-[var(--brand-violet-500)]"
             data-testid={`design-text-preset-${preset.id}`}
             key={preset.id}
             onClick={() => onSelectPreset(preset)}
@@ -88,7 +88,7 @@ export function DesignTextPanel({
         {DESIGN_FONTS.map((font) => (
           <button
             aria-label={t(`fonts.${font.id}`)}
-            className="block rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-violet-400"
+            className="block rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-[var(--brand-violet-500)]"
             data-testid={`design-font-${font.id}`}
             key={font.id}
             onClick={() => onSelectFont(font)}
@@ -111,7 +111,7 @@ export function DesignTextPanel({
           return (
             <button
               aria-label={tFancy(`${preset.id}.name`)}
-              className="block w-full overflow-hidden rounded-lg border border-border text-left transition-colors hover:border-violet-400"
+              className="block w-full overflow-hidden rounded-lg border border-border text-left transition-colors hover:border-[var(--brand-violet-500)]"
               data-testid={`design-fancy-${preset.id}`}
               key={preset.id}
               onClick={() => onSelectFancy(preset)}
