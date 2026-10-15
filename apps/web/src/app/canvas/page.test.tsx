@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { renderWithI18n } from "@/test/render-with-i18n";
 import ChatPage from "./page";
 
-// 画布重子件以 stub 替代（本文件只验证聊天链路：bootstrap → 选项卡 → 点击应答守卫）
+// 画布重子件以 stub 替代（本文件只验证聊天链路：bootstrap → 会话引导 → 选项卡应答）
 vi.mock("@/components/canvas/canvas-stage", () => ({ CanvasStage: () => null }));
 vi.mock("@/components/chat/session-sidebar", () => ({ SessionSidebar: () => null }));
 vi.mock("@/components/chat/user-menu", () => ({ UserMenuContent: () => null }));
@@ -24,6 +24,17 @@ interface ChatCallBody {
   referenceAssetIds?: string[];
 }
 
+interface SessionRow {
+  id: string;
+  agentId?: string | null;
+  title: string;
+  updatedAt: string;
+}
+
+/** 可变服务端状态：会话列表 / 建会话失败注入（按次消耗）。 */
+let sessionsList: SessionRow[] = [];
+let createFailures = 0;
+const createCalls: { agentId?: string }[] = [];
 const chatCalls: ChatCallBody[] = [];
 
 /** /api/chat SSE：推一条 message_delta 后保持打开（busy 悬置，供断言期间守卫生效）。 */
@@ -59,13 +70,23 @@ const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit): Promise<
     );
   }
   if (url === "/api/sessions" && (!init?.method || init.method === "GET")) {
-    return Promise.resolve(
-      jsonResponse({
-        sessions: [
-          { id: "s1", agentId: "poster-designer", title: "T", updatedAt: new Date().toISOString() },
-        ],
-      }),
-    );
+    return Promise.resolve(jsonResponse({ sessions: sessionsList }));
+  }
+  if (url === "/api/sessions" && init?.method === "POST") {
+    if (createFailures > 0) {
+      createFailures -= 1;
+      return Promise.resolve({ ok: false, status: 500 } as unknown as Response);
+    }
+    const body = JSON.parse(String(init.body)) as { agentId?: string };
+    createCalls.push(body);
+    const created: SessionRow = {
+      id: `s-new-${createCalls.length}`,
+      agentId: body.agentId ?? "poster-designer",
+      title: "N",
+      updatedAt: new Date().toISOString(),
+    };
+    sessionsList = [created, ...sessionsList];
+    return Promise.resolve(jsonResponse(created));
   }
   if (url.startsWith("/api/sessions/s1")) {
     return Promise.resolve(
@@ -102,6 +123,11 @@ beforeAll(() => {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionsList = [
+    { id: "s1", agentId: "poster-designer", title: "T", updatedAt: new Date().toISOString() },
+  ];
+  createFailures = 0;
+  createCalls.length = 0;
   chatCalls.length = 0;
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -111,6 +137,46 @@ afterEach(() => {
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+});
+
+describe("canvas 页：会话引导 bootstrap", () => {
+  it("有会话进入仍切最近会话并恢复消息", async () => {
+    renderWithI18n(<ChatPage />);
+    // bootstrap：自动选择最近会话 s1 并恢复消息（含 present_options 选项卡）
+    await screen.findByRole("button", { name: "促销主图" });
+    expect(createCalls).toHaveLength(0);
+  });
+
+  it("无会话进入自动建会话（等 agents 回包取首个 Agent），输入框可用", async () => {
+    sessionsList = [];
+    renderWithI18n(<ChatPage />);
+    // 初始无会话：输入框禁用
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(true);
+    // bootstrap 后自动建会话，agentId 取 /api/agents 首个
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    expect(createCalls[0]).toEqual({ agentId: "poster-designer" });
+    // 新会话落地：输入框可用
+    await waitFor(() =>
+      expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(false),
+    );
+  });
+
+  it("自动建会话失败呈现错误行 + 重试入口，重试成功后输入可用", async () => {
+    sessionsList = [];
+    createFailures = 1;
+    renderWithI18n(<ChatPage />);
+    // 首次 POST 失败：状态行报错并给重试按钮
+    const retry = await screen.findByRole("button", { name: "重试" });
+    expect(createCalls).toHaveLength(0);
+    expect(screen.getByTestId("chat-status-line").textContent).toContain("会话创建失败");
+    // 点击重试：第二次 POST 成功
+    await userEvent.click(retry);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    expect(createCalls[0]).toEqual({ agentId: "poster-designer" });
+    await waitFor(() =>
+      expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(false),
+    );
+  });
 });
 
 describe("canvas 页：选项卡点击应答（HITL）", () => {

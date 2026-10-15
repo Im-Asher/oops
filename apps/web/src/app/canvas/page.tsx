@@ -299,20 +299,13 @@ function ChatPageInner() {
   const bootstrappedRef = useRef(false);
   // newChat 每渲染重建；loadSessions（deps []）经 ref 调用当次最新版本——
   // 直发衔接由 bootstrap 引导完成时触发建会话（B1）。
-  const newChatRef = useRef<() => Promise<void>>(async () => {});
+  const newChatRef = useRef<(explicitAgentId?: string) => Promise<void>>(async () => {});
   const loadSessions = useCallback(async () => {
     const res = await fetch("/api/sessions");
-    if (!res.ok) return;
+    if (!res.ok) return undefined;
     const data = (await res.json()) as { sessions: SessionInfo[] };
     setSessions(data.sessions);
-    if (!bootstrappedRef.current) {
-      bootstrappedRef.current = true;
-      // 直发衔接：不切最近会话（spec/canvas-workspace「直发衔接进入」），
-      // 引导完成后立即新建会话（newChat 为函数声明，运行时已提升、可前向调用；
-      // 其用到的 setter/ref 与首渲染 agentId 初始化在此语境下均正确）。
-      if (data.sessions[0] && !directSendRef.current) setCurrentId(data.sessions[0].id);
-      else if (directSendRef.current) void newChatRef.current();
-    }
+    return data.sessions;
   }, []);
 
   const loadMessages = useCallback(
@@ -361,7 +354,9 @@ function ChatPageInner() {
   }, [canvas, currentId, loadMessages, handleResetEdits, dirty, t, tApi]);
 
   useEffect(() => {
-    fetch("/api/agents")
+    // bootstrap 收口：agents 与 sessions 均回包后再引导——自动建会话显式传入
+    // /api/agents 首个 Agent id，不依赖 setState 提交时序。
+    const agentsP: Promise<AgentInfo[] | undefined> = fetch("/api/agents")
       .then((r) => r.json())
       .then((d: { agents: AgentInfo[] }) => {
         setAgents(d.agents);
@@ -369,10 +364,21 @@ function ChatPageInner() {
         if (d.agents[0]) {
           setAgentId((prev) => (prev && d.agents.some((a) => a.id === prev) ? prev : d.agents[0].id));
         }
+        return d.agents;
       })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadSessions();
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadSessions 内部为异步回包后的 setSessions，非渲染期同步 setState
+    void Promise.allSettled([agentsP, loadSessions()]).then((results) => {
+      if (bootstrappedRef.current) return;
+      bootstrappedRef.current = true;
+      const agentsOk = results[0].status === "fulfilled" ? results[0].value : undefined;
+      const list = results[1].status === "fulfilled" ? (results[1].value ?? []) : [];
+      // 有会话且非直发：切最近会话；直发衔接：建衔接会话（spec/canvas-workspace
+      // 「直发衔接进入」）；无会话且非直发：同样自动建会话——否则无 currentId 时
+      // 输入框不可用（画布进入即哑输入，spec/fix-canvas-entry-hitl-options）。
+      if (list[0] && !directSendRef.current) setCurrentId(list[0].id);
+      else void newChatRef.current(directSendRef.current ? undefined : agentsOk?.[0]?.id);
+    });
   }, [loadSessions]);
 
   // 首页创作输入带来的草稿（?draft=）与 Agent 预选（?agent=）。
@@ -387,6 +393,7 @@ function ChatPageInner() {
   const [directSendStatus, setDirectSendStatus] = useState<{
     text: string;
     tone: "progress" | "error";
+    onRetry?: () => void;
   } | null>(null);
   // 生成闸门（credits spec）：/api/chat 402 后 composer 整体禁用 + 内联提示，
   // 独立于 directSendStatus（直发完成回调会清后者）；刷新页面或重试乐观重置。
@@ -478,11 +485,12 @@ function ChatPageInner() {
     applyPendingDraft(id);
   }
 
-  async function newChat() {
+  async function newChat(explicitAgentId?: string) {
+    const targetAgentId = explicitAgentId ?? agentId;
     const res = await fetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId }),
+      body: JSON.stringify({ agentId: targetAgentId }),
     });
     if (res.ok) {
       const data = (await res.json()) as SessionInfo;
@@ -493,7 +501,7 @@ function ChatPageInner() {
       setReveal(null);
       justCreatedRef.current = data.id;
       setCurrentId(data.id);
-      setAgentId(data.agentId ?? agentId);
+      setAgentId(data.agentId ?? targetAgentId);
       // 新建会话转到聊天框：关下拉、展开聊天面板并聚焦输入框。
       setHistoryOpen(false);
       setChatOpen(true);
@@ -510,6 +518,13 @@ function ChatPageInner() {
       // 注意：不预先清 pendingDraftRef——无会话可回填时需保留排队供「新会话」重试。
       const text = pendingDraftRef.current ?? "";
       await recoverDirectSendFailure(text);
+    } else {
+      // 无会话自动建会话失败：状态行报错并给重试入口（复用直发状态行 UI 位）。
+      setDirectSendStatus({
+        text: t("page.sessionCreateFailed"),
+        tone: "error",
+        onRetry: () => void newChatRef.current(explicitAgentId),
+      });
     }
   }
   newChatRef.current = newChat;

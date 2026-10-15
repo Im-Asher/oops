@@ -239,6 +239,7 @@
       "referenceUploadFailedWithStatus": "Reference upload failed ({status})",
       "exportFailed": "Export failed",
       "exportFailedWithStatus": "Export failed ({status})",
+      "sessionCreateFailed": "Failed to create session. Please retry.",
       "directSend": {
         "creatingSession": "Creating session…",
         "uploadingAttachments": "Uploading attachments ({done}/{total})…",
@@ -283,6 +284,7 @@
     "fileLink": "File",
     "emptyPrompt": "Pick an agent and describe the product or scene image you want.",
     "balance": "Credits balance",
+    "statusRetry": "Retry",
     "options": {
       "groupLabel": "Options",
       "clickToSend": "Click an option to send it, or keep typing below"

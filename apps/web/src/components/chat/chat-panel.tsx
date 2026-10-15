@@ -47,7 +47,7 @@ interface ChatPanelProps {
   /** 附件上传参考图入口（透传停靠形态输入框）。 */
   onAttach?: () => void;
   /** 直发衔接状态行（进度/错误）；null 即不展示。 */
-  statusLine?: { text: string; tone: "progress" | "error" } | null;
+  statusLine?: { text: string; tone: "progress" | "error"; onRetry?: () => void } | null;
   /** 积分耗尽（/api/chat 402 后）：composer 整体禁用直至余额恢复。 */
   creditsExhausted?: boolean;
 }
@@ -108,7 +108,7 @@ export function ChatPanel({
         selectedAssetId={selectedAssetId}
       />
       {statusLine ? (
-        <div aria-live="polite" className="px-3 pb-1" data-testid="chat-status-line">
+        <div aria-live="polite" className="flex items-center gap-2 px-3 pb-1" data-testid="chat-status-line">
           <span
             className={
               statusLine.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
@@ -116,6 +116,15 @@ export function ChatPanel({
           >
             {statusLine.text}
           </span>
+          {statusLine.onRetry ? (
+            <button
+              className="text-xs text-destructive underline-offset-2 hover:underline"
+              onClick={statusLine.onRetry}
+              type="button"
+            >
+              {t("statusRetry")}
+            </button>
+          ) : null}
         </div>
       ) : null}
       <div className="p-3">
