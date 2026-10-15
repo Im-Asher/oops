@@ -75,12 +75,12 @@ describe("AgentRegistry", () => {
     expect(meta.find((a) => a.id === "atmosphere-designer")).toMatchObject({
       name: "氛围图设计师",
       icon: "🌄",
-      tools: ["generate_image"],
+      tools: ["generate_image", "present_options"],
     });
     expect(meta.find((a) => a.id === "product-photographer")).toMatchObject({
       name: "产品摄影师",
       icon: "📸",
-      tools: ["generate_image"],
+      tools: ["generate_image", "present_options"],
     });
     expect(meta.find((a) => a.id === "product-photographer")).not.toHaveProperty("systemPrompt");
     expect(meta.find((a) => a.id === "atmosphere-designer")?.presets).toHaveLength(3);
