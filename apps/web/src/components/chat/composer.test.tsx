@@ -133,3 +133,11 @@ describe("Composer default 变体（既有行为不回归）", () => {
     expect((screen.getByLabelText("发送") as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("Composer 积分耗尽（/api/chat 402 回归，Step 3.4）", () => {
+  it("creditsExhausted 时输入/发送禁用并提示积分不足", () => {
+    renderComposer({ creditsExhausted: true });
+    expect((screen.getByLabelText("消息输入") as HTMLTextAreaElement).disabled).toBe(true);
+    expect(screen.getByPlaceholderText("积分不足，已暂停生成")).toBeTruthy();
+  });
+});
