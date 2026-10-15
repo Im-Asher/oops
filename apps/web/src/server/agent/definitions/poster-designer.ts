@@ -13,7 +13,7 @@ export const posterDesigner = defineAgent({
   icon: "🎨",
   // 灵感卡 presets 为词典 key（chat.presets.<agentId>.<key>），/api/agents 按请求 locale 解析为文案。
   presets: ["promoSale", "festivalMain", "newArrival"],
-  tools: ["generate_image", "render_html"],
+  tools: ["generate_image", "render_html", "present_options"],
   // 主模型需 vision：直接观察商品图完成版式设计（能力不满足时装配层 fail-fast）。
   models: { main: { capabilities: ["vision"] } },
   systemPrompt,

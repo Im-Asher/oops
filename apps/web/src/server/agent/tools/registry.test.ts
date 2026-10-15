@@ -52,4 +52,16 @@ describe("ToolRegistry", () => {
     expect(spy).toHaveBeenCalledWith({ prompt: "hi" }, expect.objectContaining({ userId: "u1" }));
     spy.mockRestore();
   });
+
+  it("terminate 透传：处理器返回 terminate=true 时 AgentToolResult 携带该标记（供 runtime 结束本轮）", async () => {
+    const stopDef: ToolDefinition<{ prompt: string }> = {
+      ...def,
+      name: "stop_tool",
+      execute: async () => ({ content: [{ type: "text", text: "stop" }], terminate: true }),
+    };
+    toolRegistry.register(stopDef);
+    const tool = toolRegistry.getAgentTool("stop_tool", ctx)!;
+    const result = (await tool.execute("call-3", { prompt: "hi" })) as { terminate?: boolean };
+    expect(result.terminate).toBe(true);
+  });
 });

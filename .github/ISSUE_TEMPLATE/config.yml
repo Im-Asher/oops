@@ -1,0 +1,12 @@
+# Issue template chooser configuration.
+# Blank issues are disabled so every submission carries structured,
+# actionable information. Open-ended questions and usage help should go
+# to GitHub Discussions instead.
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Help
+    url: https://github.com/Im-Asher/oops/discussions
+    about: Ask usage questions or discuss ideas — not for reproducible bugs or config failures.
+  - name: Documentation
+    url: https://github.com/Im-Asher/oops#readme
+    about: Architecture, setup, and command reference before filing an issue.

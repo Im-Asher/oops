@@ -239,6 +239,7 @@
       "referenceUploadFailedWithStatus": "参考图上传失败（{status}）",
       "exportFailed": "导出失败",
       "exportFailedWithStatus": "导出失败（{status}）",
+      "sessionCreateFailed": "会话创建失败，请重试",
       "directSend": {
         "creatingSession": "正在创建会话…",
         "uploadingAttachments": "正在上传附件（{done}/{total}）…",
@@ -283,6 +284,11 @@
     "fileLink": "文件",
     "emptyPrompt": "选择 Agent 并描述你想要的商品/场景图。",
     "balance": "积分余额",
+    "statusRetry": "重试",
+    "options": {
+      "groupLabel": "候选选项",
+      "clickToSend": "点击选项即可发送；也可以继续在下方输入"
+    },
     "composer": {
       "attachLanding": "添加附件",
       "attachReference": "上传参考图",

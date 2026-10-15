@@ -1,0 +1,68 @@
+name: Feature Request
+description: Suggest an idea or improvement for oops
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Describe the problem you are
+        trying to solve first — solutions are easier to evaluate in context.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the system would this feature touch?
+      options:
+        - Web chat UI (apps/web)
+        - Canvas (apps/web)
+        - Agent runtime (apps/web)
+        - Image generation (text-to-image providers)
+        - HTML render pipeline (Playwright)
+        - Admin console (apps/admin)
+        - Auth / sessions
+        - Credits / billing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what currently blocks or limits you?
+      placeholder: As an e-commerce seller, I want to ... but today I have to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you want to happen. Rough behavior is enough; implementation details are optional.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workarounds / alternatives
+      description: How do you (or would you) handle this today without the feature?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to help implement this feature (discussion / PR).
+          required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions and found no duplicate request.
+          required: true

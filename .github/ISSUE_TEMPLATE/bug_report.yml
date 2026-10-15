@@ -1,0 +1,100 @@
+name: Bug Report
+description: Report a reproducible problem in oops
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in every required
+        field so the problem can be reproduced and fixed quickly.
+
+        > Never paste API keys, passwords, tokens, or session cookies into this
+        > issue. Redact them before submitting.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the system does the bug occur in?
+      options:
+        - Web chat UI (apps/web)
+        - Canvas (apps/web)
+        - Agent runtime (apps/web)
+        - Image generation (text-to-image providers)
+        - HTML render pipeline (Playwright)
+        - Admin console (apps/admin)
+        - Auth / sessions
+        - Credits / billing
+        - Other / unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened, and how often does it happen (always / sometimes)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Numbered steps starting from a fresh state. Include the agent you
+        picked, the prompt you sent, and any attached reference images.
+      placeholder: |
+        1. Log in and create a session
+        2. Pick agent "..."
+        3. Send message "..."
+        4. Observe ...
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual behavior
+      description: What you expected to happen, and what actually happened.
+      placeholder: |
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        - OS and browser (with version)
+        - Node and pnpm versions (`node -v`, `pnpm -v`)
+        - How the app runs: local dev (`pnpm dev`), Docker Compose, or a production build
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: |
+        Browser console output, dev-server output, or screenshots.
+        Redact secrets first — logs may contain model provider errors.
+      render: bash
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and found no duplicate.
+          required: true
+        - label: I redacted all secrets (API keys, passwords, tokens) from this report.
+          required: true
+        - label: I am willing to provide more details if asked.
+          required: false

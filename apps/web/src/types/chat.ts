@@ -10,6 +10,8 @@ export interface UIMessage {
     | { type: "text"; text: string }
     | { type: "image"; url: string; assetId: string }
     | { type: "file"; url: string }
+    /** HITL 选项卡：present_options 恢复/流式产出的持久 part，点击 label 即作为用户消息发送 */
+    | { type: "options"; question: string; options: { label: string; description?: string }[] }
     /** 当轮流式专用：思考内容聚合（streaming 标记驱动折叠态），不落库 */
     | { type: "thinking"; text: string; streaming: boolean }
     /** 当轮流式专用：工具执行状态行，完成时被结果或移除取代，不落库 */

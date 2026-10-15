@@ -6,6 +6,8 @@ import { z } from "zod";
 export interface ToolHandlerResult {
   content: (TextContent | ImageContent)[];
   details?: Record<string, unknown>;
+  /** true = 结束本轮 agent 循环（如 present_options 等待用户点击），经 pi-agent-core AgentToolResult.terminate 生效。 */
+  terminate?: boolean;
 }
 
 export interface ToolExecutionContext {
@@ -45,7 +47,11 @@ function buildAgentTool(def: ToolDefinition, ctx: ToolExecutionContext): AgentTo
         userId: ctx.userId,
         sessionId: ctx.sessionId,
       });
-      return { content: result.content, details: (result.details ?? {}) as unknown as JsonValue };
+      return {
+        content: result.content,
+        details: (result.details ?? {}) as unknown as JsonValue,
+        terminate: result.terminate,
+      };
     },
   };
 }

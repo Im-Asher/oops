@@ -11,7 +11,8 @@ export type UIMessagePart =
       model?: string;
       size?: string;
     }
-  | { type: "file"; url: string; assetId?: string };
+  | { type: "file"; url: string; assetId?: string }
+  | { type: "options"; question: string; options: { label: string; description?: string }[] };
 
 export interface UIMessage {
   id: string;
@@ -26,6 +27,8 @@ interface StoredToolCall {
   prompt?: string;
   model?: string;
   size?: string;
+  question?: string;
+  options?: { label?: string; description?: string }[];
 }
 
 /** 把落库消息（content + toolCalls）确定性重建为可直接渲染的 UIMessage parts（零转换）。 */
@@ -55,6 +58,17 @@ export function toUIMessage(
         });
       } else if (tc?.type === "file" && tc.url) {
         parts.push({ type: "file", url: tc.url, assetId: tc.assetId });
+      } else if (tc?.type === "present_options" && typeof tc.question === "string" && tc.question && Array.isArray(tc.options)) {
+        // 选项卡恢复：清洗非法项后仍有效才产出 part（坏数据整块忽略，不抛错）。
+        const options = tc.options
+          .filter((o) => typeof o?.label === "string" && o.label.length > 0)
+          .map((o) => ({
+            label: o.label as string,
+            ...(typeof o.description === "string" && o.description ? { description: o.description } : {}),
+          }));
+        if (options.length > 0) {
+          parts.push({ type: "options", question: tc.question, options });
+        }
       }
     }
   }
