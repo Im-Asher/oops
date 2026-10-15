@@ -126,11 +126,11 @@ export function Composer({
       ) : null}
       {reference ? (
         <div className="flex items-center gap-1.5 px-1 pb-1.5">
-          <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300">
+          <span className="inline-flex items-center gap-1 rounded-md bg-brand-violet-500/15 px-2 py-1 text-xs text-brand-violet-600 dark:text-brand-violet-300">
             {t("referenceLabel", { name: reference.name })}
             <button
               aria-label={t("removeReference", { name: reference.name })}
-              className="ml-0.5 text-violet-600/80 dark:text-violet-600 dark:text-violet-300/80 hover:text-violet-700 dark:hover:text-violet-700 dark:text-violet-200"
+              className="ml-0.5 text-brand-violet-600/80 dark:text-brand-violet-300/80 hover:text-brand-violet-700 dark:hover:text-brand-violet-300"
               onClick={onRemoveReference}
               type="button"
             >
@@ -143,13 +143,13 @@ export function Composer({
         <div className="flex flex-wrap gap-1.5 px-1 pb-1.5" data-testid="composer-pending-files">
           {pendingFiles.map((f) => (
             <span
-              className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-xs text-violet-600 dark:text-violet-300"
+              className="inline-flex items-center gap-1 rounded-md bg-brand-violet-500/15 px-2 py-1 text-xs text-brand-violet-600 dark:text-brand-violet-300"
               key={f.id}
             >
               {t("pendingFile", { name: f.name })}
               <button
                 aria-label={t("removePendingFile", { name: f.name })}
-                className="ml-0.5 hover:text-violet-700 dark:hover:text-violet-200"
+                className="ml-0.5 hover:text-brand-violet-700 dark:hover:text-brand-violet-300"
                 onClick={() => onRemovePendingFile?.(f.id)}
                 type="button"
               >
@@ -255,7 +255,7 @@ export function Composer({
         ) : (
           <Button
             aria-label={t("send")}
-            className="size-8 rounded-full bg-violet-500/90 hover:bg-violet-500"
+            className="size-8 rounded-full bg-primary hover:bg-primary/90"
             disabled={busy || !gateReady || !value.trim()}
             onClick={onSend}
             size="icon-sm"

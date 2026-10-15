@@ -1009,7 +1009,7 @@ function ChatPageInner() {
                 : t("page.savedLocal")}
           </span>
           <Button
-            className="h-8 gap-1.5 bg-violet-500/90 px-3 text-xs text-white hover:bg-violet-500"
+            className="h-8 gap-1.5 bg-primary px-3 text-xs hover:bg-primary/90"
             disabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
             onClick={() => void handleExport()}
             size="sm"
