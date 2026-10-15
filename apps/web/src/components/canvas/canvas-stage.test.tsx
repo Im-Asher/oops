@@ -2,7 +2,11 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { initialCanvasState, type CanvasItem } from "@/lib/canvas/canvas-reducer";
+import {
+  DEFAULT_FILTERS,
+  initialCanvasState,
+  type CanvasItem,
+} from "@/lib/canvas/canvas-reducer";
 import { renderWithI18n } from "@/test/render-with-i18n";
 
 import { CanvasStage } from "./canvas-stage";
@@ -27,7 +31,7 @@ function item(overrides: Partial<CanvasItem> = {}): CanvasItem {
     width: 200,
     aspect: 1,
     status: "image",
-    edit: { crop: null, filters: {} },
+    edit: { crop: null, filters: { ...DEFAULT_FILTERS } },
     ...overrides,
   };
 }
