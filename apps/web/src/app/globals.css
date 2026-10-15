@@ -217,8 +217,9 @@
   --secondary: var(--brand-ink-800);
   --secondary-foreground: #ffffff;
   --muted: var(--brand-ink-850);
-  /* ink-500 on ink-950 = 4.6:1（B2.2） */
-  --muted-foreground: var(--brand-ink-500);
+  /* 实测 ink-500 on ink-900 仅 4.01:1 不达 AA（B2.2 的 4.6 声称有误）；
+     改用 ink-400：ink-950 上 6.94 / ink-900 上 6.46（B2.4 硬规则优先） */
+  --muted-foreground: var(--brand-ink-400);
   --accent: var(--brand-ink-800);
   --accent-foreground: #ffffff;
   --destructive: oklch(0.704 0.191 22.216);
