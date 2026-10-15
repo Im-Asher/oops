@@ -23,7 +23,7 @@ export function DesignTemplatePanel({ onSelect }: { onSelect: (template: DesignT
           return (
             <button
               aria-label={t(`names.${template.id}`)}
-              className="block w-full overflow-hidden rounded-lg border border-border text-left transition-colors hover:border-violet-400"
+              className="block w-full overflow-hidden rounded-lg border border-border text-left transition-colors hover:border-[var(--brand-violet-500)]"
               data-testid={`design-template-${template.id}`}
               key={template.id}
               onClick={() => onSelect(template)}

@@ -38,10 +38,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang={lang}
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <head>
-        {/* 首屏阻塞防闪烁：默认暗色（html 已带 dark），仅存储为 light 时移除 */}
+        {/* 首屏阻塞防闪烁：默认暗色（html 已带 dark），仅存储为 light 时移除。
+            脚本在水合前改写 className 必然触发 React 属性 mismatch，suppressHydrationWarning
+            是官方出口（next-themes 同款），只抑制 html 元素自身、不影响子树校验。 */}
         <script
           dangerouslySetInnerHTML={{
             __html:

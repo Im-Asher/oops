@@ -89,7 +89,7 @@ function MergedSelectionBox({ elements }: { elements: DesignElement[] }) {
   }
   return (
     <div
-      className="absolute border border-dashed border-violet-400"
+      className="absolute border border-dashed border-[var(--brand-violet-500)]"
       data-testid="design-selection-box"
       style={{
         height: maxY - minY,

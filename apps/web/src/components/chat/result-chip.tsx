@@ -22,7 +22,7 @@ export function ResultChip({ active, position, onFocus }: ResultChipProps) {
       aria-label={active ? t("activeLabel", { position }) : t("locateLabel", { position })}
       aria-pressed={active}
       className={`mt-2 inline-flex h-8 cursor-pointer items-center gap-1.5 self-start rounded-full border bg-popover px-3 text-xs text-foreground/85 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        active ? "border-violet-400 text-violet-700 dark:text-violet-200" : "border-border hover:border-ring"
+        active ? "border-brand-violet-300 text-brand-violet-700 dark:text-brand-violet-300" : "border-border hover:border-ring"
       }`}
       onClick={onFocus}
       title={active ? t("activeTitle") : t("viewTitle")}

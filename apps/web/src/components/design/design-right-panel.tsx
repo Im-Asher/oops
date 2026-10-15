@@ -124,7 +124,7 @@ function Swatches({ active, onPick }: { active: string; onPick: (color: string) 
         <button
           aria-label={color}
           className={`size-5 rounded border ${
-            active.toLowerCase() === color ? "border-violet-500 ring-1 ring-violet-500" : "border-border"
+            active.toLowerCase() === color ? "border-[var(--brand-violet-500)] ring-1 ring-[var(--brand-violet-500)]" : "border-border"
           }`}
           key={color}
           onClick={() => onPick(color)}

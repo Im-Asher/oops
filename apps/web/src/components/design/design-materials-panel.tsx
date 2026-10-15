@@ -16,7 +16,7 @@ export function DesignMaterialsPanel({ onSelect }: { onSelect: (material: Design
         {DESIGN_MATERIALS.map((material) => (
           <button
             aria-label={t(`names.${material.id}`)}
-            className="flex items-center justify-center rounded-lg border border-border p-2 transition-colors hover:border-violet-400"
+            className="flex items-center justify-center rounded-lg border border-border p-2 transition-colors hover:border-[var(--brand-violet-500)]"
             data-testid={`design-material-${material.id}`}
             key={material.id}
             onClick={() => onSelect(material)}

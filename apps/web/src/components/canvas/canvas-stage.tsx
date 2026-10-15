@@ -59,7 +59,7 @@ function CanvasItemView({
   return (
     <div
       className={`absolute overflow-hidden rounded-lg border border-border/80 bg-popover ${
-        selected ? "ring-2 ring-violet-400" : ""
+        selected ? "ring-2 ring-[var(--brand-violet-500)]" : ""
       } ${item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
       data-item-id={item.id}
       onPointerDown={(event) => {
@@ -401,7 +401,7 @@ export function CanvasStage({
       }`}
       style={{
         backgroundImage:
-          "radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)",
+          "radial-gradient(circle, var(--stage-dot) 1px, transparent 1px)",
         backgroundPosition: `${view.x}px ${view.y}px`,
         backgroundSize: `${GRID_SIZE * view.scale}px ${GRID_SIZE * view.scale}px`,
       }}

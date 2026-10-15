@@ -140,7 +140,7 @@ export function ChatPanelHeader({
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={title}>
               {title}
             </span>
-            <span className="shrink-0 rounded bg-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-300">
+            <span className="shrink-0 rounded bg-brand-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-brand-violet-600 dark:text-brand-violet-300">
               AI
             </span>
             <span
