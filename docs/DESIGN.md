@@ -84,7 +84,7 @@ Why this matters: **a brand change = edit layers 1 and 3.** Semantic names like 
 
 ## B2. Color
 
-### B2.1 Brand Ramps (Primitive) `[proposed]`
+### B2.1 Brand Ramps (Primitive) `[shipped — apps/web/src/app/globals.css :root，守卫 globals.tokens.test.ts]`
 
 > **Naming rule: every brand ramp carries the `--brand-` prefix.** Tailwind v4 already ships built-in scales — `--color-violet-500: #8d54ff`, `--color-cyan-500`, and so on — which power utilities like `bg-violet-500`. Unprefixed `--violet-500` would sit one character away from a *different* purple that renders on the very same screen. The prefix makes that collision physically impossible, and it also keeps layers 1 and 3 reading as one family. **Never write `bg-violet-500` expecting brand color**; use `var(--brand-violet-500)`.
 
@@ -111,7 +111,7 @@ Cyan — brand secondary; **atmosphere and focus only**.
 
 Bridge blue — gradient midpoint so violet→cyan does not pass through mud: `--brand-blue-500: #4a5cf0`.
 
-### B2.2 Neutral Ramp — Cool Gray with a Whisper of Violet `[proposed]`
+### B2.2 Neutral Ramp — Cool Gray with a Whisper of Violet `[shipped — 同上]`
 
 Once the brand hue is chromatic, the grays must lean cool too, or the whole UI reads dirty.
 
@@ -123,7 +123,7 @@ Once the brand hue is chromatic, the grays must lean cool too, or the whole UI r
 | `--brand-ink-800` | `#262430` | Dark border |
 | `--brand-ink-700` | `#3a3846` | Dark divider, hover fill |
 | `--brand-ink-600` | `#565469` | Light secondary text |
-| `--brand-ink-500` | `#77748a` | Dark secondary text (4.6:1 on `--brand-ink-950`) |
+| `--brand-ink-500` | `#77748a` | Dark secondary text — **实测 4.31:1 on `--brand-ink-950`（卡片上 4.01），不达 AA；语义层暗色 muted-foreground 已改映射 `--brand-ink-400`（B2.7），本档勿再作正文字色** |
 | `--brand-ink-400` | `#9b98ad` | Disabled text on light |
 | `--brand-ink-300` | `#c3c0cf` | Strong light border |
 | `--brand-ink-200` | `#e2e0ea` | Light border |
@@ -133,7 +133,7 @@ Once the brand hue is chromatic, the grays must lean cool too, or the whole UI r
 
 Light-mode primary text is `--brand-ink-900` (`#16151d`, 15.9:1 on white) — **not pure black**.
 
-### B2.3 Semantic Colors — Decoupled From the Brand `[proposed]`
+### B2.3 Semantic Colors — Decoupled From the Brand `[partially shipped — web 保留 --destructive；--success/--warning/--info 目前只活在 admin ANTD_THEME_TOKEN，web 侧 token 未落]`
 
 **Rule: semantic hues (green / amber / red / blue) must not overlap brand hues (violet / cyan). Red always means "error or danger" and never brand decoration.** Section A's `#ff5757` serving as both a brand sparkle and the error color is exactly the coupling we are cutting.
 
@@ -146,24 +146,25 @@ Light-mode primary text is `--brand-ink-900` (`#16151d`, 15.9:1 on white) — **
 
 Coral `#ff7059` is demoted to a **decoration-only third color**: large fills and illustrations on the landing page. Never text, never status, never a button fill.
 
-### B2.4 Contrast Table (WCAG, measured — re-verify on landing)
+### B2.4 Contrast Table (WCAG, measured — re-verified 2026-10-15, change add-landing-page 任务 3.3)
 
 | Foreground | Background | Ratio | Verdict |
 | --- | --- | --- | --- |
-| white | `--brand-violet-500` `#7d2ae8` | 6.2:1 | ✓ body and large text |
-| white | `--brand-violet-600` `#6a1fd0` | 8.0:1 | ✓ hover state |
+| white | `--brand-violet-500` `#7d2ae8` | 6.23:1 | ✓ body and large text |
+| white | `--brand-violet-600` `#6a1fd0` | 7.72:1 | ✓ hover state |
 | white | `--brand-cyan-500` `#00c4cc` | 2.15:1 | ✗ decoration only, never text |
-| white | `--brand-cyan-600` `#009aa2` | 3.4:1 | △ large text / graphics only |
-| white | `--brand-cyan-700` `#007a81` | 5.1:1 | ✓ the cyan text step |
-| white | `--destructive` `#e5484d` | 3.9:1 | △ button labels need ≥16px/600, or drop to a `--destructive-700` |
-| `--brand-ink-900` | white | 15.9:1 | ✓ |
-| `--brand-ink-600` | white | 6.5:1 | ✓ secondary text |
-| `--brand-ink-500` | white | 4.6:1 | ✓ secondary text on light |
+| white | `--brand-cyan-600` `#009aa2` | 3.42:1 | △ large text / graphics only |
+| white | `--brand-cyan-700` `#007a81` | 5.12:1 | ✓ the cyan text step |
+| white | `--destructive` `#e5484d` | 3.91:1 | △ button labels need ≥16px/600, or drop to a `--destructive-700` |
+| `--brand-ink-900` | white | 18.12:1 | ✓ |
+| `--brand-ink-600` | white | 7.32:1 | ✓ secondary text |
+| `--brand-ink-500` | white | 4.52:1 | ✓ secondary text on light |
 | reference `#9aa0a6` | white | 2.64:1 | ✗ borders and placeholder blocks only |
+| white | `--brand-blue-500`（渐变中点） | 5.15:1 | ✓ 渐变 CTA 白字全程 ≥5.12 |
 
 **Hard rule that falls out of this table**: the light end of a gradient must be darkened. A white label on `#7d2ae8 → #00c4cc` **fails AA**. Either terminate at `--brand-cyan-700` (~4.4–5.1:1) or set the label at ≥16px/600 and claim the large-text threshold.
 
-### B2.5 Brand Tokens `[proposed]`
+### B2.5 Brand Tokens `[shipped — globals.css :root + @utility，禁裸 hex 由守卫测试断言]`
 
 ```
 --brand-gradient        linear-gradient(135deg, var(--brand-violet-500) 0%, var(--brand-blue-500) 52%, var(--brand-cyan-700) 100%)   — token composition only; raw hex in the gradient is forbidden
@@ -200,7 +201,7 @@ The rule most likely to be bypassed, and the most important one here.
 | Page background | `--brand-ink-50` / white | `--brand-ink-950` |
 | Card / panel | white | `--brand-ink-900` |
 | Primary text | `--brand-ink-900` | white |
-| Secondary text | `--brand-ink-600` | `--brand-ink-500` |
+| Secondary text | `--brand-ink-600` | `--brand-ink-400`（偏离 B2.2 的 ink-500 建议：实测 4.31:1 不达 AA，3.3 修正） |
 | Border | `--brand-ink-200` | `--brand-ink-800` |
 | Primary CTA | violet gradient (both ends darkened per B2.4) | same hues, +5% lightness |
 | Brand colors | same hues as dark — **no desaturation** | same |
