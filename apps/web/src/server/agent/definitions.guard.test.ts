@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { agentRegistry } from "./index";
 
 /**
  * Drop-in 注册守卫（agent-registry spec「Drop-in 目录注册」）：
@@ -55,5 +56,19 @@ describe("definitions drop-in 守卫", () => {
     const files = ["atmosphere-designer.ts", "product-photographer.ts"];
     const registered = ["atmosphere-designer", "product-photographer", "removed-agent"];
     expect(findPhantom(files, registered)).toEqual(["removed-agent"]);
+  });
+});
+
+describe("present_options 声明守卫（HITL 选项卡）", () => {
+  it("每个注册 Agent 的 tools 均声明 present_options，且按名授权装配后可拿到（漏声明即守卫报红）", () => {
+    const agents = agentRegistry.list();
+    expect(agents.length).toBeGreaterThanOrEqual(3); // 内置三 Agent
+    const missingDeclared = agents.filter((a) => !a.tools.includes("present_options")).map((a) => a.id);
+    expect(missingDeclared).toEqual([]);
+    const ctx = { userId: "u-guard", sessionId: "s-guard" };
+    for (const agent of agents) {
+      const assembled = agentRegistry.getAgentTools(agent.id, ctx);
+      expect(assembled.some((t) => t.name === "present_options"), agent.id).toBe(true);
+    }
   });
 });
