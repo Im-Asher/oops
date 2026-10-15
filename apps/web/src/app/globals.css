@@ -96,38 +96,44 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* ---- Layer 2 · 语义层（B2.7 明/暗映射）---------------------------------
+     Step 3 换值：primary/ring 走品牌阶，neutral 全线换偏紫冷灰（B2.2）。
+     destructive 与 chart 维持原值（B2.3 语义色不参与品牌化；chart 不在 3.1 范围）。 */
+  --background: #ffffff;
+  --foreground: var(--brand-ink-900);
+  --card: #ffffff;
+  --card-foreground: var(--brand-ink-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-ink-900);
+  /* 白字 on violet-500 = 6.2:1（B2.4） */
+  --primary: var(--brand-violet-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-ink-100);
+  --secondary-foreground: var(--brand-ink-900);
+  --muted: var(--brand-ink-50);
+  /* ink-600 on white = 6.5:1（B2.4） */
+  --muted-foreground: var(--brand-ink-600);
+  --accent: var(--brand-ink-100);
+  --accent-foreground: var(--brand-ink-900);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: var(--brand-ink-200);
+  --input: var(--brand-ink-200);
+  /* cyan 只承担氛围与焦点（B2.1）；ring 用 600 档保证浅底可见度 */
+  --ring: var(--brand-cyan-600);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: var(--brand-ink-50);
+  --sidebar-foreground: var(--brand-ink-900);
+  --sidebar-primary: var(--brand-violet-500);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-ink-100);
+  --sidebar-accent-foreground: var(--brand-ink-900);
+  --sidebar-border: var(--brand-ink-200);
+  --sidebar-ring: var(--brand-cyan-600);
 
   /* ---- Layer 1 ·品牌色阶（docs/DESIGN.md B2.1 / B2.2）------------------------
      统一带 --brand- 前缀：Tailwind 内置 --color-violet-500 是 #8d54ff，与本品牌紫
@@ -196,38 +202,40 @@
 }
 
 .dark {
-  /* 暗色 token 与原暗色硬编码视觉对齐（#0B0B0D 主底 / #111113 侧栏 / #141416 卡片） */
-  --background: oklch(0.155 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* 暗色语义层换值（B2.7 暗色列）：ink 暗色阶替换原中性灰，primary 直上品牌紫 */
+  --background: var(--brand-ink-950);
+  --foreground: #ffffff;
+  --card: var(--brand-ink-900);
+  --card-foreground: #ffffff;
+  --popover: var(--brand-ink-850);
+  --popover-foreground: #ffffff;
+  /* 白字 on violet-500 = 6.2:1（B2.4）；暗底上的紫主按钮由 3.4 冒烟核验 */
+  --primary: var(--brand-violet-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-ink-800);
+  --secondary-foreground: #ffffff;
+  --muted: var(--brand-ink-850);
+  /* ink-500 on ink-950 = 4.6:1（B2.2） */
+  --muted-foreground: var(--brand-ink-500);
+  --accent: var(--brand-ink-800);
+  --accent-foreground: #ffffff;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.278 0 0);
-  --input: oklch(0.3 0 0);
-  --ring: oklch(0.556 0 0);
+  --border: var(--brand-ink-800);
+  --input: var(--brand-ink-700);
+  --ring: var(--brand-cyan-500);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.19 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: var(--brand-ink-900);
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: var(--brand-violet-500);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-ink-800);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--brand-ink-800);
+  --sidebar-ring: var(--brand-cyan-500);
 }
 
 /* 圆角刻度的两档新增（B4）；既有 sm…4xl 由 --radius 派生，不动 */
@@ -252,24 +260,24 @@
    值与 :root 一字不差，语义层换色（Step 3）时两处需同步。 */
 .landing-root {
   color-scheme: light;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #ffffff;
+  --foreground: var(--brand-ink-900);
+  --card: #ffffff;
+  --card-foreground: var(--brand-ink-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-ink-900);
+  --primary: var(--brand-violet-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-ink-100);
+  --secondary-foreground: var(--brand-ink-900);
+  --muted: var(--brand-ink-50);
+  --muted-foreground: var(--brand-ink-600);
+  --accent: var(--brand-ink-100);
+  --accent-foreground: var(--brand-ink-900);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: var(--brand-ink-200);
+  --input: var(--brand-ink-200);
+  --ring: var(--brand-cyan-600);
 }
 
 /* B7.1.9：入场 = 12px 上移 + 淡入，200ms 单档节奏；全页至多 6 个元素、级差 ≤80ms；

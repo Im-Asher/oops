@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 /**
  * 设计 token 契约守卫（docs/DESIGN.md B1 四层分层的落地校验）。
  *
- * 覆盖 Layer 1（品牌色阶）与 Layer 4（形状 / 动效）+ 字体 token；Layer 2 语义层换色
- * 由change `add-landing-page` 的 Step 3 负责，其验证在对应任务里，不在本文件断言。
+ * 覆盖 Layer 1（品牌色阶）、Layer 2（语义层关键映射与 .landing-root 同步）、
+ * Layer 4（形状 / 动效）+ 字体 token。
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(resolve(here, "globals.css"), "utf-8");
@@ -108,5 +108,30 @@ describe("globals.css 设计 token 契约", () => {
     expect(gradient).toContain("var(--brand-blue-500)");
     expect(gradient).toContain("var(--brand-cyan-700)");
     expect(gradient).not.toMatch(/#[0-9a-f]{3,8}/i);
+  });
+
+  /** 提取某个选择器块内的全部自定义属性声明。 */
+  function blockVars(selector: string): Map<string, string> {
+    const block = css.match(new RegExp(`(?:^|\\n)${selector}\\s*\\{([^}]+)\\}`))?.[1] ?? "";
+    return new Map([...block.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gim)].map((m) => [m[1], m[2].trim()]));
+  }
+
+  it("Step 3 语义层关键映射（B2.7）：primary 走品牌紫，ring 走青色档", () => {
+    const root = blockVars(":root");
+    const dark = blockVars("\\.dark");
+    for (const vars of [root, dark]) {
+      expect(vars.get("--primary")).toBe("var(--brand-violet-500)");
+      expect(vars.get("--primary-foreground")).toBe("#ffffff");
+    }
+    expect(root.get("--ring")).toBe("var(--brand-cyan-600)");
+    expect(dark.get("--ring")).toBe("var(--brand-cyan-500)");
+  });
+
+  it(".landing-root 与 :root 语义层一字不差（D2 手工同步规则，漂移即红）", () => {
+    const root = blockVars(":root");
+    const landing = blockVars("\\.landing-root");
+    expect(landing.size).toBeGreaterThan(0);
+    const drift = [...landing].filter(([k, v]) => root.get(k) !== v).map(([k]) => k);
+    expect(drift).toEqual([]);
   });
 });
