@@ -8,7 +8,7 @@ describe("present_options 工具", () => {
     expect(
       presentOptionsSchema.safeParse({
         question: "这张图主要用在哪里？",
-        options: [{ label: "商品详情页氛围图" }, { label: "电商主图", detail: "1:1 纯白背景" }],
+        options: [{ label: "商品详情页氛围图" }, { label: "电商主图", description: "1:1 纯白背景" }],
       }).success,
     ).toBe(true);
   });
@@ -43,7 +43,7 @@ describe("present_options 工具", () => {
   it("execute：details 原样透出 question/options，terminate=true 结束本轮等待点击", async () => {
     const args = {
       question: "海报用途？",
-      options: [{ label: "促销主图" }, { label: "上新海报", detail: "新品上架" }],
+      options: [{ label: "促销主图" }, { label: "上新海报", description: "新品上架" }],
     };
     const result = await presentOptionsTool.execute(args, ctx);
     expect(result.terminate).toBe(true);

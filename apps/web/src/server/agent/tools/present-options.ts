@@ -12,7 +12,7 @@ export const presentOptionsSchema = z.object({
     .array(
       z.object({
         label: z.string().min(1).max(40).describe("选项按钮文案，用户点它即作为下一条消息发出"),
-        detail: z.string().min(1).max(120).optional().describe("可选补充说明，显示在按钮下方"),
+        description: z.string().min(1).max(120).optional().describe("可选补充说明，显示在按钮下方"),
       }),
     )
     .min(2)
@@ -34,7 +34,7 @@ const presentOptionsJsonSchema = {
         type: "object",
         properties: {
           label: { type: "string", minLength: 1, description: "选项按钮文案，用户点它即作为下一条消息发出" },
-          detail: { type: "string", minLength: 1, description: "可选补充说明，显示在按钮下方" },
+          description: { type: "string", minLength: 1, description: "可选补充说明，显示在按钮下方" },
         },
         required: ["label"],
         additionalProperties: false,
