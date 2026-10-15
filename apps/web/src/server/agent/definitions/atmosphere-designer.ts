@@ -13,7 +13,7 @@ export const atmosphereDesigner = defineAgent({
   icon: "🌄",
   // 灵感卡 presets 为词典 key（chat.presets.<agentId>.<key>），/api/agents 按请求 locale 解析为文案。
   presets: ["autumnWood", "loungeScene", "beachPicnic"],
-  tools: ["generate_image"],
+  tools: ["generate_image", "present_options"],
   systemPrompt,
 });
 
