@@ -283,6 +283,10 @@
     "fileLink": "文件",
     "emptyPrompt": "选择 Agent 并描述你想要的商品/场景图。",
     "balance": "积分余额",
+    "options": {
+      "groupLabel": "候选选项",
+      "clickToSend": "点击选项即可发送；也可以继续在下方输入"
+    },
     "composer": {
       "attachLanding": "添加附件",
       "attachReference": "上传参考图",

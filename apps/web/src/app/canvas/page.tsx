@@ -834,6 +834,35 @@ function ChatPageInner() {
           break;
         }
         case "tool_end": {
+          // HITL 选项卡：present_options 结果映射为持久 options part（刷新后由 toUIMessage 恢复同构）；
+          // 移除本工具状态行，不进入下方画布占位卡结算。
+          if (event.name === "present_options") {
+            updateAssistant((parts) => {
+              const next = parts.filter((p) => !(p.type === "tool_status" && p.id === event.id));
+              const details = (event.details ?? {}) as { question?: unknown; options?: unknown };
+              const question = typeof details.question === "string" ? details.question : "";
+              const options = Array.isArray(details.options)
+                ? details.options.flatMap((o) => {
+                    const item = (o ?? {}) as { label?: unknown; description?: unknown };
+                    return typeof item.label === "string" && item.label
+                      ? [
+                          {
+                            label: item.label,
+                            ...(typeof item.description === "string" && item.description
+                              ? { description: item.description }
+                              : {}),
+                          },
+                        ]
+                      : [];
+                  })
+                : [];
+              if (question && options.length > 0 && !next.some((p) => p.type === "options")) {
+                next.push({ type: "options", question, options });
+              }
+              return next;
+            });
+            break;
+          }
           // 占位卡原位结算：成功换图、失败置失败卡（不在当前会话时由切回后的 deriveImages 重建）。
           if (currentIdRef.current === sessionId) {
             if (event.details?.url) {
@@ -952,6 +981,21 @@ function ChatPageInner() {
     }
   }
 
+  /**
+   * 文本直发（composer 发送与选项卡点击共用）：slot/busy 守卫 + runRound 收口。
+   * roundRefs 由调用方决定（composer 取画布选中；选项卡应答恒为无引用新方案）。
+   * 不清输入草稿——清草稿仅 composer 发送语义，选项点击不丢用户未完草稿。
+   */
+  async function sendText(text: string, roundRefs: string[] = []) {
+    const sessionId = currentId;
+    const slot = sessionId ? slots[sessionId] : undefined;
+    const trimmed = text.trim();
+    if (!sessionId || !slot || !trimmed || slot.busy) return;
+    // 手动发送接管对话流后，旧的直发衔接状态行（如残留错误）不再有信息量，一并清理。
+    setDirectSendStatus(null);
+    await runRound(sessionId, trimmed, roundRefs);
+  }
+
   async function send() {
     const sessionId = currentId;
     const slot = sessionId ? slots[sessionId] : undefined;
@@ -961,9 +1005,12 @@ function ChatPageInner() {
     const sel = selectedItem(canvas);
     const roundRefs = sel && sel.status === "image" ? [sel.assetId] : [];
     updateSlot(sessionId, (s) => ({ ...s, draft: "" }));
-    // 手动发送接管对话流后，旧的直发衔接状态行（如残留错误）不再有信息量，一并清理。
-    setDirectSendStatus(null);
-    await runRound(sessionId, text, roundRefs);
+    await sendText(text, roundRefs);
+  }
+
+  /** 选项卡点击应答：label 原样作为用户消息（无引用新方案）；busy 由 sendText 守卫。 */
+  function handlePickOption(label: string) {
+    void sendText(label);
   }
 
   /** 失败占位卡重试：以卡内保存的原始意图（prompt + 原引用）重新发起一轮。 */
@@ -1130,6 +1177,7 @@ function ChatPageInner() {
           messages={messages}
           onAgentChange={(id) => void handleAgentChange(id)}
           onInputChange={handleInputChange}
+          onPickOption={handlePickOption}
           onRemoveReference={() => dispatch({ type: "select", id: null })}
           onSelectAsset={handleFocusAsset}
           onSend={() => void send()}

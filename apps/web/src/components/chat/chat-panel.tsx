@@ -32,6 +32,8 @@ interface ChatPanelProps {
   /** 画布当前选中条目的 assetId（过渡联动：聊天缩略图高亮）。 */
   selectedAssetId?: string | null;
   onSelectAsset?: (assetId: string) => void;
+  /** 选项卡点击应答：label 作为下一条用户消息发送（busy 守卫在页面层 sendText）。 */
+  onPickOption?: (label: string) => void;
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
@@ -70,6 +72,7 @@ export function ChatPanel({
   messages,
   selectedAssetId,
   onSelectAsset,
+  onPickOption,
   input,
   onInputChange,
   onSend,
@@ -98,7 +101,9 @@ export function ChatPanel({
       />
       <MessageList
         agentIcon={agentIcon}
+        busy={busy}
         messages={messages}
+        onPickOption={onPickOption}
         onSelectAsset={onSelectAsset}
         selectedAssetId={selectedAssetId}
       />

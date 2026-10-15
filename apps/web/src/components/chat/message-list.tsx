@@ -22,6 +22,10 @@ interface MessageListProps {
   /** 当前会话所属 Agent 的头像 emoji（assistant 消息徽标）。 */
   agentIcon?: string;
   onSelectAsset?: (assetId: string) => void;
+  /** 选项卡点击应答（点击 label 即作为下一条用户消息发送）。 */
+  onPickOption?: (label: string) => void;
+  /** 会话进行中：选项按钮禁用（防重复应答）。 */
+  busy?: boolean;
 }
 
 function AgentAvatar({ icon }: { icon?: string }) {
@@ -85,6 +89,47 @@ function ToolStatusLine({ label }: { label: string }) {
 }
 
 /**
+ * HITL 选项卡：Agent 请求拍板的分支渲染为可点击 chips（风格对齐 composer 灵感卡）。
+ * 点击 label 即作为下一条用户消息发送；busy 中禁用（防重复应答）。
+ */
+function OptionCard({
+  question,
+  options,
+  onPick,
+  busy,
+}: {
+  question: string;
+  options: { label: string; description?: string }[];
+  onPick?: (label: string) => void;
+  busy?: boolean;
+}) {
+  const t = useTranslations("chat");
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/40 p-2.5"
+      data-testid="options-card"
+    >
+      <span className="text-xs text-muted-foreground">{question}</span>
+      <div aria-label={t("options.groupLabel")} className="flex flex-wrap gap-1.5" role="group">
+        {options.map((o) => (
+          <button
+            className="rounded-full border border-border bg-background px-3 py-1.5 text-left text-xs text-foreground transition-colors duration-200 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+            disabled={busy || !onPick}
+            key={o.label}
+            onClick={() => onPick?.(o.label)}
+            type="button"
+          >
+            {o.label}
+            {o.description ? <span className="ml-1 text-muted-foreground">{o.description}</span> : null}
+          </button>
+        ))}
+      </div>
+      <span className="text-[11px] text-muted-foreground/80">{t("options.clickToSend")}</span>
+    </div>
+  );
+}
+
+/**
  * 消息渲染：AI Elements Message 容器 + 角色头像 + 进行中反馈。
  * 图片 part 渲染为结果摘要 chip：点击把画布定位到对应条目并选中。
  */
@@ -93,6 +138,8 @@ export function MessageList({
   selectedAssetId,
   agentIcon,
   onSelectAsset,
+  onPickOption,
+  busy,
 }: MessageListProps) {
   const t = useTranslations("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -165,6 +212,16 @@ export function MessageList({
                       );
                     case "tool_status":
                       return <ToolStatusLine key={i} label={p.label} />;
+                    case "options":
+                      return (
+                        <OptionCard
+                          busy={busy}
+                          key={i}
+                          onPick={onPickOption}
+                          options={p.options}
+                          question={p.question}
+                        />
+                      );
                   }
                 })}
               </MessageContent>

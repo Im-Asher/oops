@@ -283,6 +283,10 @@
     "fileLink": "File",
     "emptyPrompt": "Pick an agent and describe the product or scene image you want.",
     "balance": "Credits balance",
+    "options": {
+      "groupLabel": "Options",
+      "clickToSend": "Click an option to send it, or keep typing below"
+    },
     "composer": {
       "attachLanding": "Add attachments",
       "attachReference": "Upload reference image",
