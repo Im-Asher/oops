@@ -54,7 +54,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图（`src/server/infra/render/`），进程内限并发，与生图共用执行器闸门 |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
-| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线） |
+| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（web 30 天 / 管理端 12 小时） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线）。管理端是另一套会话：`oops_admin_session` 不同名 + `ADMIN_AUTH_SECRET`（缺省回退 `AUTH_SECRET`），两侧互不相认 |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
@@ -331,9 +331,15 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 
 ### 7.1 管理面（admin console）
 
-独立应用 `apps/admin`（antd 栈，dev 端口 3001），与 web 共享同一 `oops_session`
-HMAC cookie；页面由 proxy 存在性检查 + layout `requireAdmin` 双层守卫。六张管理面：
+独立应用 `apps/admin`（antd 栈，dev 端口 3001），**自带登录页 `/login` 与独立的
+`oops_admin_session` 会话**（复用 `users` 表账号，`role=admin` 才发会话；web 端会话
+不被认，登录语义与部署形态无关）；页面由 proxy 存在性检查（无会话 → `/login`）+ layout
+`requireAdmin` 双层守卫。六张管理面：
 用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板。
+
+- **登录契约**：`POST /api/login` 同源校验 → 限频（10/60s）→ `authenticateAdmin`（密码 +
+  `role=admin` + `status=active`；失败一律"用户名或密码不正确"，不泄漏账号与角色）→
+  落 `auth.login` 审计 → 下发管理端会话 cookie。`role` 仍每请求判定：登录后被降级即 403。
 
 - **API 纪律**：每个 Route Handler 先 `requireAdmin`（401/403 结构化错误），输入 zod
   校验；**全部写操作 = 业务写入 + 同事务审计**（who / what / when / before / after），
@@ -343,7 +349,8 @@ HMAC cookie；页面由 proxy 存在性检查 + layout `requireAdmin` 双层守�
   写侧进程内代数 bump（admin 端写后本进程即时生效，web 端 ≤30s 收敛）；overlay
   读失败 fail-open 回落下层且失败结果不缓存。消费点：Agent 启停（web 侧过滤注册表）、
   模型启停、角色默认模型（main / summarizer）。
-- **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`user.status_change` / `invite.create` /
+- **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`auth.login`（管理员登录，覆盖面中
+  唯一的非写操作项）/ `user.status_change` / `invite.create` /
   `invite.revoke` / `credits.adjust` / `pricing.update` / `agent.toggle` / `model.config`
   （同时覆盖模型启停与角色默认模型）；审计可按动作 / 目标 / 操作者检索。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
