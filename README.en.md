@@ -22,8 +22,8 @@ Describe your needs, upload product assets, pick a design agent, and get product
 | 💭 **Why** | E-commerce imagery is slow and costly with human designers — agents turn "10 rounds of revisions" into "1 conversation" |
 | 👥 **Who** | E-commerce sellers / operators (no design background), and developers who want plug-and-play AI image agents |
 | 🕐 **When** | Bulk imagery before product launch, rapid poster iteration for campaigns, filling in scene shots, A/B variations |
-| 🌍 **Where** | In the browser (`/home` landing page + full-screen `/canvas` workbench); self-hosted (Node 22+ / Docker) |
-| 🛠️ **How** | `pnpm install` → `docker compose up -d` → configure `.env.local` → `pnpm db:migrate` → `pnpm dev` |
+| 🌍 **Where** | In the browser (public landing `/` + studio `/home` + full-screen `/canvas` workbench); self-hosted (Node 22+ / Docker) |
+| 🛠️ **How** | `pnpm install` → `docker compose up -d` → configure `apps/web/.env.local` → `pnpm db:migrate` → `pnpm dev` |
 | 💰 **How much** | Pay-as-you-go LLM + image APIs; in-process task limits (image gen ×2 / screenshot ×1–2), zero extra middleware cost |
 
 ---
@@ -71,7 +71,8 @@ Tasks run asynchronously (concurrency 2, 90s timeout per task) — close the pag
 ## 🌍 Where · Where does it run?
 
 - 🖥️ **Browser**: `http://localhost:3000`
-  - `/home` — landing page (creation composer + agent card entries)
+  - `/` — public marketing landing page (visible when signed out; signed-in visits redirect to `/home`)
+  - `/home` — studio home (creation composer + agent card entries)
   - `/canvas` — full-screen AI canvas workbench (floating chat panel + dotted canvas)
 - ☁️ **Deployment**: any host running Node.js 22+ (Chromium needed for screenshot rendering); requires Postgres + MinIO (S3-compatible), both provisioned by `docker-compose.yaml`
 
@@ -85,7 +86,7 @@ pnpm install
 docker compose up -d
 
 # 3️⃣ Configure environment (database / MinIO / LLM & image API keys)
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
 
 # 4️⃣ Initialize the database
 pnpm db:migrate

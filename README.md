@@ -22,8 +22,8 @@
 | 💭 **Why** 为什么 | 电商图片制作依赖设计师人力、周期长、成本高 —— 用 Agent 把"改稿十轮"变成"聊一轮" |
 | 👥 **Who** 给谁用 | 电商卖家 / 运营人员（无设计背景），以及想低门槛接入 AI 生图能力的开发者 |
 | 🕐 **When** 何时用 | 上架前批量出图、大促海报快速迭代、场景图补齐、单品多版本比稿 |
-| 🌍 **Where** 在哪用 | 浏览器访问（首页 `/home` + 全屏 AI 画布 `/canvas`）；自托管部署（Node 22+ / Docker） |
-| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `.env.local` → `pnpm db:migrate` → `pnpm dev` |
+| 🌍 **Where** 在哪用 | 浏览器访问（公开落地页 `/` + 工作台 `/home` + 全屏 AI 画布 `/canvas`）；自托管部署（Node 22+ / Docker） |
+| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `.env.local`（根共享层，对照 `.env.example`）→ `pnpm db:migrate` → `pnpm dev` |
 | 💰 **How much** 花多少 | LLM + 生图 API 按量计费；进程内任务限并发（生图 2 / 截图 1~2），无额外中间件成本 |
 
 ---
@@ -73,7 +73,8 @@
 ## 🌍 Where · 在哪用
 
 - 🖥️ **浏览器**：`http://localhost:3000`
-  - `/home` —— 落地页（创作输入 + Agent 卡片入口）
+  - `/` —— 公开营销落地页（未登录可见；已登录访问会直达 `/home`）
+  - `/home` —— 工作台首页（创作输入 + Agent 卡片入口）
   - `/canvas` —— 全屏 AI 画布工作台（悬浮聊天面板 + 点阵画布）
 - ☁️ **部署**：任意可运行 Node.js 22+ 的主机（截图渲染需 Chromium）；依赖 Postgres + MinIO（S3 兼容），`docker-compose.yaml` 一键拉起
 
@@ -87,7 +88,7 @@ pnpm install
 docker compose up -d
 
 # 3️⃣ 配置环境变量（数据库 / MinIO / LLM 与生图 API Key）
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
 
 # 4️⃣ 初始化数据库
 pnpm db:migrate
@@ -102,7 +103,8 @@ pnpm dev
 
 | 命令 | 用途 |
 | --- | --- |
-| `pnpm dev` | 开发服务器 |
+| `pnpm dev` | 开发服务器（web，端口 3000） |
+| `pnpm --filter @oops/admin dev` | 管理端开发服务器（端口 3001） |
 | `pnpm build` / `pnpm start` | 生产构建 / 启动 |
 | `pnpm lint` | ESLint（含分层边界检查） |
 | `pnpm typecheck` | TypeScript 严格检查 |

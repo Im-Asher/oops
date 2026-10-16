@@ -1,0 +1,93 @@
+name: Configuration / Environment Issue
+description: Trouble with env setup, Docker Compose, or deployment
+labels: [configuration]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when the app fails to start, connect, or call
+        external services (database, storage, model providers) due to setup.
+
+        > **Security reminder** — `.env*` files contain secrets that must never
+        > leave your machine:
+        > - Paste **key names only**, never values (`LLM_MAIN_MODEL` ✓, its value ✗).
+        > - Redact API keys, passwords, tokens, and connection strings from logs
+        >   before pasting (e.g. replace with `sk-***`).
+
+  - type: dropdown
+    id: env-layer
+    attributes:
+      label: Env layer involved
+      description: The project loads a shared root layer plus an app-level override layer.
+      options:
+        - Root `.env.local` (shared: DATABASE_URL, S3_*, AUTH_SECRET, LLM_*, RENDER_*, QWEN_*)
+        - "`apps/web/.env.local` (web-specific overrides)"
+        - "`apps/admin/.env.local` (admin-specific overrides)"
+        - Multiple layers / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - Local dev (`pnpm dev`) with Docker Compose Postgres
+        - Local dev without Docker
+        - Production build (`pnpm build && pnpm start`)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: config-keys
+    attributes:
+      label: Config keys involved
+      description: List the env key **names** only. Never paste values.
+      placeholder: |
+        LLM_PROVIDER
+        LLM_MAIN_MODEL
+        S3_ENDPOINT
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error output
+      description: |
+        Full terminal output or error message (redacted). If there is no error
+        output, describe the unexpected behavior instead.
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried
+      description: Steps and changes that did not resolve the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: |
+        - OS
+        - Node (`node -v`) and pnpm (`pnpm -v`)
+        - Docker / Docker Compose version, if used
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and found no duplicate.
+          required: true
+        - label: I only pasted key names (no values) and redacted all secrets from logs.
+          required: true
