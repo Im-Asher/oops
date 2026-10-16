@@ -61,6 +61,7 @@ describe("admin audit repo", () => {
 
   it("action and target type constant sets are complete", () => {
     expect([...ADMIN_AUDIT_ACTIONS]).toEqual([
+      "auth.login",
       "user.status_change",
       "invite.create",
       "invite.revoke",
