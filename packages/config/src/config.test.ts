@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAdminAuthConfig,
   getAuthConfig,
   getDbConfig,
   getImageConfig,
@@ -70,6 +71,45 @@ describe("getAuthConfig", () => {
 
   it("过短抛错", () => {
     expect(() => getAuthConfig({ AUTH_SECRET: "short" })).toThrow(/AUTH_SECRET/);
+  });
+});
+
+describe("getAdminAuthConfig", () => {
+  const AUTH = { AUTH_SECRET: "x".repeat(32) };
+
+  it("未配 ADMIN_AUTH_SECRET 时回退 AUTH_SECRET，并给出默认有效期与路径", () => {
+    expect(getAdminAuthConfig(AUTH)).toEqual({
+      adminAuthSecret: "x".repeat(32),
+      adminSessionMaxAgeSeconds: 43200,
+      adminCookiePath: "/",
+    });
+  });
+
+  it("显式配置覆盖全部三项", () => {
+    expect(
+      getAdminAuthConfig({
+        ...AUTH,
+        ADMIN_AUTH_SECRET: "y".repeat(32),
+        ADMIN_SESSION_MAX_AGE_SECONDS: "3600",
+        ADMIN_COOKIE_PATH: "/admin",
+      }),
+    ).toEqual({
+      adminAuthSecret: "y".repeat(32),
+      adminSessionMaxAgeSeconds: 3600,
+      adminCookiePath: "/admin",
+    });
+  });
+
+  it("ADMIN_AUTH_SECRET 过短抛错", () => {
+    expect(() => getAdminAuthConfig({ ...AUTH, ADMIN_AUTH_SECRET: "short" })).toThrow(
+      /ADMIN_AUTH_SECRET/,
+    );
+  });
+
+  it("ADMIN_SESSION_MAX_AGE_SECONDS 非正整数抛错", () => {
+    expect(() =>
+      getAdminAuthConfig({ ...AUTH, ADMIN_SESSION_MAX_AGE_SECONDS: "0" }),
+    ).toThrow();
   });
 });
 

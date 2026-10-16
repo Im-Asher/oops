@@ -35,6 +35,22 @@ const webShape = {
   WEB_APP_URL: z.string().url("WEB_APP_URL 必须是完整 URL").optional(),
 };
 
+/**
+ * 管理端会话域（add-admin-login design D2/D3/D8）：
+ * 会话 cookie 与 web 端不同名且密钥独立；未配 ADMIN_AUTH_SECRET 时回退 AUTH_SECRET，
+ * 保证单实例开发环境开箱可用，生产单独配置即可隔离两侧失陷面。
+ */
+const adminAuthShape = {
+  ADMIN_AUTH_SECRET: z
+    .string()
+    .min(32, "ADMIN_AUTH_SECRET 需至少 32 字符（生成：openssl rand -base64 32）")
+    .optional(),
+  // 管理端是高权限面：默认远短于 web 端 30 天，且不滑动
+  ADMIN_SESSION_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(43200),
+  // 同域子路径部署（如 /admin）时限定 cookie Path，避免管理端会话被发往 web 路由
+  ADMIN_COOKIE_PATH: z.string().min(1).default("/"),
+};
+
 /** S3 兼容对象存储域（全部后端专属，缺失即存储子系统不可用）。 */
 const s3Shape = {
   S3_ENDPOINT: z.string().url("S3_ENDPOINT 必须是完整 URL"),
@@ -100,6 +116,7 @@ const renderShape = {
 
 const coreSchema = z.object(coreShape);
 const authSchema = z.object(authShape);
+const adminAuthSchema = z.object(adminAuthShape);
 const webSchema = z.object(webShape);
 const s3Schema = z.object(s3Shape);
 const llmSchema = z.object(llmShape);
@@ -109,6 +126,7 @@ const renderSchema = z.object(renderShape);
 const envSchema = z.object({
   ...coreShape,
   ...authShape,
+  ...adminAuthShape,
   ...webShape,
   ...s3Shape,
   ...llmShape,
@@ -145,6 +163,28 @@ export interface AuthConfig {
 export function getAuthConfig(env: Env = process.env): AuthConfig {
   const v = authSchema.parse(env);
   return { authSecret: v.AUTH_SECRET };
+}
+
+export interface AdminAuthConfig {
+  /** 管理端会话签名密钥；未单独配置时回退 AUTH_SECRET */
+  adminAuthSecret: string;
+  /** 管理端会话有效期（秒），默认 12 小时 */
+  adminSessionMaxAgeSeconds: number;
+  /** 管理端会话 cookie 的 Path，默认 / */
+  adminCookiePath: string;
+}
+
+/**
+ * 管理端会话域（ADMIN_AUTH_SECRET / ADMIN_SESSION_MAX_AGE_SECONDS / ADMIN_COOKIE_PATH）。
+ * 密钥回退到 AUTH_SECRET 是刻意的：开发环境无需多配一个变量即可启动管理端。
+ */
+export function getAdminAuthConfig(env: Env = process.env): AdminAuthConfig {
+  const v = adminAuthSchema.parse(env);
+  return {
+    adminAuthSecret: v.ADMIN_AUTH_SECRET ?? getAuthConfig(env).authSecret,
+    adminSessionMaxAgeSeconds: v.ADMIN_SESSION_MAX_AGE_SECONDS,
+    adminCookiePath: v.ADMIN_COOKIE_PATH,
+  };
 }
 
 export interface WebAppConfig {

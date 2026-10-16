@@ -1,4 +1,5 @@
 export * from "./authenticate";
+export * from "./authenticate-admin";
 export * from "./oops-id";
 export * from "./password";
 export * from "./rate-limit";
