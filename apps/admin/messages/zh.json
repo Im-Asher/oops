@@ -2,13 +2,20 @@
   "common": {
     "appTitle": "Oops Admin",
     "logout": "退出登录",
-    "gate": {
-      "title": "需要先登录",
-      "body": "管理端与 web 端共用同一登录会话。请先在 web 端（localhost:3000）登录管理员账号，再回到这里刷新即可进入。"
+    "login": {
+      "title": "管理端登录",
+      "subtitle": "请使用管理员账号登录管理端",
+      "username": "用户名",
+      "password": "密码",
+      "usernamePlaceholder": "请输入用户名",
+      "passwordPlaceholder": "请输入密码",
+      "submit": "登录",
+      "required": "请输入用户名和密码",
+      "failed": "登录失败，请重试"
     },
     "guard": {
       "expiredTitle": "会话已失效",
-      "expiredBody": "登录状态已过期或账号状态有变化。请从 web 端（localhost:3000）重新登录，再回到管理端刷新即可。",
+      "expiredBody": "登录状态已过期或账号状态有变化，请重新登录。",
       "forbiddenTitle": "无管理员权限",
       "forbiddenBody": "当前账号不是管理员。如需访问管理端，请由管理员授予 admin 角色后再试。"
     },
