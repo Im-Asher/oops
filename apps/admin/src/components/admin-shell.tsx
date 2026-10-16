@@ -4,7 +4,7 @@
 // 必须为 client 组件：Menu 选中态/路由跳转需浏览器交互；antd 复合组件
 // 静态属性在 RSC client-reference proxy 上不可访问（1.2 spike 纪律）。
 import type { ReactNode } from "react";
-import { ConfigProvider, Button, Layout, Menu } from "antd";
+import { App, ConfigProvider, Button, Layout, Menu } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
@@ -74,7 +74,11 @@ export default function AdminShell({
             </Button>
           </form>
         </Header>
-        <Content style={{ padding: 24 }}>{children}</Content>
+        {/* App 提供 message/notification/modal 的上下文实例：视图一律用 App.useApp()
+            取 message，静态方法拿不到主题与上下文（antd 控制台告警） */}
+        <Content style={{ padding: 24 }}>
+          <App>{children}</App>
+        </Content>
       </Layout>
       </Layout>
     </ConfigProvider>

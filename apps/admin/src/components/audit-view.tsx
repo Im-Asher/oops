@@ -180,7 +180,7 @@ export default function AuditView() {
         <Button onClick={resetFilters}>{t("reset")}</Button>
       </Space>
 
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
 
       <Table<AuditRow>
         rowKey="id"
