@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // 路由级测试：mock 认证/仓储/存储/事务，验证收藏、覆盖式标签、彻底删除与越权语义。
 const h = vi.hoisted(() => ({
   userId: null as string | null,
-  ownedRow: undefined as { id: string; title: string | null; savedAt: Date | null } | undefined,
+  ownedRow: undefined as
+    | { id: string; title: string | null; savedAt: Date | null; storageKey?: string; mimeType?: string; width?: number | null; height?: number | null; kind?: string }
+    | undefined,
   ownedKey: undefined as string | undefined,
   setSavedArgs: [] as unknown[],
   removedAssetId: null as string | null,
@@ -13,6 +15,7 @@ const h = vi.hoisted(() => ({
   clearCalls: [] as string[],
   linkCalls: [] as { assetId: string; tagIds: string[] }[],
   createdTags: [] as string[],
+  tagRows: [] as { assetId: string; tagId: string; name: string }[],
   txError: null as Error | null,
 }));
 
@@ -62,6 +65,7 @@ vi.mock("@oops/db/tag.repo", async (importOriginal) => {
       clearForAsset: vi.fn(async (assetId: string) => {
         h.clearCalls.push(assetId);
       }),
+      listByAssetIds: vi.fn(async () => h.tagRows),
       linkTags: vi.fn(async (assetId: string, tagIds: string[]) => {
         h.linkCalls.push({ assetId, tagIds });
       }),
@@ -79,7 +83,7 @@ vi.mock("@/server/infra/storage/s3", () => ({
   }),
 }));
 
-import { DELETE, PATCH } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 
 function patchReq(body: unknown): Request {
   return new Request("http://localhost/api/assets/a1", {
@@ -93,7 +97,54 @@ function delReq(): Request {
   return new Request("http://localhost/api/assets/a1", { method: "DELETE" });
 }
 
+function getReq(): Request {
+  return new Request("http://localhost/api/assets/a1");
+}
+
 const ctx = { params: Promise.resolve({ id: "a1" }) };
+
+describe("GET /api/assets/[id]", () => {
+  beforeEach(() => {
+    h.userId = "u1";
+    h.ownedRow = {
+      id: "a1",
+      title: "618主图",
+      savedAt: new Date("2026-10-17T10:00:00Z"),
+      storageKey: "assets/a.png",
+      mimeType: "image/png",
+      width: 1024,
+      height: 768,
+      kind: "image",
+    };
+    h.tagRows = [{ assetId: "a1", tagId: "t1", name: "海报" }];
+  });
+
+  it("未认证返回 401", async () => {
+    h.userId = null;
+    const res = await GET(getReq(), ctx);
+    expect(res.status).toBe(401);
+  });
+
+  it("他人资产返回 404（不泄露存在性）", async () => {
+    h.ownedRow = undefined;
+    const res = await GET(getReq(), ctx);
+    expect(res.status).toBe(404);
+  });
+
+  it("返回可访问地址与元信息（画布转交设计据此换址）", async () => {
+    const res = await GET(getReq(), ctx);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { item: Record<string, unknown> };
+    expect(body.item).toMatchObject({
+      id: "a1",
+      url: "/files/assets/a.png",
+      width: 1024,
+      height: 768,
+      title: "618主图",
+      tags: [{ tagId: "t1", name: "海报" }],
+    });
+  });
+});
 
 describe("PATCH /api/assets/[id]", () => {
   beforeEach(() => {
