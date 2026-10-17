@@ -29,7 +29,8 @@ Key characteristics:
   exceeds ~30k tokens (char-approx), older turns are compacted into a skeleton
   LLM summary (`sessions.summary` + `summarized_up_to` watermark, originals
   never deleted). Thinking blocks and base64 images are never persisted.
-- **Portfolio** — a cross-session gallery at `/portfolio`. An entry *is* the original
+- **Portfolio** — a cross-session gallery shown as a view inside `/home`'s main
+  area (sidebar switches views; there is no standalone `/portfolio` route). An entry *is* the original
   asset, tagged via `assets.savedAt` (null = not collected) — never a copy, so
   collection costs no extra storage. Side effect: session delete
   (`DELETE /api/sessions/:id`) must skip collected assets
