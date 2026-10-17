@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db as defaultDb } from ".";
+import type { DbClient } from "./credit-ledger.repo";
 import { assetTags, assets, sessions, type Asset } from "./schema";
 
 export interface AssetInput {
@@ -60,11 +61,11 @@ export interface AssetRepo {
   listSaved(userId: string, options?: ListSavedOptions): Promise<SavedAssetItem[]>;
   /** 收藏态判断；非本人资产一律undefined（不泄露存在性）。 */
   getSaved(id: string, userId: string): Promise<Asset | undefined>;
-  /** 收藏/取消收藏 + 可选改标题。幂等。 */
+  /** 收藏/取消收藏 + 可选改标题。幂等；省略的字段不参与 SET。 */
   setSaved(
     id: string,
     userId: string,
-    update: { savedAt: Date | null; title?: string | null },
+    update: { savedAt?: Date | null; title?: string | null },
   ): Promise<Asset | undefined>;
   /** 取本人资产的 storageKey 供调用方删字节；非本人返回 undefined。 */
   getOwnedKey(id: string, userId: string): Promise<string | undefined>;
@@ -78,7 +79,7 @@ export interface AssetRepo {
   removeUnsavedBySession(sessionId: string): Promise<void>;
 }
 
-export function createAssetRepo(db: typeof defaultDb = defaultDb): AssetRepo {
+export function createAssetRepo(db: DbClient = defaultDb): AssetRepo {
   return {
     async create(input) {
       const [row] = await db
@@ -182,7 +183,9 @@ export function createAssetRepo(db: typeof defaultDb = defaultDb): AssetRepo {
     },
 
     async setSaved(id, userId, update) {
-      const patch: Partial<typeof assets.$inferInsert> = { savedAt: update.savedAt };
+      // 只把显式给出的字段放进 SET：省略 savedAt 时不能覆盖既有收藏态
+      const patch: Partial<typeof assets.$inferInsert> = {};
+      if (update.savedAt !== undefined) patch.savedAt = update.savedAt;
       if (update.title !== undefined) patch.title = update.title;
       const rows = await db
         .update(assets)

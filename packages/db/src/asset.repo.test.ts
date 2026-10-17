@@ -160,6 +160,14 @@ describe("asset repo", () => {
       expect(mock.state.lastSet).toEqual({ savedAt: null });
     });
 
+    it("setSaved leaves savedAt untouched when only the title changes", async () => {
+      const mock = makeMockDb({ pendingSet: { title: "主图" } });
+      const repo = createAssetRepo(mock.db);
+      await repo.setSaved("a1", "u1", { title: "主图" });
+      // 不带 savedAt 键：改标题不应影响收藏态（否则收藏项会被静默移出作品集）
+      expect(mock.state.lastSet).toEqual({ title: "主图" });
+    });
+
     it("getOwnedKey returns the key only for the owner", async () => {
       const mock = makeMockDb({ selectResult: [{ storageKey: "assets/a.png" }] });
       const repo = createAssetRepo(mock.db);

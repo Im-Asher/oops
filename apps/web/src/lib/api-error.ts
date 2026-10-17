@@ -33,6 +33,7 @@ const CODE_KEYS = {
   TOO_LARGE: "tooLarge",
   UNSUPPORTED_TYPE: "unsupportedType",
   INSUFFICIENT_CREDITS: "insufficientCredits",
+  ASSET_DELETE_FAILED: "assetDeleteFailed",
 } as const satisfies Record<string, keyof Messages["common"]["apiErrors"]>;
 
 export type ApiErrorCode = keyof typeof CODE_KEYS;

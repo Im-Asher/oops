@@ -21,7 +21,8 @@
       "invalidAgent": "Agent 不存在",
       "invalidReference": "引用的图片不存在或无权使用",
       "tooLarge": "文件过大",
-      "unsupportedType": "不支持的文件类型"
+      "unsupportedType": "不支持的文件类型",
+      "assetDeleteFailed": "图片删除失败，请稍后重试"
     },
     "localeToggle": {
       "label": "切换语言"
