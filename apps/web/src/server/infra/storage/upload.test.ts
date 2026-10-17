@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   handleDerivedUpload,
+  handleDesignUpload,
   handleReferenceUpload,
   handleUpload,
   validateUpload,
@@ -137,6 +138,59 @@ describe("handleReferenceUpload", () => {
       deps as never,
     );
     expect(res.status).toBe(413);
+    expect(createAsset).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleDesignUpload", () => {
+  it("落库为无会话归属的 kind=image 资产，记录宽高与 purpose，不追加聊天消息", async () => {
+    const { deps, createAsset, createMessage } = mockDeps();
+    const res = await handleDesignUpload(
+      { bytes: new Uint8Array([1, 2, 3]), type: "image/png", name: "d.png", width: 1080, height: 1440, userId: "u1" },
+      deps,
+    );
+    expect(res.status).toBe(201);
+    const assetArg = createAsset.mock.calls[0]?.[0] as {
+      kind: string;
+      sessionId?: string;
+      userId: string;
+      width?: number;
+      height?: number;
+      meta: Record<string, unknown>;
+    };
+    expect(assetArg.kind).toBe("image");
+    // 创建设计没有会话概念：不得伪造 sessionId
+    expect(assetArg.sessionId).toBeUndefined();
+    expect(assetArg.userId).toBe("u1");
+    expect(assetArg.width).toBe(1080);
+    expect(assetArg.height).toBe(1440);
+    expect(assetArg.meta.purpose).toBe("design");
+    // 作品集不写会话消息，成果只进作品集
+    expect(createMessage).not.toHaveBeenCalled();
+    const body = (await res.json()) as { url: string; assetId: string };
+    expect(body.assetId).toBe("asset-1");
+    expect(body.url).toMatch(/^\/files\//);
+  });
+
+  it("拒绝非图片类型（复用同一套校验），不产生存储对象与资产行", async () => {
+    const { deps, putObject, createAsset } = mockDeps();
+    const res = await handleDesignUpload(
+      { bytes: new Uint8Array([1]), type: "text/plain", userId: "u1" },
+      deps,
+    );
+    expect(res.status).toBe(415);
+    expect(putObject).not.toHaveBeenCalled();
+    expect(createAsset).not.toHaveBeenCalled();
+  });
+
+  it("拒绝超限文件，不产生存储对象与资产行", async () => {
+    const { deps, putObject, createAsset } = mockDeps();
+    const res = await handleDesignUpload(
+      { bytes: new Uint8Array(11 * 1024 * 1024), type: "image/png", userId: "u1" },
+      deps,
+    );
+    expect(res.status).toBe(413);
+    expect(putObject).not.toHaveBeenCalled();
     expect(createAsset).not.toHaveBeenCalled();
   });
 });

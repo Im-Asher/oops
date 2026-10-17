@@ -70,6 +70,45 @@ export async function handleUpload(
   );
 }
 
+export interface DesignUploadInput extends UploadInput {
+  /** 设计稿的逻辑尺寸，作为资产宽高入库（作品集网格据此算宽高比）。 */
+  width?: number;
+  height?: number;
+}
+
+/**
+ * 处理创建设计的导出成果：复用同一套 MIME/大小校验，落库为**无会话归属**的
+ * kind=image 资产（创建设计没有会话概念），不追加任何聊天消息——成果只进作品集。
+ * 与 handleUpload 的区别仅在于携带宽高与 purpose 标记。
+ */
+export async function handleDesignUpload(
+  input: DesignUploadInput,
+  deps: UploadDeps,
+): Promise<Response> {
+  const rejection = validateUpload(input.type, input.bytes.length);
+  if (rejection) {
+    const status = rejection.code === "UNSUPPORTED_TYPE" ? 415 : 413;
+    return Response.json({ error: rejection }, { status });
+  }
+
+  const key = generateAssetKey(extFromMime(input.type));
+  await deps.storage.putObject(key, input.bytes, input.type);
+  const asset = await deps.assets.create({
+    storageKey: key,
+    mimeType: input.type,
+    kind: "image",
+    width: input.width,
+    height: input.height,
+    meta: {
+      purpose: "design",
+      ...(input.name ? { originalName: input.name } : {}),
+    },
+    userId: input.userId,
+  });
+
+  return Response.json({ url: `/files/${key}`, assetId: asset.id }, { status: 201 });
+}
+
 export interface ReferenceUploadInput extends UploadInput {
   sessionId: string;
 }
