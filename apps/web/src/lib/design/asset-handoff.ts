@@ -4,7 +4,7 @@
  * 任意外部图片源（design.md D7）。以新增图层落地，既有元素不动，可撤销。
  */
 import { newElementId, type ImageElement } from "@/lib/design/doc";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /** 图层最大占画布的比例——避免大图铺满后无法操作其他元素。 */
 const MAX_RATIO = 0.8;
@@ -61,14 +61,25 @@ interface AssetDetail {
  * 读取 ?assetId= 拉取资产并作为图层插入。
  * - 资产不存在（404）：提示且设计稿保持不变，不出现空白稿
  *
- * 去重靠依赖数组而非 ref 守卫：StrictMode 下 effect 会双跑（mount → cleanup →
- * 再次 mount），ref 守卫会让第二次直接返回，而第一次的请求已被 cancelled，
- * 结果是图层永不插入。请求自带 cancelled 标志，重复的那次安全作废。
+ * 两种重复插入要分别防住，两者机制不同：
+ *
+ * 1. StrictMode 双跑（同一挂载周期内 effect 跑两次）。
+ *    只靠 cancelled 标志不够：两次 effect 各持独立的 cancelled，先发起的那次
+ *    被 cleanup 置为 true 会安全作废，但后发起的那次正常插入 —— 单靠它其实够用，
+ *    问题在于若两次都在各自cleanup 前返回，就会插入两份。故用 insertedRef 记录
+ *    「本次挂载已处理过哪个 assetId」，第二次直接跳过。
+ *
+ * 2. 草稿恢复（刷新页面）。设计稿持久化在 localStorage，上次插入的图层还在，
+ *    而 URL 里的 assetId 没变，effect 会再跑一次并再插一份。用 shouldInsert
+ *    让调用方按当前稿件内容判断。
+ *
+ * insertedRef 只记「本次挂载」，刷新后是新 ref，因此第2 种仍需shouldInsert。
  */
 export function useAssetHandoff({
   assetId,
   canvasSize,
   getViewportCenter,
+  shouldInsert,
   onInsert,
   onMissing,
 }: {
@@ -79,11 +90,17 @@ export function useAssetHandoff({
    * 渲染期取到的会是 0。图层落下时现调。
    */
   getViewportCenter: () => { x: number; y: number };
+  /** 调用方按当前稿件内容判断是否还该插入（用于草稿恢复去重）。 */
+  shouldInsert: (element: ImageElement) => boolean;
   onInsert: (element: ImageElement) => void;
   onMissing: () => void;
 }): void {
+  const insertedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!assetId) return;
+    // 本次挂载已处理过：StrictMode 的第二次运行，或同一 assetId 的重复 effect
+    if (insertedRef.current === assetId) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -99,17 +116,18 @@ export function useAssetHandoff({
           onMissing();
           return;
         }
-        onInsert(
-          assetImageElement(
-            {
-              id: body.item.id,
-              url: body.item.url,
-              width: body.item.width,
-              height: body.item.height,
-            },
-            { ...canvasSize, center: getViewportCenter() },
-          ),
+        const element = assetImageElement(
+          {
+            id: body.item.id,
+            url: body.item.url,
+            width: body.item.width,
+            height: body.item.height,
+          },
+          { ...canvasSize, center: getViewportCenter() },
         );
+        if (!shouldInsert(element)) return;
+        insertedRef.current = assetId;
+        onInsert(element);
       } catch {
         if (!cancelled) onMissing();
       }

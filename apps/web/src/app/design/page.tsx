@@ -164,6 +164,12 @@ function DesignPageInner() {
         state.view,
       );
     },
+    // 草稿持久化在 localStorage：刷新后 URL 的 assetId 未变但稿件里已有该图，
+    // 不去重会每次刷新都多插一层。
+    shouldInsert: (element) =>
+      !state.doc.elements.some(
+        (el) => el.type === "image" && el.src === element.src,
+      ),
     onInsert: (element) => dispatch({ type: "addElements", elements: [element], select: true }),
     onMissing: () => setHandoffError(true),
   });
