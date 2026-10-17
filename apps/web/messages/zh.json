@@ -511,7 +511,11 @@
       "draftSaving": "保存中…",
       "draftSaved": "草稿已保存",
       "download": "下载 PNG",
-      "downloadError": "导出失败，请重试"
+      "downloadError": "导出失败，请重试",
+      "saveToPortfolio": "同时存入作品集",
+      "savedToPortfolio": "已存入作品集",
+      "saveFailed": "已下载，但存入作品集失败",
+      "handoffMissing": "该图片已不可用"
     },
     "rightPanel": {
       "canvasTitle": "画布",

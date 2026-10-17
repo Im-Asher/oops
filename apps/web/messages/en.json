@@ -511,7 +511,11 @@
       "draftSaving": "Saving…",
       "draftSaved": "Draft saved",
       "download": "Download PNG",
-      "downloadError": "Export failed, please try again"
+      "downloadError": "Export failed, please try again",
+      "saveToPortfolio": "Also save to portfolio",
+      "savedToPortfolio": "Saved to portfolio",
+      "saveFailed": "Downloaded, but failed to save to portfolio",
+      "handoffMissing": "This image is no longer available"
     },
     "rightPanel": {
       "canvasTitle": "Canvas",

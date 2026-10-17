@@ -17,6 +17,8 @@ import { DesignTemplatePanel } from "@/components/design/design-template-panel";
 import { DesignRightPanel } from "@/components/design/design-right-panel";
 import { DesignTextPanel } from "@/components/design/design-text-panel";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/design/draft-storage";
+import { useAssetHandoff } from "@/lib/design/asset-handoff";
+import { uploadDesignToPortfolio } from "@/lib/design/portfolio-upload";
 import { downloadBlob, exportDesignToBlob } from "@/lib/design/export-design";
 import { createEmptyDoc, newElementId, type DesignDoc, type DesignElement } from "@/lib/design/doc";
 import { createDesignState, designReducer, type DesignState } from "@/lib/design/design-reducer";
@@ -76,6 +78,12 @@ function DesignPageInner() {
   /** 画布 surface：导出截图目标（布局尺寸 = doc 尺寸，视口缩放不影响输出）。 */
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [exportError, setExportError] = useState(false);
+  /** 转交资产不可用（已删或非本人）：内联提示，设计稿不受影响。 */
+  const [handoffError, setHandoffError] = useState(false);
+  /** 导出时勾选「同时存入作品集」。 */
+  const [saveToPortfolio, setSaveToPortfolio] = useState(false);
+  /** 入库失败（下载已完成）：提示用户图片没进作品集。 */
+  const [saveError, setSaveError] = useState(false);
 
   // 草稿自动保存：doc 引用变化才排程（首渲染不保存），debounce 合并连续编辑。
   useEffect(() => {
@@ -99,14 +107,24 @@ function DesignPageInner() {
   );
 
   // 导出：清选中排除手柄后再截图（一次撤销语义不受影响），失败就地提示。
+  // 勾选「同时存入作品集」时额外走一次上传；上传失败只提示，下载照常完成
+  // ——下载是用户首要意图，入库是附加动作，绝不能因入库失败而拿不到图。
   const handleDownload = async () => {
     const node = surfaceRef.current;
     if (!node) return;
     setExportError(false);
+    setSaveError(false);
     dispatch({ type: "clearSelection" });
     try {
       const blob = await exportDesignToBlob(node, { width: state.doc.width, height: state.doc.height });
       downloadBlob(blob, `design-${state.doc.width}x${state.doc.height}.png`);
+      if (saveToPortfolio) {
+        try {
+          await uploadDesignToPortfolio(blob, state.doc.width, state.doc.height);
+        } catch {
+          setSaveError(true);
+        }
+      }
     } catch {
       setExportError(true);
     }
@@ -130,6 +148,25 @@ function DesignPageInner() {
     const placed = centerFragmentAt(elements, center);
     if (placed.length > 0) dispatch({ type: "addElements", elements: placed, select: true });
   };
+
+  /**
+   * 画布/作品集转交：?assetId= 命中则以新增图层落地，既有元素不动、可撤销。
+   * 视口中心在插入瞬间才量取（canvasAreaRef 在首帧后才有尺寸），不能放在渲染期算。
+   */
+  const handoffAssetId = params.get("assetId");
+  useAssetHandoff({
+    assetId: handoffAssetId,
+    canvasSize: { width: state.doc.width, height: state.doc.height },
+    getViewportCenter: () => {
+      const rect = canvasAreaRef.current?.getBoundingClientRect();
+      return viewportCenterToCanvas(
+        { width: rect?.width ?? 0, height: rect?.height ?? 0 },
+        state.view,
+      );
+    },
+    onInsert: (element) => dispatch({ type: "addElements", elements: [element], select: true }),
+    onMissing: () => setHandoffError(true),
+  });
 
   const handleSelectTextPreset = (preset: TextPreset) => {
     insertAtViewportCenter([textPresetElement(preset, tText(`presets.${preset.id}.sample`))]);
@@ -211,7 +248,29 @@ function DesignPageInner() {
           <DownloadIcon className="size-4" />
           {t("download")}
         </button>
+        {/* 入库是附加动作：勾选后导出同时把成果存进作品集 */}
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            checked={saveToPortfolio}
+            className="size-3.5 accent-[var(--brand-violet-500)]"
+            onChange={(e) => setSaveToPortfolio(e.target.checked)}
+            type="checkbox"
+          />
+          {t("saveToPortfolio")}
+        </label>
       </header>
+
+      {/* 内联提示：入库失败或转交资产不可用。均不阻断编辑与下载 */}
+      {saveError ? (
+        <p className="border-b border-border bg-amber-500/10 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-400" role="status">
+          {t("saveFailed")}
+        </p>
+      ) : null}
+      {handoffError ? (
+        <p className="border-b border-border bg-red-500/10 px-4 py-1.5 text-xs text-red-600 dark:text-red-400" role="status">
+          {t("handoffMissing")}
+        </p>
+      ) : null}
 
       {/* 左栏 rail + 面板 + 中央画布（右侧属性面板由 5.5 接入） */}
       <div className="flex min-h-0 flex-1">

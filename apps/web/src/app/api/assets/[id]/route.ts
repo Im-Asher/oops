@@ -30,6 +30,37 @@ const patchSchema = z
     message: "至少需要一个变更字段",
   });
 
+/**
+ * GET：单图详情。画布/作品集把assetId 转交创建设计时用它换地址——
+ * 传id 而非 url，服务端校验归属后才给地址，避免手改参数注入外链（design.md D7）。
+ */
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await requireUser(req);
+  if (!userId) {
+    return Response.json({ error: { code: "UNAUTHENTICATED", message: "请先登录" } }, { status: 401 });
+  }
+  const { id } = await params;
+  const asset = await createAssetRepo().getSaved(id, userId);
+  if (!asset) {
+    return Response.json({ error: { code: "NOT_FOUND", message: "图片不存在" } }, { status: 404 });
+  }
+  const tags = await createTagRepo().listByAssetIds([id]);
+  return Response.json({
+    item: {
+      id: asset.id,
+      url: `/files/${asset.storageKey}`,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      kind: asset.kind,
+      title: asset.title,
+      savedAt: asset.savedAt,
+      sessionId: asset.sessionId,
+      tags: tags.map((t) => ({ tagId: t.tagId, name: t.name })),
+    },
+  });
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const userId = await requireUser(req);
   if (!userId) {
