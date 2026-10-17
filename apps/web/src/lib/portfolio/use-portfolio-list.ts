@@ -32,6 +32,12 @@ export interface PortfolioItem {
 
 export type ListState = "loading" | "ready" | "error";
 
+/** 一页取数结果。 */
+interface PagedResult {
+  items: PortfolioItem[];
+  nextCursor: string | null;
+}
+
 export interface PortfolioList {
   items: PortfolioItem[];
   /** 全部已加载条目的标签并集，用于筛选 chip 行。 */
@@ -75,8 +81,14 @@ export function usePortfolioList(
   // 请求序号：丢弃过期响应，避免快速切标签时旧结果覆盖新结果
   const seqRef = useRef(0);
 
+  /**
+   * 取数逻辑放进 effect 而非 useCallback：调用方传的是内联箭头函数，
+   * 身份每渲染都变。若把它列入 fetchPage 依赖，则 load → reload → effect
+   * 每渲染都变，effect 反复重跑形成无限请求循环（页面持续闪烁）。
+   * 放进 effect 后 translate 的变化不会重跑取数——它只在出错时读一次文案。
+   */
   const fetchPage = useCallback(
-    async (cursor: string | null, tag: string | null) => {
+    async (cursor: string | null, tag: string | null): Promise<PagedResult | null> => {
       const seq = ++seqRef.current;
       const params = new URLSearchParams({ saved: "true", limit: String(PAGE_SIZE) });
       if (cursor) params.set("cursor", cursor);
@@ -93,12 +105,11 @@ export function usePortfolioList(
         setError(message);
         return null;
       }
-      return body as {
-        items: PortfolioItem[];
-        nextCursor: string | null;
-      };
+      return body as PagedResult;
     },
-    [translate],
+    // translate 仅用于出错文案，不影响取数结果，故不作为依赖（见上方说明）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const load = useCallback(

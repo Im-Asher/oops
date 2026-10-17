@@ -4,7 +4,7 @@
  * 任意外部图片源（design.md D7）。以新增图层落地，既有元素不动，可撤销。
  */
 import { newElementId, type ImageElement } from "@/lib/design/doc";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 /** 图层最大占画布的比例——避免大图铺满后无法操作其他元素。 */
 const MAX_RATIO = 0.8;
@@ -60,7 +60,10 @@ interface AssetDetail {
 /**
  * 读取 ?assetId= 拉取资产并作为图层插入。
  * - 资产不存在（404）：提示且设计稿保持不变，不出现空白稿
- * - 同一 assetId 只处理一次（ref 守卫），避免重复插入
+ *
+ * 去重靠依赖数组而非 ref 守卫：StrictMode 下 effect 会双跑（mount → cleanup →
+ * 再次 mount），ref 守卫会让第二次直接返回，而第一次的请求已被 cancelled，
+ * 结果是图层永不插入。请求自带 cancelled 标志，重复的那次安全作废。
  */
 export function useAssetHandoff({
   assetId,
@@ -79,11 +82,8 @@ export function useAssetHandoff({
   onInsert: (element: ImageElement) => void;
   onMissing: () => void;
 }): void {
-  const doneRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!assetId || doneRef.current === assetId) return;
-    doneRef.current = assetId;
+    if (!assetId) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -117,7 +117,8 @@ export function useAssetHandoff({
     return () => {
       cancelled = true;
     };
-    // 只在 assetId 变化时处理一次；尺寸/视口在插入瞬间取值即可
+    // 只在 assetId 变化时取一次；尺寸/视口在插入瞬间取值即可。
+    // 资产 id 变了才需要再插一张，同 id 重复渲染不重复插入。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetId]);
 }
