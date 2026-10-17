@@ -35,6 +35,8 @@ interface ChatPanelHeaderProps {
   /** 下拉内容（会话列表 + 用户区，由页面组装）。 */
   historyContent?: ReactNode;
   onCollapse?: () => void;
+  /** 是否展示积分徽标；宿主另有积分入口时关闭，避免同屏重复。默认展示。 */
+  showCredits?: boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export function ChatPanelHeader({
   onHistoryOpenChange,
   historyContent,
   onCollapse,
+  showCredits = true,
 }: ChatPanelHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -62,6 +65,8 @@ export function ChatPanelHeader({
   const title = sessionTitle || (canRename ? t("untitledSession") : t("noSessionSelected"));
 
   useEffect(() => {
+    // 宿主自呈积分时不再拉取 profile，避免同屏重复请求。
+    if (!showCredits) return;
     let cancelled = false;
     fetch("/api/profile")
       .then((r) => (r.ok ? r.json() : null))
@@ -74,7 +79,7 @@ export function ChatPanelHeader({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showCredits]);
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -143,15 +148,17 @@ export function ChatPanelHeader({
             <span className="shrink-0 rounded bg-brand-violet-500/20 px-1 py-0.5 text-[10px] font-medium text-brand-violet-600 dark:text-brand-violet-300">
               AI
             </span>
-            <span
-              aria-label={t("balance")}
-              className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
-              data-testid="credit-balance"
-              title={t("balance")}
-            >
-              <CoinsIcon className="size-3" />
-              {creditBalance ?? "—"}
-            </span>
+            {showCredits ? (
+              <span
+                aria-label={t("balance")}
+                className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+                data-testid="credit-balance"
+                title={t("balance")}
+              >
+                <CoinsIcon className="size-3" />
+                {creditBalance ?? "—"}
+              </span>
+            ) : null}
             <Button
               aria-label={t("renameSession")}
               className="size-6 text-muted-foreground hover:bg-accent hover:text-foreground"

@@ -320,10 +320,12 @@ export function DesignCanvas({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (drag.kind === "pan") {
+      // 基线取按下瞬间捕获的视图（drag.viewX/viewY），MUST NOT 用 viewRef——
+      // 它由 useEffect 从 state 回写，滞后于指针事件，会以过期基线重算导致回跳。
       dispatch({
         type: "setView",
         view: panView(
-          { scale: viewRef.current.scale, x: viewRef.current.x, y: viewRef.current.y },
+          { scale: drag.scale, x: drag.viewX, y: drag.viewY },
           event.clientX - drag.startX,
           event.clientY - drag.startY,
         ),

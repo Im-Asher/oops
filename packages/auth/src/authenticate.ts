@@ -10,14 +10,26 @@ export interface AuthSuccess {
   tokenVersion: number;
 }
 
+/**
+ * 角色门槛（管理端登录用）：要求 role 命中且账号 active。
+ * 缺省不加门槛——web 端登录的既有行为 MUST NOT 变化。
+ */
+export interface AuthenticateOptions {
+  requireRole?: "admin";
+}
+
 /** 登录验证：成功返回 userId 与会话版本；失败一律返回 null（统一文案由路由给出，不区分失败原因）。 */
 export async function authenticate(
   username: string,
   password: string,
+  options: AuthenticateOptions = {},
 ): Promise<AuthSuccess | null> {
   const user = await createUserRepo().findByUsername(username);
   const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
-  return user && ok
-    ? { userId: user.id, tokenVersion: user.tokenVersion }
-    : null;
+  if (!user || !ok) return null;
+  if (options.requireRole === "admin") {
+    // 角色与账号状态一并判定：被停用或被降级的管理员不能再登录
+    if (user.role !== "admin" || user.status !== "active") return null;
+  }
+  return { userId: user.id, tokenVersion: user.tokenVersion };
 }

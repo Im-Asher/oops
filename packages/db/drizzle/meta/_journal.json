@@ -64,6 +64,20 @@
       "when": 1791813185687,
       "tag": "0008_groovy_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792220960014,
+      "tag": "0009_lumpy_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792221616814,
+      "tag": "0010_gorgeous_radioactive_man",
+      "breakpoints": true
     }
   ]
 }

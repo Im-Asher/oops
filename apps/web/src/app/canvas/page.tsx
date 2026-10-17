@@ -1,13 +1,12 @@
 "use client";
 
+import { AppHeader } from "@/components/canvas/app-header";
 import { CanvasStage } from "@/components/canvas/canvas-stage";
-import { Button } from "@/components/ui/button";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { SessionSidebar } from "@/components/chat/session-sidebar";
-import { UserMenuContent } from "@/components/chat/user-menu";
 import { apiErrorMessage } from "@/lib/api-error";
 import { composeEditedImage } from "@/lib/canvas/export-canvas";
-import { DownloadIcon, MessageSquareIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   canvasReducer,
@@ -21,8 +20,9 @@ import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { hasPendingHandoff, takePendingHandoffFiles } from "@/lib/chat/home-handoff";
+import { useSavedStates } from "@/lib/portfolio/use-saved-states";
 
 /**
  * useSearchParams 需要客户端回退边界：静态预渲染期间由 Suspense 兜底。
@@ -58,6 +58,12 @@ function ChatPageInner() {
   const [exportError, setExportError] = useState<string | null>(null);
   // 工作台状态：聊天显隐（窄屏即聊天/画布切换）、会话抽屉。
   const [chatOpen, setChatOpen] = useState(true);
+  // 聊天面板宽度（仅 md+ 悬浮形态生效）：默认 340，最小 300，最大窗口宽度的 50%。
+  const DEFAULT_CHAT_WIDTH = 340;
+  const MIN_CHAT_WIDTH = 300;
+  const CHAT_WIDTH_KEY = "oops:chat-panel-width";
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const chatWidthRef = useRef(DEFAULT_CHAT_WIDTH);
   // 头部时钟下拉（会话列表 + 用户区）：受控开关与搜索词。
   const [historyOpen, setHistoryOpen] = useState(false);
   // 输入框外部聚焦信号：新建会话后带回聊天框（nonce 变化触发聚焦一次）。
@@ -74,6 +80,18 @@ function ChatPageInner() {
   const currentSlot = currentId ? slots[currentId] : undefined;
   const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
   const busy = currentSlot?.busy ?? false;
+
+  // 作品集收藏态：画布所有已结算图片的 assetId 一次批量查得（design.md D9）。
+  // 转交设计同样只传 assetId——服务端校验归属后才给 URL，避免外链注入（D7）。
+  const collectableAssetIds = canvas.items
+    .filter((item) => item.status === "image" && item.assetId)
+    .map((item) => item.assetId);
+  const { isSaved, toggle: toggleSaved } = useSavedStates(collectableAssetIds);
+  const router = useRouter();
+  const sendToDesign = useCallback((item: CanvasItem) => {
+    if (!item.assetId) return;
+    router.push(`/design?assetId=${encodeURIComponent(item.assetId)}`);
+  }, [router]);
 
   // SSE 回合内的画布事件按发起会话归档：仅当发起会话仍是当前会话才上画布，
   // 流中切会话不串图（槽内消息仍照常归档，切回时由 deriveImages 重建）。
@@ -372,12 +390,10 @@ function ChatPageInner() {
       if (bootstrappedRef.current) return;
       bootstrappedRef.current = true;
       const agentsOk = results[0].status === "fulfilled" ? results[0].value : undefined;
-      const list = results[1].status === "fulfilled" ? (results[1].value ?? []) : [];
-      // 有会话且非直发：切最近会话；直发衔接：建衔接会话（spec/canvas-workspace
-      // 「直发衔接进入」）；无会话且非直发：同样自动建会话——否则无 currentId 时
-      // 输入框不可用（画布进入即哑输入，spec/fix-canvas-entry-hitl-options）。
-      if (list[0] && !directSendRef.current) setCurrentId(list[0].id);
-      else void newChatRef.current(directSendRef.current ? undefined : agentsOk?.[0]?.id);
+      // 进入画布即开新会话（spec/fix-canvas-ux-polish「进入画布即开新会话」）：
+      // 非直发进入一律建会话，MUST NOT 自动打开历史会话——会话列表只用于填充时钟下拉。
+      // 直发衔接：建衔接会话（spec/canvas-workspace「直发衔接进入」），不经 Agent 缺省值。
+      void newChatRef.current(directSendRef.current ? undefined : agentsOk?.[0]?.id);
     });
   }, [loadSessions]);
 
@@ -1038,6 +1054,59 @@ function ChatPageInner() {
     void runRound(currentId, text, refs);
   }
 
+  // 聊天面板宽度偏好：挂载时从 localStorage 恢复（避免 SSR/hydration 不一致），
+  // 并钳制到当前窗口 50% 上限；窗口缩放时对已存宽度重新钳制，保证画布始终可见。
+  useEffect(() => {
+    const max = Math.floor(window.innerWidth / 2);
+    let initial = DEFAULT_CHAT_WIDTH;
+    try {
+      const stored = Number(localStorage.getItem(CHAT_WIDTH_KEY));
+      if (Number.isFinite(stored) && stored > 0) initial = stored;
+    } catch {
+      /* 无存储权限时回退默认 */
+    }
+    const clamped = Math.min(max, Math.max(MIN_CHAT_WIDTH, initial));
+    chatWidthRef.current = clamped;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 仅挂载时从本机存储恢复一次，非渲染期同步 setState
+    setChatWidth(clamped);
+    const onResize = () => {
+      const nextMax = Math.floor(window.innerWidth / 2);
+      setChatWidth((w) => {
+        const next = Math.min(nextMax, w);
+        chatWidthRef.current = next;
+        return next;
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  /** 拖拽手柄按下：捕获起点，窗口级监听 pointermove/up 实时改宽，松手落盘。 */
+  function startResize(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = chatWidthRef.current;
+    const onMove = (ev: PointerEvent) => {
+      const max = Math.floor(window.innerWidth / 2);
+      const next = Math.min(max, Math.max(MIN_CHAT_WIDTH, startW + (ev.clientX - startX)));
+      chatWidthRef.current = next;
+      setChatWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(CHAT_WIDTH_KEY, String(chatWidthRef.current));
+      } catch {
+        /* 无存储权限时忽略 */
+      }
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   const currentSession = sessions.find((s) => s.id === currentId);
   const sessionAgent =
     agents.find((a) => a.id === currentSession?.agentId) ??
@@ -1058,28 +1127,6 @@ function ChatPageInner() {
         className="absolute inset-0 motion-reduce:animate-none animate-in fade-in duration-500"
         ref={canvasWrapRef}
       >
-        {/* 画布右上全局件：真实保存状态 + 导出唯一入口（EditToolbar 不再重复） */}
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
-          <span
-            aria-live="polite"
-            className="rounded-full bg-popover/80 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur"
-          >
-            {saveStatus === "idle"
-              ? null
-              : saveStatus === "saving"
-                ? t("page.saving")
-                : t("page.savedLocal")}
-          </span>
-          <Button
-            className="h-8 gap-1.5 bg-primary px-3 text-xs hover:bg-primary/90"
-            disabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
-            onClick={() => void handleExport()}
-            size="sm"
-          >
-            <DownloadIcon />
-            {exporting ? t("page.exporting") : t("page.export")}
-          </Button>
-        </div>
         {/* 新结果提示：占位卡完成时结果不在视口内才浮出（在视口内静默），点击定位选中 */}
         {reveal ? (
           <button
@@ -1095,8 +1142,13 @@ function ChatPageInner() {
           dispatch={dispatch}
           exportError={exportError}
           focus={focus}
+          isSaved={isSaved}
           onRetryItem={retryItem}
           onResetEdits={handleResetEdits}
+          onToDesign={sendToDesign}
+          onToggleSaved={(item) => {
+            if (item.assetId) void toggleSaved(item.assetId);
+          }}
           state={canvas}
         />
         {/* 参考图上传失败：画布顶部内联提示，点按消失 */}
@@ -1124,11 +1176,24 @@ function ChatPageInner() {
         />
       </div>
 
-      {/* 聊天收起后的重开入口：画布左上悬浮 */}
+      {/* 悬浮顶栏：返回首页 + 画布全局件（保存状态/导出/积分/头像）。
+          <md 聊天面板为全屏切换层，顶栏让位以免与聊天头部叠压。 */}
+      <div className={chatOpen ? "hidden md:block" : undefined}>
+        <AppHeader
+          exportDisabled={!(dirty && selectedCanvasItem?.status === "image" && !!currentId) || exporting}
+          exportLabel={exporting ? t("page.exporting") : t("page.export")}
+          onExport={() => void handleExport()}
+          {...(saveStatus === "idle"
+            ? {}
+            : { saveLabel: saveStatus === "saving" ? t("page.saving") : t("page.savedLocal") })}
+        />
+      </div>
+
+      {/* 聊天收起后的重开入口：画布左上悬浮（顶栏之下，避免与返回首页撞位） */}
       {!chatOpen ? (
         <button
           aria-label={t("page.openChat")}
-          className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-full border border-border bg-popover/90 text-foreground shadow-lg hover:bg-accent"
+          className="absolute left-4 top-16 z-30 flex size-10 items-center justify-center rounded-full border border-border bg-popover/90 text-foreground shadow-lg hover:bg-accent"
           onClick={() => setChatOpen(true)}
           type="button"
         >
@@ -1142,11 +1207,23 @@ function ChatPageInner() {
       <div
         className={
           chatOpen
-            ? "absolute inset-0 z-40 flex motion-reduce:animate-none animate-in fade-in slide-in-from-left-4 zoom-in-[0.98] duration-300 ease-out md:inset-auto md:bottom-4 md:left-4 md:top-4 md:w-[340px] md:overflow-hidden md:rounded-xl md:border md:border-border/80 md:shadow-2xl md:shadow-black/40"
+            ? "absolute inset-0 z-40 flex motion-reduce:animate-none animate-in fade-in slide-in-from-left-4 zoom-in-[0.98] duration-300 ease-out md:inset-auto md:bottom-4 md:left-4 md:top-16 md:w-[var(--chat-width)] md:overflow-hidden md:rounded-xl md:border md:border-border/80 md:shadow-2xl md:shadow-black/40"
             : "hidden"
         }
         data-testid="chat-panel-container"
+        style={{ "--chat-width": `${chatWidth}px` } as React.CSSProperties}
       >
+        {/* 右侧拖拽手柄：仅 md+ 悬浮形态可缩放（窄屏全屏互斥形态不显示）。 */}
+        {chatOpen ? (
+          <div
+            aria-label={t("page.resizeChatPanel")}
+            aria-orientation="vertical"
+            className="absolute right-0 top-0 z-10 hidden h-full w-1.5 cursor-col-resize bg-transparent hover:bg-primary/20 md:block"
+            data-testid="chat-resize-handle"
+            onPointerDown={startResize}
+            role="separator"
+          />
+        ) : null}
         <ChatPanel
           agentIcon={sessionAgent?.icon}
           agentId={agentId}
@@ -1160,29 +1237,25 @@ function ChatPageInner() {
             if (currentId) void renameSession(currentId, title);
           }}
           historyContent={
-            <div className="flex h-[420px] flex-col overflow-hidden">
-              <div className="min-h-0 flex-1">
-                <SessionSidebar
-                  agents={agents}
-                  currentId={currentId}
-                  errorMessage={actionError}
-                  onDeleteSession={(id) => void deleteSession(id)}
-                  onCollapse={() => setHistoryOpen(false)}
-                  onNewChat={() => void newChat()}
-                  onQueryChange={setHistoryQuery}
-                  onRenameSession={(id, title) => void renameSession(id, title)}
-                  onSelectSession={(id) => {
-                    setHistoryOpen(false);
-                    void selectSession(id);
-                  }}
-                  query={historyQuery}
-                  sessions={sessions}
-                />
-              </div>
-              {/* 用户区：无会话空态下用户入口仍可达（时钟下拉常开） */}
-              <div className="shrink-0 border-t border-border bg-background p-1">
-                <UserMenuContent />
-              </div>
+            <div className="h-[420px] overflow-hidden">
+              {/* 会话下拉只承载会话操作：身份入口由画布悬浮顶栏头像承载
+                  （spec/session-management「会话列表」）。 */}
+              <SessionSidebar
+                agents={agents}
+                currentId={currentId}
+                errorMessage={actionError}
+                onDeleteSession={(id) => void deleteSession(id)}
+                onCollapse={() => setHistoryOpen(false)}
+                onNewChat={() => void newChat()}
+                onQueryChange={setHistoryQuery}
+                onRenameSession={(id, title) => void renameSession(id, title)}
+                onSelectSession={(id) => {
+                  setHistoryOpen(false);
+                  void selectSession(id);
+                }}
+                query={historyQuery}
+                sessions={sessions}
+              />
             </div>
           }
           historyOpen={historyOpen}
@@ -1199,6 +1272,8 @@ function ChatPageInner() {
           onStop={stopGeneration}
           reference={composerReference}
           selectedAssetId={selectedCanvasItem?.assetId ?? null}
+          // 画布页积分由悬浮顶栏统一呈现，面板头部不再重复（spec「AI 画布页布局」）。
+          showCredits={false}
           creditsExhausted={creditsExhausted}
           statusLine={directSendStatus ?? (creditGateError ? { text: creditGateError, tone: "error" as const } : null)}
           sessionTitle={sessions.find((s) => s.id === currentId)?.title ?? ""}

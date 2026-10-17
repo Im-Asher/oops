@@ -151,3 +151,5 @@ openspec
 .vercel
 next-env.d.ts
 .playwright-cli/
+
+.trees/

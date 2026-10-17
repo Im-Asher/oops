@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   userId: null as string | null,
   sessionExists: true,
-  calls: { reference: 0, derived: 0, plain: 0 },
+  calls: { reference: 0, derived: 0, plain: 0, design: 0 },
+  designArgs: null as { width?: number; height?: number } | null,
 }));
 
 vi.mock("@oops/auth/require-user", () => ({
@@ -20,6 +21,11 @@ vi.mock("@oops/db/session.repo", () => ({
 }));
 
 vi.mock("@/server/infra/storage/upload", () => ({
+  handleDesignUpload: vi.fn(async (input: { width?: number; height?: number }) => {
+    h.calls.design += 1;
+    h.designArgs = { width: input.width, height: input.height };
+    return new Response(JSON.stringify({ url: "/files/dz.png", assetId: "a-dz" }), { status: 201 });
+  }),
   handleReferenceUpload: vi.fn(async () => {
     h.calls.reference += 1;
     return new Response(JSON.stringify({ url: "/files/ref.png", assetId: "a-ref" }), { status: 201 });
@@ -55,7 +61,8 @@ describe("POST /upload purpose=reference", () => {
   beforeEach(() => {
     h.userId = "u1";
     h.sessionExists = true;
-    h.calls = { reference: 0, derived: 0, plain: 0 };
+    h.calls = { reference: 0, derived: 0, plain: 0, design: 0 };
+    h.designArgs = null;
   });
 
   it("成功：分流到 handleReferenceUpload，不触发导出/普通上传", async () => {
@@ -63,7 +70,7 @@ describe("POST /upload purpose=reference", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as { assetId: string };
     expect(body.assetId).toBe("a-ref");
-    expect(h.calls).toEqual({ reference: 1, derived: 0, plain: 0 });
+    expect(h.calls).toEqual({ reference: 1, derived: 0, plain: 0, design: 0 });
   });
 
   it("缺 sessionId 返回 400，不进任何处理分支", async () => {
@@ -87,5 +94,54 @@ describe("POST /upload purpose=reference", () => {
     await POST(post({ sessionId: "s1", sourceAssetId: "src-1", width: "10", height: "10" }));
     expect(h.calls.derived).toBe(1);
     expect(h.calls.reference).toBe(0);
+  });
+});
+
+describe("POST /upload purpose=design", () => {
+  beforeEach(() => {
+    h.userId = "u1";
+    h.sessionExists = true;
+    h.calls = { reference: 0, derived: 0, plain: 0, design: 0 };
+    h.designArgs = null;
+  });
+
+  it("成功：分流到 handleDesignUpload 并回传 assetId", async () => {
+    const res = await POST(post({ purpose: "design", width: "1080", height: "1440" }));
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { assetId: string };
+    expect(body.assetId).toBe("a-dz");
+    expect(h.calls.design).toBe(1);
+    // 不触碰参考图/画布导出/普通上传分支
+    expect(h.calls).toMatchObject({ reference: 0, derived: 0, plain: 0 });
+  });
+
+  it("设计稿宽高透传给 handler（作品集网格据此算宽高比）", async () => {
+    await POST(post({ purpose: "design", width: "1080", height: "1440" }));
+    expect(h.designArgs).toEqual({ width: 1080, height: 1440 });
+  });
+
+  it("宽高缺失或非法时传 undefined，不传 NaN 也不传 0", async () => {
+    await POST(post({ purpose: "design" }));
+    expect(h.designArgs).toEqual({ width: undefined, height: undefined });
+    await POST(post({ purpose: "design", width: "abc", height: "xyz" }));
+    expect(h.designArgs).toEqual({ width: undefined, height: undefined });
+    // Number(null) === 0：若不做空串与 >0 校验，缺省宽高会被记成 0×0
+    await POST(post({ purpose: "design", width: "0", height: "0" }));
+    expect(h.designArgs).toEqual({ width: undefined, height: undefined });
+    await POST(post({ purpose: "design", width: "  ", height: "  " }));
+    expect(h.designArgs).toEqual({ width: undefined, height: undefined });
+  });
+
+  it("purpose=design 不需要 sessionId，且不查会话", async () => {
+    const res = await POST(post({ purpose: "design" }));
+    expect(res.status).toBe(201);
+    expect(h.sessionExists).toBe(true); // 会话存在性未被触碰（reference 分支才会查）
+    expect(h.calls.design).toBe(1);
+  });
+
+  it("purpose=design 优先于 sessionId 分支（带 sessionId 也走设计）", async () => {
+    await POST(post({ purpose: "design", sessionId: "s1" }));
+    expect(h.calls.design).toBe(1);
+    expect(h.calls.derived).toBe(0);
   });
 });

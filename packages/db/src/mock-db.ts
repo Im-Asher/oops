@@ -12,6 +12,8 @@ export interface MockDbState {
   lastSet: unknown;
   /** 最近一次 .values() 入参（returning 后不清空，供断言用） */
   lastValues: unknown;
+  /** 让下一次 .values()...onConflictDoNothing().returning() 返回空集（模拟唯一冲突未插入） */
+  conflictOnNextInsert?: boolean;
   calls: { op: string; args: unknown[] }[];
 }
 
@@ -29,6 +31,7 @@ export function makeMockDb(
     pendingSet: initial?.pendingSet,
     lastSet: undefined,
     lastValues: undefined,
+    conflictOnNextInsert: initial?.conflictOnNextInsert,
     calls: [],
   };
   let selectCursor = 0;
@@ -41,6 +44,14 @@ export function makeMockDb(
     // 显式 execute() 结尾：剥掉后缀按底层终止符匹配（drizzle QueryPromise 标准出口）
     const effective = op.replace(/\.execute$/, "");
     if (effective.endsWith(".returning")) {
+      // onConflictDoNothing 冲突时 PG 返回空数组。收紧到"确实走过 onConflictDoNothing"
+      // 的链：否则 flag 会被后续无关的 insert.returning() 静默提前消费。
+      if (state.conflictOnNextInsert && effective.includes(".onConflictDoNothing.")) {
+        state.conflictOnNextInsert = false;
+        state.pendingValues = undefined;
+        state.pendingSet = undefined;
+        return [];
+      }
       const v = state.pendingValues ?? state.pendingSet ?? {};
       state.pendingValues = undefined;
       state.pendingSet = undefined;

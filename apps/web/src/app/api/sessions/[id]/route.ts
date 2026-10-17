@@ -58,7 +58,9 @@ export async function DELETE(
   const assets = createAssetRepo();
   const storage = createStorage(defaultS3Client);
   try {
-    const keys = await assets.listKeysBySession(id);
+    // 只清理未收藏资产：作品集已收藏项豁免于会话 GC（sessionId 随后被置空，
+    // 作品集里该条目显示为来源未知——这是已确认接受的取舍）
+    const keys = await assets.listKeysBySessionUnsaved(id);
     for (const key of keys) {
       await storage.removeObject(key);
     }
@@ -68,7 +70,7 @@ export async function DELETE(
       { status: 500 },
     );
   }
-  await assets.removeBySession(id);
+  await assets.removeUnsavedBySession(id);
   await sessions.remove(id);
   return Response.json({ ok: true });
 }

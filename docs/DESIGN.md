@@ -68,7 +68,7 @@ Canva is the friendliest face in design tooling: Adobe looks professional and fo
 
 1. **This file is the single source of truth for design tokens.** Hardcoded colors, radii, or durations in components are forbidden. Add the value to B1 first, land it as a token in `globals.css`, then reference it.
 2. **Four token layers. A brand change only touches layers 1 and 3.**
-3. Dark is the **default** theme. Anything that "only works in light mode" is a defect — `openspec/specs/app-theme/spec.md` mandates both themes.
+3. Light is the **default** theme (2026-10: flipped from dark per product decision). Anything that "only works in one mode" is a defect — `openspec/specs/app-theme/spec.md` mandates both themes.
 4. When code and this document disagree, code wins — but then either fix the code or come back and fix this file. Permanent divergence is not allowed.
 
 ## B1. Token Layers & Naming

@@ -7,9 +7,11 @@ import type { DbClient } from "./credit-ledger.repo";
  * 审计动作常量集（text 列 + 应用层约束，动作集随管理面增长免 DDL）：
  * user.status_change 用户启停 / invite.create 邀请码生成 / invite.revoke 邀请码作废 /
  * credits.adjust 积分发放扣减 / pricing.update 定价修改 / agent.toggle Agent 启停 /
- * model.config 模型目录启停与角色默认模型变更
+ * model.config 模型目录启停与角色默认模型变更 /
+ * auth.login 管理员登录（覆盖面中唯一的非写操作项，操作对象为该管理员自身）
  */
 export const ADMIN_AUDIT_ACTIONS = [
+  "auth.login",
   "user.status_change",
   "invite.create",
   "invite.revoke",

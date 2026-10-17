@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   Alert,
+  App,
   Button,
   Card,
   DatePicker,
@@ -17,7 +18,6 @@ import {
   Table,
   Tag,
   Typography,
-  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslations } from "next-intl";
@@ -78,6 +78,8 @@ const STATUS_TAG: Record<LedgerStatus, { color: string; key: string }> = {
 
 export default function PointsView() {
   const t = useTranslations("common.section.points");
+  // 经 App 上下文取 message：静态方法拿不到主题/上下文（antd 告警）
+  const { message } = App.useApp();
 
   // ── 调整表单：用户远程搜索选项 ──
   const [userOptions, setUserOptions] = useState<Array<{ label: string; value: string }>>([]);
@@ -321,7 +323,8 @@ export default function PointsView() {
     return () => {
       active = false;
     };
-  }, [fetchPrices, t]);
+    // message 来自 App 上下文且被 antd 记忆化（引用稳定），可安全入依赖数组
+  }, [fetchPrices, t, message]);
 
   const startEdit = (row: PriceRow) => {
     setEditingKey(row.key);
@@ -514,7 +517,7 @@ export default function PointsView() {
           </Button>
           <Button onClick={resetFilters}>{t("reset")}</Button>
         </Space>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+        {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
         <Table<LedgerRow>
           rowKey="id"
           loading={loading}
@@ -543,12 +546,12 @@ export default function PointsView() {
         {reconcileResult && (
           <div style={{ marginTop: 16 }}>
             {reconcileResult.consistent ? (
-              <Alert type="success" message={t("reconcileAllGood")} showIcon />
+              <Alert type="success" title={t("reconcileAllGood")} showIcon />
             ) : (
               <>
                 <Alert
                   type="warning"
-                  message={t("reconcileMismatch", { count: reconcileResult.total })}
+                  title={t("reconcileMismatch", { count: reconcileResult.total })}
                   showIcon
                   style={{ marginBottom: 16 }}
                 />

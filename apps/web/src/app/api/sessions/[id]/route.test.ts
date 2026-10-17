@@ -45,11 +45,12 @@ vi.mock("@oops/db/session.repo", () => ({
 }));
 vi.mock("@oops/db/asset.repo", () => ({
   createAssetRepo: () => ({
-    listKeysBySession: vi.fn(async () => {
+    // 会话 GC 只清理未收藏资产；已收藏项由作品集豁免（见 design.md D2）
+    listKeysBySessionUnsaved: vi.fn(async () => {
       if (h.failOnKey === "__list__") throw new Error("list boom");
       return h.keys;
     }),
-    removeBySession: vi.fn(async (sessionId: string) => {
+    removeUnsavedBySession: vi.fn(async (sessionId: string) => {
       h.removedAssetSessionId = sessionId;
     }),
   }),
@@ -111,13 +112,23 @@ describe("DELETE /api/sessions/[id]", () => {
     expect(h.removedSessionId).toBeNull();
   });
 
-  it("成功：先删全部对象字节，再删资产行与会话行", async () => {
+  it("成功：先删未收藏对象字节，再删未收藏资产行与会话行", async () => {
     const res = await DELETE(del("s1"), ctx("s1"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ ok: true });
     expect(h.removedKeys).toEqual(["assets/a.png", "assets/b.jpg"]);
     expect(h.removedAssetSessionId).toBe("s1");
     expect(h.removedSessionId).toBe("s1");
+  });
+
+  it("已收藏资产不在清理范围内：其字节与行均被保留", async () => {
+    // mock 的 Unsaved 列举已按 savedAt is null 过滤，此处注入的即未收藏集。
+    // 已收藏项不出现在 keys 中，因而既不会被 removeObject 也不会被整行删除。
+    h.keys = ["assets/unsaved.png"];
+    const res = await DELETE(del("s1"), ctx("s1"));
+    expect(res.status).toBe(200);
+    expect(h.removedKeys).toEqual(["assets/unsaved.png"]);
+    expect(h.removedKeys).not.toContain("assets/saved.png");
   });
 
   it("对象删除失败中止：返回 500，会话与资产行保持存在", async () => {

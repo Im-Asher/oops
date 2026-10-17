@@ -7,13 +7,13 @@ import { useCallback, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
+  App,
   Button,
   Input,
   Popconfirm,
   Space,
   Switch,
   Table,
-  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslations } from "next-intl";
@@ -38,6 +38,8 @@ interface UserPage {
 
 export default function UsersView() {
   const t = useTranslations("common.section.users");
+  // 经 App 上下文取 message：静态方法拿不到主题/上下文（antd 告警）
+  const { message } = App.useApp();
 
   // 控件态（自由编辑）与已应用态（驱动取数）分离
   const [searchInput, setSearchInput] = useState("");
@@ -201,7 +203,7 @@ export default function UsersView() {
         <Button onClick={resetSearch}>{t("reset")}</Button>
       </Space>
 
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
 
       <Table<UserRow>
         rowKey="id"
