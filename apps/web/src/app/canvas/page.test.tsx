@@ -7,8 +7,26 @@ import ChatPage from "./page";
 
 // 画布重子件以 stub 替代（本文件只验证聊天链路：bootstrap → 会话引导 → 选项卡应答）
 vi.mock("@/components/canvas/canvas-stage", () => ({ CanvasStage: () => null }));
-vi.mock("@/components/chat/session-sidebar", () => ({ SessionSidebar: () => null }));
-vi.mock("@/components/chat/user-menu", () => ({ UserMenuContent: () => null }));
+// 会话列表 stub：渲染可点击的会话项（历史会话按需打开的验证面）
+vi.mock("@/components/chat/session-sidebar", () => ({
+  SessionSidebar: ({
+    onSelectSession,
+    sessions,
+  }: {
+    onSelectSession: (id: string) => void;
+    sessions: { id: string; title: string }[];
+  }) => (
+    <ul>
+      {sessions.map((s) => (
+        <li key={s.id}>
+          <button onClick={() => onSelectSession(s.id)} type="button">
+            {s.title}
+          </button>
+        </li>
+      ))}
+    </ul>
+  ),
+}));
 vi.mock("@/lib/chat/home-handoff", () => ({
   hasPendingHandoff: () => false,
   takePendingHandoffFiles: () => [],
@@ -139,12 +157,31 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** 打开时钟下拉并选择指定标题的会话（历史会话按需打开）。 */
+async function openHistoryAndSelect(title: string): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name: "会话历史" }));
+  await userEvent.click(await screen.findByRole("button", { name: title }));
+}
+
 describe("canvas 页：会话引导 bootstrap", () => {
-  it("有会话进入仍切最近会话并恢复消息", async () => {
+  it("有历史会话进入仍开新会话，不自动打开历史会话", async () => {
     renderWithI18n(<ChatPage />);
-    // bootstrap：自动选择最近会话 s1 并恢复消息（含 present_options 选项卡）
+    // 进入即建会话（spec「进入画布即开新会话」）：不预选 s1，也不拉它的消息
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    expect(createCalls[0]).toEqual({ agentId: "poster-designer" });
+    // 会话列表仍被拉取（供时钟下拉使用）
+    expect(fetchMock.mock.calls.some(([u]) => String(u) === "/api/sessions")).toBe(true);
+    // s1 的消息未恢复：选项卡不存在
+    expect(screen.queryByRole("button", { name: "促销主图" })).toBeNull();
+  });
+
+  it("历史会话可从时钟下拉打开并恢复消息", async () => {
+    renderWithI18n(<ChatPage />);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    await openHistoryAndSelect("T");
+    // 按需打开历史会话：消息与选项卡恢复
     await screen.findByRole("button", { name: "促销主图" });
-    expect(createCalls).toHaveLength(0);
+    expect(createCalls).toHaveLength(1);
   });
 
   it("无会话进入自动建会话（等 agents 回包取首个 Agent），输入框可用", async () => {
@@ -179,10 +216,24 @@ describe("canvas 页：会话引导 bootstrap", () => {
   });
 });
 
+describe("canvas 页：会话下拉不含身份区块", () => {
+  it("打开下拉只有会话项，无个人信息 / 退出登录", async () => {
+    renderWithI18n(<ChatPage />);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    await userEvent.click(screen.getByRole("button", { name: "会话历史" }));
+    expect(await screen.findByRole("button", { name: "T" })).toBeTruthy();
+    // 身份入口已迁至悬浮顶栏头像（spec/session-management「会话列表」）
+    expect(screen.queryByRole("link", { name: "个人信息" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "退出登录" })).toBeNull();
+  });
+});
+
 describe("canvas 页：选项卡点击应答（HITL）", () => {
   it("恢复的选项卡可点击：label 作为无引用新方案发送；busy 中按钮禁用不重复发送", async () => {
     renderWithI18n(<ChatPage />);
-    // bootstrap：自动选择最近会话并恢复消息（含 present_options 选项卡）
+    // 先经时钟下拉打开历史会话 s1，恢复其消息（含 present_options 选项卡）
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    await openHistoryAndSelect("T");
     const pick = await screen.findByRole("button", { name: "促销主图" });
     await userEvent.click(pick);
     await waitFor(() => expect(chatCalls).toHaveLength(1));

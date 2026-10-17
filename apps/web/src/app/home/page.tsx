@@ -157,7 +157,7 @@ export default function HomePage() {
         <div className="flex items-center gap-2 px-3 pb-4">
           <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
           <span
-            className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+            className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary"
             data-testid="app-version-badge"
             title={t("buildVersion", { version: APP_VERSION })}
           >

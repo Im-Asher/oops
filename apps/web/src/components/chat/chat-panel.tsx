@@ -50,6 +50,8 @@ interface ChatPanelProps {
   statusLine?: { text: string; tone: "progress" | "error"; onRetry?: () => void } | null;
   /** 积分耗尽（/api/chat 402 后）：composer 整体禁用直至余额恢复。 */
   creditsExhausted?: boolean;
+  /** 头部是否展示积分徽标（宿主另有积分入口时关闭，避免同屏重复）。默认展示。 */
+  showCredits?: boolean;
 }
 
 /**
@@ -84,6 +86,7 @@ export function ChatPanel({
   onAttach,
   statusLine,
   creditsExhausted,
+  showCredits = true,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
   return (
@@ -98,6 +101,7 @@ export function ChatPanel({
         onHistoryOpenChange={onHistoryOpenChange}
         onRename={(title) => onRename?.(title)}
         sessionTitle={sessionTitle}
+        showCredits={showCredits}
       />
       <MessageList
         agentIcon={agentIcon}

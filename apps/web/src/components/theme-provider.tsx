@@ -44,15 +44,15 @@ function applyTheme(theme: Theme) {
 
 /**
  * 全局明暗主题（spec/ui-refactor）：html class 切换 + localStorage 持久化，
- * 默认暗色。首屏 class 由 layout 中的防闪烁阻塞脚本设置，挂载后从存储同步进
- * React 状态；SSR 首渲染固定为默认暗色，与初始 HTML 保持一致。
+ * 默认亮色。首屏 class 由 layout 中的防闪烁阻塞脚本设置，挂载后从存储同步进
+ * React 状态；SSR 首渲染固定为默认亮色，与初始 HTML 保持一致。
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
   useEffect(() => {
     // html class 已由防闪烁脚本就位，这里只补齐 React 状态（订阅外部存储的初始值）
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setThemeState(readStoredTheme() ?? "dark");
+    setThemeState(readStoredTheme() ?? "light");
   }, []);
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
@@ -69,10 +69,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** 读取当前主题；未挂 Provider 时回退默认暗色与 no-op（测试/独立渲染场景）。 */
+/** 读取当前主题；未挂 Provider 时回退默认亮色与 no-op（测试/独立渲染场景）。 */
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
-  return ctx ?? { theme: "dark", setTheme: () => {}, toggleTheme: () => {} };
+  return ctx ?? { theme: "light", setTheme: () => {}, toggleTheme: () => {} };
 }
 
 /** 明暗切换按钮：暗色显示太阳（点击转亮），亮色显示月亮。 */

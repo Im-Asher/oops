@@ -229,6 +229,10 @@
       "cancel": "Cancel",
       "confirmCrop": "Confirm crop"
     },
+    "appHeader": {
+      "backToHome": "Back to home",
+      "balance": "Credits"
+    },
     "page": {
       "toolStatus": {
         "generateImage": "Generating image…",

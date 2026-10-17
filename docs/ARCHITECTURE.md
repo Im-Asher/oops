@@ -202,9 +202,9 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 「本机工作区回贴完成」之后才消费草稿（避免快照旧草稿覆盖首页带来的新草稿）。
 
 **主题**：`components/theme-provider.tsx` 手写 Context（零依赖）——`applyTheme` 切 html
-`dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本按存储/系统偏好预设 class 防
-首屏闪烁。颜色一律走明/暗两套 CSS token（globals.css class-based dark variant），切换入口在
-首页侧栏底部与画布聊天面板头部。
+`dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本在存储为 dark 时预设 class 防
+首屏闪烁，默认亮色。颜色一律走明/暗两套 CSS token（globals.css class-based dark variant），
+切换入口在首页侧栏底部与画布悬浮顶栏（AppHeader）。
 
 ### 5.3 i18n：locale 解析、词典分层与防回流
 

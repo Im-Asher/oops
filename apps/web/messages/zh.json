@@ -229,6 +229,10 @@
       "cancel": "取消",
       "confirmCrop": "确认裁剪"
     },
+    "appHeader": {
+      "backToHome": "返回首页",
+      "balance": "积分余额"
+    },
     "page": {
       "toolStatus": {
         "generateImage": "正在生成图片…",
