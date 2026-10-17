@@ -29,6 +29,16 @@ Key characteristics:
   exceeds ~30k tokens (char-approx), older turns are compacted into a skeleton
   LLM summary (`sessions.summary` + `summarized_up_to` watermark, originals
   never deleted). Thinking blocks and base64 images are never persisted.
+- **Portfolio** — a cross-session gallery at `/portfolio`. An entry *is* the original
+  asset, tagged via `assets.savedAt` (null = not collected) — never a copy, so
+  collection costs no extra storage. Side effect: session delete
+  (`DELETE /api/sessions/:id`) must skip collected assets
+  (`listKeysBySessionUnsaved` / `removeUnsavedBySession` sit beside the
+  unconditional variants); survivors keep a null `sessionId` and therefore show
+  no known source. Tags live in a global `tags` pool joined by `asset_tags`, so
+  spelling cannot fragment. Processing entry points pass `assetId` (never a URL)
+  through `GET /api/assets/:id`, which checks ownership before handing out an
+  address — a URL param would let a user inject an arbitrary external image.
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.

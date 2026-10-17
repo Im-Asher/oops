@@ -32,7 +32,6 @@ export function useSavedStates(assetIds: string[]): {
     }
     let cancelled = false;
     void (async () => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 异步回包后的置态，非渲染期同步调用
       setLoading(true);
       try {
         const res = await fetch(`/api/assets?saved&ids=${encodeURIComponent(key)}`);

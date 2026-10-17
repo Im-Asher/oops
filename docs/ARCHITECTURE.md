@@ -183,12 +183,23 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，未实现项置灰禁用；主区创作横幅、
+**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计 / 作品集可用，素材库与消息中心置灰禁用；主区创作横幅、
 创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
 （顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
-触发，携 `?w=&h=` 建页）+ `/chat` 页面级 `redirect("/canvas")` 保存量入口。窄屏（md 以下）
+触发，携 `?w=&h=` 建页）+ `/portfolio` 作品集页（无应用侧栏，CSS multi-column 瀑布流 +
+标签筛选 chip + 游标分页；大图预览等比适配无缩放交互；卡片提供去画布/去设计两个加工出口）+
+`/chat` 页面级 `redirect("/canvas")` 保存量入口。窄屏（md 以下）
 聊天与画布互斥切换显示。
+
+**作品集与加工出口**（`/portfolio`）：作品集是跨会话聚合视图——**条目即原资产本身**，
+由 `assets.saved_at` 打标实现，非副本（见 §7）。三条入口：AI 画布卡片 hover 星标、
+创建设计导出面板「同时存入作品集」勾选、首页侧栏 `navPortfolio`。加工出口一律传
+`assetId` 而非图片 URL（`/canvas?assetId=`、`/design?assetId=`），服务端经
+`GET /api/assets/:id` 校验归属后才给出 `/files/*` 地址——传URL 会让用户手改参数注入
+任意外部图片源。设计侧以新增图层落地（复用 `designReducer` 的 `addElements`，自带
+`pushHistory` 故可撤销），不覆盖既有设计稿；资产已删只内联提示，设计稿保持原样。
+设计导出勾选入库失败时只警告：浏览器下载已完成，附加动作不得阻断首要意图。
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -317,6 +328,15 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
 > `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
+>
+> `portfolio` 在 `assets` 上加 `saved_at`（收藏时间，null = 未收藏）与 `title`（用户命名），
+> 并新增 `tags`（全局标签词表，`name` 唯一）与 `asset_tags`（关联表，复合主键，两侧外键
+> `ON DELETE CASCADE`）两表（迁移 `0010`）。**收藏即在原资产上打标，不复制字节**
+> （零存储开销），代价是 `DELETE /api/sessions/:id` 的 GC 需跳过已收藏项
+> （`listKeysBySessionUnsaved` / `removeUnsavedBySession` 与无条件版本并存）；存活资产的
+> `session_id` 因 `ON DELETE SET NULL` 被置空，作品集展示其来源时呈现为未知。`saved_at`
+> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。创建设计的导出成果经
+> `POST /upload purpose=design` 落库为**无会话归属**资产（设计编辑器没有会话概念）。
 > `canvas-first-workbench` 增 `meta.referenceAssetId`（generate_image 血缘：引用的源图 assetId，
 > 参考图上传 `purpose=reference` 落 `kind=image` + `meta.purpose="reference"`，不追加聊天消息）。
 > `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
@@ -383,7 +403,9 @@ oops/
 │   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
 │   │       ├── profile/            # GET/PATCH 资料 + POST 改密（requireUser + 改密按 IP 限频）
 │   │       ├── sessions/route.ts   # 会话列表/新建（按认证用户隔离）
-│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联）
+│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联；已收藏资产豁免）
+│   │       ├── assets/route.ts     # GET 作品集列表（游标分页 + 标签筛选）/ 批量收藏态（ids）
+│   │       ├── assets/[id]/route.ts# GET 单图详情（加工出口换址）/ PATCH 收藏·标题·标签 / DELETE 彻底删除
 │   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
@@ -392,7 +414,7 @@ oops/
 │   │       ├── storage/            # 存储抽象（S3 兼容，env 切换后端）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
 │   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
-│   │           ├── upload.ts       # 上传/画布导出处理（userId 必传）
+│   │           ├── upload.ts       # 上传处理：purpose=reference（参考图）/ =design（设计成果，无会话归属）/ 带 sessionId（画布派生导出）/ 缺省（userId-only）
 │   │   │   └── providers/          # 外部 Provider 接入
 │   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
 │   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider
