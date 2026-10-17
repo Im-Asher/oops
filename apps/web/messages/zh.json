@@ -447,6 +447,59 @@
       "change": "修改密码"
     }
   },
+  "portfolio": {
+    "page": {
+      "title": "作品集",
+      "subtitle": "{count} 件作品",
+      "empty": {
+        "title": "作品集还是空的",
+        "hint": "在画布或创建设计中点击星标，把满意的图存进来"
+      },
+      "loadFailed": "加载失败",
+      "retry": "重试",
+      "loadMore": "加载更多",
+      "end": "没有更多了",
+      "allTags": "全部"
+    },
+    "card": {
+      "untitled": "未命名",
+      "sourceUnknown": "来源未知",
+      "fromSession": "来自：{name}",
+      "imageMissing": "图片丢失",
+      "save": "存作品集",
+      "unsave": "取消收藏",
+      "toCanvas": "去画布",
+      "toDesign": "去设计",
+      "edit": "编辑信息",
+      "delete": "彻底删除",
+      "cancel": "取消",
+      "confirm": "确定",
+      "deleteHint": "将从服务器永久删除这张图片，无法恢复",
+      "gone": "该图片已不可用"
+    },
+    "edit": {
+      "titleLabel": "标题",
+      "titlePlaceholder": "给这张图起个名",
+      "tagsLabel": "标签",
+      "tagsPlaceholder": "输入标签后回车",
+      "tagsHint": "标签全局共享，拼写一致即可复用",
+      "save": "保存",
+      "saved": "已保存",
+      "failed": "保存失败，请重试"
+    },
+    "preview": {
+      "download": "下载",
+      "prompt": "生成提示词",
+      "model": "模型",
+      "size": "尺寸",
+      "savedAt": "收藏于"
+    },
+    "error": {
+      "emptyTag": "标签不能为空",
+      "tagTooLong": "标签过长",
+      "tooManyTags": "标签过多"
+    }
+  },
   "design": {
     "page": {
       "back": "返回",

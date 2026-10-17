@@ -447,6 +447,59 @@
       "change": "Change password"
     }
   },
+  "portfolio": {
+    "page": {
+      "title": "Portfolio",
+      "subtitle": "{count} works",
+      "empty": {
+        "title": "Your portfolio is empty",
+        "hint": "Tap the star on a canvas or design result to save it here"
+      },
+      "loadFailed": "Failed to load",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "end": "No more works",
+      "allTags": "All"
+    },
+    "card": {
+      "untitled": "Untitled",
+      "sourceUnknown": "Unknown source",
+      "fromSession": "From: {name}",
+      "imageMissing": "Image missing",
+      "save": "Save to portfolio",
+      "unsave": "Remove from portfolio",
+      "toCanvas": "Open in canvas",
+      "toDesign": "Open in design",
+      "edit": "Edit details",
+      "delete": "Delete permanently",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deleteHint": "This image will be permanently removed from the server",
+      "gone": "This image is no longer available"
+    },
+    "edit": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Give this image a name",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Type a tag and press Enter",
+      "tagsHint": "Tags are shared across the workspace",
+      "save": "Save",
+      "saved": "Saved",
+      "failed": "Failed to save, please try again"
+    },
+    "preview": {
+      "download": "Download",
+      "prompt": "Prompt",
+      "model": "Model",
+      "size": "Dimensions",
+      "savedAt": "Saved on"
+    },
+    "error": {
+      "emptyTag": "Tag cannot be empty",
+      "tagTooLong": "Tag is too long",
+      "tooManyTags": "Too many tags"
+    }
+  },
   "design": {
     "page": {
       "back": "Back",
