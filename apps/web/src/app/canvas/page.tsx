@@ -20,8 +20,9 @@ import type { CanvasItem } from "@/lib/canvas/canvas-reducer";
 import { clearWorkspace, loadWorkspace, saveWorkspace } from "@/lib/canvas/workspace-storage";
 import type { AgentInfo, ChatEvent, SessionInfo, UIMessage } from "@/types/chat";
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { hasPendingHandoff, takePendingHandoffFiles } from "@/lib/chat/home-handoff";
+import { useSavedStates } from "@/lib/portfolio/use-saved-states";
 
 /**
  * useSearchParams 需要客户端回退边界：静态预渲染期间由 Suspense 兜底。
@@ -73,6 +74,18 @@ function ChatPageInner() {
   const currentSlot = currentId ? slots[currentId] : undefined;
   const messages = currentSlot?.messages ?? EMPTY_SLOT.messages;
   const busy = currentSlot?.busy ?? false;
+
+  // 作品集收藏态：画布所有已结算图片的 assetId 一次批量查得（design.md D9）。
+  // 转交设计同样只传 assetId——服务端校验归属后才给 URL，避免外链注入（D7）。
+  const collectableAssetIds = canvas.items
+    .filter((item) => item.status === "image" && item.assetId)
+    .map((item) => item.assetId);
+  const { isSaved, toggle: toggleSaved } = useSavedStates(collectableAssetIds);
+  const router = useRouter();
+  const sendToDesign = useCallback((item: CanvasItem) => {
+    if (!item.assetId) return;
+    router.push(`/design?assetId=${encodeURIComponent(item.assetId)}`);
+  }, [router]);
 
   // SSE 回合内的画布事件按发起会话归档：仅当发起会话仍是当前会话才上画布，
   // 流中切会话不串图（槽内消息仍照常归档，切回时由 deriveImages 重建）。
@@ -1070,8 +1083,13 @@ function ChatPageInner() {
           dispatch={dispatch}
           exportError={exportError}
           focus={focus}
+          isSaved={isSaved}
           onRetryItem={retryItem}
           onResetEdits={handleResetEdits}
+          onToDesign={sendToDesign}
+          onToggleSaved={(item) => {
+            if (item.assetId) void toggleSaved(item.assetId);
+          }}
           state={canvas}
         />
         {/* 参考图上传失败：画布顶部内联提示，点按消失 */}

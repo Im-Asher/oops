@@ -61,7 +61,7 @@ function imageFile(name: string): File {
 }
 
 describe("首页落地页", () => {
-  it("侧栏：AI 画布与创建设计可用（弹窗触发）、其余导航项置灰禁用", async () => {
+  it("侧栏：AI 画布/创建设计/作品集可用，其余导航项置灰禁用", async () => {
     renderWithI18n(<HomePage />);
     const canvasLink = await screen.findByText("AI 画布");
     expect(canvasLink.closest("a")?.getAttribute("href")).toBe("/canvas");
@@ -71,7 +71,11 @@ describe("首页落地页", () => {
     expect(await screen.findByText("新建设计")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    for (const label of ["作品集", "素材库", "消息中心", "设置"]) {
+    // 作品集已实现：链接可用（非禁用按钮）
+    const portfolioLink = screen.getByText("作品集");
+    expect(portfolioLink.closest("a")?.getAttribute("href")).toBe("/portfolio");
+    // 其余未实现的导航项仍为置灰禁用
+    for (const label of ["素材库", "消息中心", "设置"]) {
       expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
     }
     // 用户入口（头像触发）可达

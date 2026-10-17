@@ -222,6 +222,8 @@
     },
     "stage": {
       "label": "Canvas — zoom, pan and drag artworks",
+      "saveToPortfolio": "Save to portfolio",
+      "sendToDesign": "Send to design",
       "itemAlt": "Canvas artwork",
       "generating": "Generating…",
       "failed": "Generation failed",

@@ -174,7 +174,7 @@ export default function HomePage() {
             onAction={() => setDesignDialogOpen(true)}
           />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupLibrary")}</p>
-          <NavItem icon={ImageIcon} label={t("navPortfolio")} />
+          <NavItem href="/portfolio" icon={ImageIcon} label={t("navPortfolio")} />
           <NavItem icon={ImagesIcon} label={t("navAssets")} />
           <NavItem icon={MessageSquareIcon} label={t("navMessages")} />
         </nav>

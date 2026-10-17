@@ -222,6 +222,8 @@
     },
     "stage": {
       "label": "画布，可缩放、平移与拖动作品",
+      "saveToPortfolio": "存作品集",
+      "sendToDesign": "转至创建设计",
       "itemAlt": "画布作品",
       "generating": "生成中…",
       "failed": "生成失败",

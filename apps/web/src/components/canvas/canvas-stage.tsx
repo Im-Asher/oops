@@ -19,7 +19,7 @@ import {
 import { centerViewOn, fitView, panView, zoomAtPoint } from "@/lib/canvas/coords";
 import { filtersToCssOrNone } from "@/lib/canvas/filter-string";
 import { itemRect } from "@/lib/canvas/layout";
-import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
+import { LoaderCircleIcon, PaletteIcon, StarIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -36,6 +36,11 @@ interface CanvasStageProps {
   onResetEdits: () => void;
   /** 失败占位卡重试：以卡内保存的原始意图重新发起一轮对话。 */
   onRetryItem?: (item: CanvasItem) => void;
+  /** 作品集收藏态查询：按 assetId 判断该条目是否已收藏。 */
+  isSaved?: (assetId: string) => boolean;
+  onToggleSaved?: (item: CanvasItem) => void;
+  /** 转至创建设计：以新增图层落地，不影响现有设计稿。 */
+  onToDesign?: (item: CanvasItem) => void;
 }
 
 /** 单条目：图片按裁剪/滤镜预览；生成中/失败为占位卡。 */
@@ -46,6 +51,9 @@ function CanvasItemView({
   onPointerDown,
   onImageLoad,
   onRetry,
+  saved,
+  onToggleSaved,
+  onToDesign,
 }: {
   item: CanvasItem;
   selected: boolean;
@@ -54,11 +62,16 @@ function CanvasItemView({
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>, item: CanvasItem) => void;
   onImageLoad: (item: CanvasItem, aspect: number) => void;
   onRetry?: (item: CanvasItem) => void;
+  /** 收藏态与作品集出口；仅对已结算的图片提供。 */
+  saved?: boolean;
+  onToggleSaved?: (item: CanvasItem) => void;
+  onToDesign?: (item: CanvasItem) => void;
 }) {
   const t = useTranslations("canvas.stage");
+  const canCollect = item.status === "image" && !!item.assetId && !!onToggleSaved;
   return (
     <div
-      className={`absolute overflow-hidden rounded-lg border border-border/80 bg-popover ${
+      className={`group/item absolute overflow-hidden rounded-lg border border-border/80 bg-popover ${
         selected ? "ring-2 ring-[var(--brand-violet-500)]" : ""
       } ${item.status === "image" ? "cursor-grab active:cursor-grabbing" : ""}`}
       data-item-id={item.id}
@@ -69,6 +82,37 @@ function CanvasItemView({
       }}
       style={{ height: item.width * item.aspect, left: item.x, top: item.y, width: item.width }}
     >
+      {canCollect ? (
+        // 反向缩放保持屏幕恒定尺寸；hover 才显形，避免干扰画布浏览
+        <span
+          className="absolute right-1.5 top-1.5 z-20 flex gap-1 opacity-0 transition group-hover/item:opacity-100"
+          style={{ transform: `scale(${inverseScale})`, transformOrigin: "top right" }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <button
+            aria-label={t("saveToPortfolio")}
+            className={`rounded-md bg-background/80 p-1 backdrop-blur transition hover:bg-background ${
+              saved ? "text-amber-500" : "text-muted-foreground"
+            }`}
+            onClick={() => onToggleSaved?.(item)}
+            title={t("saveToPortfolio")}
+            type="button"
+          >
+            <StarIcon className={`size-3.5 ${saved ? "fill-current" : ""}`} />
+          </button>
+          {onToDesign ? (
+            <button
+              aria-label={t("sendToDesign")}
+              className="rounded-md bg-background/80 p-1 text-muted-foreground backdrop-blur transition hover:bg-background hover:text-foreground"
+              onClick={() => onToDesign(item)}
+              title={t("sendToDesign")}
+              type="button"
+            >
+              <PaletteIcon className="size-3.5" />
+            </button>
+          ) : null}
+        </span>
+      ) : null}
       {item.agentName || item.agentIcon ? (
         // 署名徽标：角落小徽章，pointer-events-none 不影响拖拽/选中，反向缩放恒定屏幕尺寸
         <span
@@ -148,6 +192,9 @@ export function CanvasStage({
   focus,
   onResetEdits,
   onRetryItem,
+  isSaved,
+  onToggleSaved,
+  onToDesign,
 }: CanvasStageProps) {
   const t = useTranslations("canvas.stage");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -432,6 +479,9 @@ export function CanvasStage({
               onImageLoad={handleImageLoad}
               onPointerDown={handleItemPointerDown}
               onRetry={onRetryItem}
+              onToDesign={onToDesign}
+              onToggleSaved={onToggleSaved}
+              saved={item.assetId && isSaved ? isSaved(item.assetId) : false}
               selected={item.id === selectedId}
             />
           ))}
