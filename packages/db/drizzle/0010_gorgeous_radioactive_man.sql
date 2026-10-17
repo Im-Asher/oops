@@ -1,0 +1,2 @@
+CREATE INDEX "assets_saved_at_idx" ON "assets" USING btree ("saved_at") WHERE "assets"."saved_at" is not null;--> statement-breakpoint
+ALTER TABLE "tags" ADD CONSTRAINT "tags_name_len" CHECK (char_length("tags"."name") <= 64);
