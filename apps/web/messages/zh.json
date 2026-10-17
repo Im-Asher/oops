@@ -21,7 +21,8 @@
       "invalidAgent": "Agent 不存在",
       "invalidReference": "引用的图片不存在或无权使用",
       "tooLarge": "文件过大",
-      "unsupportedType": "不支持的文件类型"
+      "unsupportedType": "不支持的文件类型",
+      "assetDeleteFailed": "图片删除失败，请稍后重试"
     },
     "localeToggle": {
       "label": "切换语言"
@@ -221,6 +222,8 @@
     },
     "stage": {
       "label": "画布，可缩放、平移与拖动作品",
+      "saveToPortfolio": "存作品集",
+      "sendToDesign": "转至创建设计",
       "itemAlt": "画布作品",
       "generating": "生成中…",
       "failed": "生成失败",
@@ -228,6 +231,10 @@
       "retryAria": "重试生成",
       "cancel": "取消",
       "confirmCrop": "确认裁剪"
+    },
+    "appHeader": {
+      "backToHome": "返回首页",
+      "balance": "积分余额"
     },
     "page": {
       "toolStatus": {
@@ -265,7 +272,8 @@
       "exporting": "导出中…",
       "export": "导出",
       "revealResult": "有新结果，点击查看",
-      "openChat": "打开聊天"
+      "openChat": "打开聊天",
+      "resizeChatPanel": "调整聊天面板宽度"
     }
   },
   "chat": {
@@ -442,6 +450,59 @@
       "change": "修改密码"
     }
   },
+  "portfolio": {
+    "page": {
+      "title": "作品集",
+      "subtitle": "{count} 件作品",
+      "empty": {
+        "title": "作品集还是空的",
+        "hint": "在画布或创建设计中点击星标，把满意的图存进来"
+      },
+      "loadFailed": "加载失败",
+      "retry": "重试",
+      "loadMore": "加载更多",
+      "end": "没有更多了",
+      "allTags": "全部"
+    },
+    "card": {
+      "untitled": "未命名",
+      "sourceUnknown": "来源未知",
+      "fromSession": "来自：{name}",
+      "imageMissing": "图片丢失",
+      "save": "存作品集",
+      "unsave": "取消收藏",
+      "toCanvas": "去画布",
+      "toDesign": "去设计",
+      "edit": "编辑信息",
+      "delete": "彻底删除",
+      "cancel": "取消",
+      "confirm": "确定",
+      "deleteHint": "将从服务器永久删除这张图片，无法恢复",
+      "gone": "该图片已不可用"
+    },
+    "edit": {
+      "titleLabel": "标题",
+      "titlePlaceholder": "给这张图起个名",
+      "tagsLabel": "标签",
+      "tagsPlaceholder": "输入标签后回车",
+      "tagsHint": "标签全局共享，拼写一致即可复用",
+      "save": "保存",
+      "saved": "已保存",
+      "failed": "保存失败，请重试"
+    },
+    "preview": {
+      "download": "下载",
+      "prompt": "生成提示词",
+      "model": "模型",
+      "size": "尺寸",
+      "savedAt": "收藏于"
+    },
+    "error": {
+      "emptyTag": "标签不能为空",
+      "tagTooLong": "标签过长",
+      "tooManyTags": "标签过多"
+    }
+  },
   "design": {
     "page": {
       "back": "返回",
@@ -451,7 +512,11 @@
       "draftSaving": "保存中…",
       "draftSaved": "草稿已保存",
       "download": "下载 PNG",
-      "downloadError": "导出失败，请重试"
+      "downloadError": "导出失败，请重试",
+      "saveToPortfolio": "同时存入作品集",
+      "savedToPortfolio": "已存入作品集",
+      "saveFailed": "已下载，但存入作品集失败",
+      "handoffMissing": "该图片已不可用"
     },
     "rightPanel": {
       "canvasTitle": "画布",

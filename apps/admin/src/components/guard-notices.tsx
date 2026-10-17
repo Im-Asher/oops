@@ -1,14 +1,23 @@
-import { Result } from "antd";
+import { Button, Result } from "antd";
 import { getTranslations } from "next-intl/server";
 
-/** 401：会话失效引导页（验签失败/过期/ghost——ghost 在 requireUser 层即拒）。 */
+/**
+ * 401：会话失效引导页（验签失败/过期/ghost/被降级——见 requireAdmin）。
+ * 管理端自带登录入口，故直接给出去登录页的出口，不再引导到 web 端。
+ */
 export async function ExpiredNotice() {
   const t = await getTranslations("common.guard");
+  const tLogin = await getTranslations("common.login");
   return (
     <Result
       status="warning"
       title={t("expiredTitle")}
       subTitle={t("expiredBody")}
+      extra={
+        <Button type="primary" href="/login">
+          {tLogin("title")}
+        </Button>
+      }
     />
   );
 }

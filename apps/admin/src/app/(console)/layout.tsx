@@ -8,8 +8,9 @@ import AdminShell from "@/components/admin-shell";
 
 /**
  * 布局层门卫（admin-scaffold design D2 全量校验位置）+ 布局骨架挂载点。
- * proxy 只做 cookie 存在性引导；此处做验签/有效期/用户存在且 active/
- * 会话版本/role 全量校验并分流渲染（expired/forbidden/放行）。
+ * proxy 只做管理端 cookie 存在性引导（无则去 /login）；此处做验签/有效期/
+ * 用户存在且 active/会话版本/role 全量校验并分流渲染（expired/forbidden/放行）。
+ * expired 给出登录页入口，forbidden 单独保留：role 可被降级，不能只看登录时刻。
  * 放行分支再查一次库取管理员身份给头部展示（task 3.2）——守卫内部各自
  * 查库（require-user 状态/tv、require-admin role、此处身份），admin 内部
  * 工具流量下可接受；M2 落真实管理 API 时收敛守卫返回 user 行一次查询。

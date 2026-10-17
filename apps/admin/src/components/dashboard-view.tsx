@@ -132,7 +132,7 @@ export default function DashboardView() {
 
   return (
     <Spin spinning={loading}>
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
       <Row gutter={[16, 16]}>
         {STATUS_ORDER.map((status) => (
           <Col key={status} xs={12} md={8} lg={4}>

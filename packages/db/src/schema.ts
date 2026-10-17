@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -131,28 +133,76 @@ export const messages = pgTable("messages", {
     .defaultNow(),
 });
 
-export const assets = pgTable("assets", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull(),
-  sessionId: uuid("session_id").references(() => sessions.id, {
-    onDelete: "set null",
-  }),
-  kind: assetKind("kind").notNull().default("image"),
-  // MinIO 对象 key，如 assets/<uuid>.png
-  storageKey: text("storage_key").notNull(),
-  mimeType: text("mime_type").notNull(),
-  width: integer("width"),
-  height: integer("height"),
-  // 生图上下文
-  prompt: text("prompt"),
-  model: text("model"),
-  sourceUrl: text("source_url"),
-  // 任意扩展元数据（滤镜/裁剪参数、导出设置等）
-  meta: jsonb("meta").notNull().default({}),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const assets = pgTable(
+  "assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    kind: assetKind("kind").notNull().default("image"),
+    // MinIO 对象 key，如 assets/<uuid>.png
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    // 生图上下文
+    prompt: text("prompt"),
+    model: text("model"),
+    sourceUrl: text("source_url"),
+    // 任意扩展元数据（滤镜/裁剪参数、导出设置等）
+    meta: jsonb("meta").notNull().default({}),
+    // 作品集：收藏时间。null = 未收藏（作品集条目即资产本身，收藏不复制字节）
+    savedAt: timestamp("saved_at", { withTimezone: true }),
+    // 作品集：用户自定义标题
+    title: text("title"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // 作品集主查询形态：WHERE saved_at IS NOT NULL ORDER BY saved_at DESC。
+    // 部分索引只覆盖已收藏行——assets 是全系统行数最多的表，全量索引会
+    // 把绝大多数永远为 null 的行也拖进索引。
+    index("assets_saved_at_idx")
+      .on(t.savedAt)
+      .where(sql`${t.savedAt} is not null`),
+  ],
+);
+
+// 全局标签池：跨用户共享词表，name 唯一保证同义拼写收敛为一条记录。
+// 无删除入口（词表单调增长是刻意的取舍，见 design.md D3）。
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // 兜底长度约束：repo 层先行拦截以给出可分类错误，此处防止绕过 repo 的写入。
+  // 与 MAX_TAG_NAME_LENGTH 保持一致。
+  (t) => [check("tags_name_len", sql`char_length(${t.name}) <= 64`)],
+);
+
+// 纯关联表，无业务表。两侧 cascade：资产被彻底删除时关联随之消失，不留孤儿行。
+export const assetTags = pgTable(
+  "asset_tags",
+  {
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => assets.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.assetId, t.tagId] }),
+    index("asset_tags_tag_id_idx").on(t.tagId),
+  ],
+);
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -274,3 +324,5 @@ export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
 export type CreditPrice = typeof creditPrices.$inferSelect;
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type AppConfig = typeof appConfig.$inferSelect;
+export type Tag = typeof tags.$inferSelect;
+export type AssetTag = typeof assetTags.$inferSelect;

@@ -3,7 +3,7 @@
 // 模型配置视图（task 6.3）：目录条目启停（文本/图像两组）+ 角色默认三层明细与设置/清除。
 // 状态一律以 GET /api/admin/models 全量回读为准（写后 refresh），避免乐观态漂移。
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Popconfirm, Select, Space, Switch, Table, Tag, message } from "antd";
+import { Alert, App, Button, Card, Popconfirm, Select, Space, Switch, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslations } from "next-intl";
 
@@ -54,6 +54,8 @@ function sourceLabel(t: (k: string) => string, v: ModelRow["source"]): string {
 
 export default function ModelsView() {
   const t = useTranslations("common.section.models");
+  // 经 App 上下文取 message：静态方法拿不到主题/上下文（antd 告警）
+  const { message } = App.useApp();
 
   const [data, setData] = useState<ModelsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -309,7 +311,7 @@ export default function ModelsView() {
 
   return (
     <div>
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
       <Card size="small" title={t("roleDefaultsTitle")} style={{ marginBottom: 24 }}>
         <Space orientation="vertical" style={{ width: "100%" }}>
           {renderRoleCard("main")}

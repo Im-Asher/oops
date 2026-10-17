@@ -28,7 +28,8 @@
       "invalidAgent": "Agent not found",
       "invalidReference": "The referenced image does not exist or may not be used",
       "tooLarge": "File too large",
-      "unsupportedType": "Unsupported file type"
+      "unsupportedType": "Unsupported file type",
+      "assetDeleteFailed": "Failed to delete the image, please try again later"
     }
   },
   "landing": {
@@ -221,6 +222,8 @@
     },
     "stage": {
       "label": "Canvas — zoom, pan and drag artworks",
+      "saveToPortfolio": "Save to portfolio",
+      "sendToDesign": "Send to design",
       "itemAlt": "Canvas artwork",
       "generating": "Generating…",
       "failed": "Generation failed",
@@ -228,6 +231,10 @@
       "retryAria": "Retry generation",
       "cancel": "Cancel",
       "confirmCrop": "Confirm crop"
+    },
+    "appHeader": {
+      "backToHome": "Back to home",
+      "balance": "Credits"
     },
     "page": {
       "toolStatus": {
@@ -265,7 +272,8 @@
       "exporting": "Exporting…",
       "export": "Export",
       "revealResult": "New result — click to view",
-      "openChat": "Open chat"
+      "openChat": "Open chat",
+      "resizeChatPanel": "Resize chat panel"
     }
   },
   "chat": {
@@ -442,6 +450,59 @@
       "change": "Change password"
     }
   },
+  "portfolio": {
+    "page": {
+      "title": "Portfolio",
+      "subtitle": "{count} works",
+      "empty": {
+        "title": "Your portfolio is empty",
+        "hint": "Tap the star on a canvas or design result to save it here"
+      },
+      "loadFailed": "Failed to load",
+      "retry": "Retry",
+      "loadMore": "Load more",
+      "end": "No more works",
+      "allTags": "All"
+    },
+    "card": {
+      "untitled": "Untitled",
+      "sourceUnknown": "Unknown source",
+      "fromSession": "From: {name}",
+      "imageMissing": "Image missing",
+      "save": "Save to portfolio",
+      "unsave": "Remove from portfolio",
+      "toCanvas": "Open in canvas",
+      "toDesign": "Open in design",
+      "edit": "Edit details",
+      "delete": "Delete permanently",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deleteHint": "This image will be permanently removed from the server",
+      "gone": "This image is no longer available"
+    },
+    "edit": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Give this image a name",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Type a tag and press Enter",
+      "tagsHint": "Tags are shared across the workspace",
+      "save": "Save",
+      "saved": "Saved",
+      "failed": "Failed to save, please try again"
+    },
+    "preview": {
+      "download": "Download",
+      "prompt": "Prompt",
+      "model": "Model",
+      "size": "Dimensions",
+      "savedAt": "Saved on"
+    },
+    "error": {
+      "emptyTag": "Tag cannot be empty",
+      "tagTooLong": "Tag is too long",
+      "tooManyTags": "Too many tags"
+    }
+  },
   "design": {
     "page": {
       "back": "Back",
@@ -451,7 +512,11 @@
       "draftSaving": "Saving…",
       "draftSaved": "Draft saved",
       "download": "Download PNG",
-      "downloadError": "Export failed, please try again"
+      "downloadError": "Export failed, please try again",
+      "saveToPortfolio": "Also save to portfolio",
+      "savedToPortfolio": "Saved to portfolio",
+      "saveFailed": "Downloaded, but failed to save to portfolio",
+      "handoffMissing": "This image is no longer available"
     },
     "rightPanel": {
       "canvasTitle": "Canvas",

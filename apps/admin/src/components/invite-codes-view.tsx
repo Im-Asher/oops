@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import {
   Alert,
+  App,
   Badge,
   Button,
   DatePicker,
@@ -15,7 +16,6 @@ import {
   Popconfirm,
   Table,
   Typography,
-  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslations } from "next-intl";
@@ -58,6 +58,8 @@ const STATUS_BADGE: Record<DerivedStatus, { color: string; key: string }> = {
 
 export default function InviteCodesView() {
   const t = useTranslations("common.section.inviteCodes");
+  // 经 App 上下文取 message：静态方法拿不到主题/上下文（antd 告警）
+  const { message } = App.useApp();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -235,7 +237,7 @@ export default function InviteCodesView() {
         </Form.Item>
       </Form>
 
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
 
       <Table<InviteCodeRow>
         rowKey="id"

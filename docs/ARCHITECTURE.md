@@ -54,7 +54,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
 | 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图（`src/server/infra/render/`），进程内限并发，与生图共用执行器闸门 |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
-| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（30 天） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线） |
+| 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（web 30 天 / 管理端 12 小时） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线）。管理端是另一套会话：`oops_admin_session` 不同名 + `ADMIN_AUTH_SECRET`（缺省回退 `AUTH_SECRET`），两侧互不相认 |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
 | 测试 | Vitest | 服务层单测 + 路由 mock 测试 |
 | 代码规范 | ESLint（`no-restricted-imports` 强制分层边界）+ tsc | |
@@ -183,12 +183,24 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，未实现项置灰禁用；主区创作横幅、
+**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，素材库与消息中心置灰禁用；主区创作横幅、
 创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
 （顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
-触发，携 `?w=&h=` 建页）+ `/chat` 页面级 `redirect("/canvas")` 保存量入口。窄屏（md 以下）
+触发，携 `?w=&h=` 建页）+
+`/chat` 页面级 `redirect("/canvas")` 保存量入口。作品集**不占独立路由**：作为 `/home` 主区的
+一个视图（`view: "home" | "portfolio"`），侧栏「作品集」切换主区而非跳转；`/portfolio`
+仅保留为 `redirect("/home")` 供旧书签可用。窄屏（md 以下）
 聊天与画布互斥切换显示。
+
+**作品集与加工出口**（`/home` 主区作品集视图）：作品集是跨会话聚合视图——**条目即原资产本身**，
+由 `assets.saved_at` 打标实现，非副本（见 §7）。三条入口：AI 画布卡片 hover 星标、
+创建设计导出面板「同时存入作品集」勾选、首页侧栏 `navPortfolio`。加工出口一律传
+`assetId` 而非图片 URL（`/canvas?assetId=`、`/design?assetId=`），服务端经
+`GET /api/assets/:id` 校验归属后才给出 `/files/*` 地址——传URL 会让用户手改参数注入
+任意外部图片源。设计侧以新增图层落地（复用 `designReducer` 的 `addElements`，自带
+`pushHistory` 故可撤销），不覆盖既有设计稿；资产已删只内联提示，设计稿保持原样。
+设计导出勾选入库失败时只警告：浏览器下载已完成，附加动作不得阻断首要意图。
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -202,9 +214,9 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 「本机工作区回贴完成」之后才消费草稿（避免快照旧草稿覆盖首页带来的新草稿）。
 
 **主题**：`components/theme-provider.tsx` 手写 Context（零依赖）——`applyTheme` 切 html
-`dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本按存储/系统偏好预设 class 防
-首屏闪烁。颜色一律走明/暗两套 CSS token（globals.css class-based dark variant），切换入口在
-首页侧栏底部与画布聊天面板头部。
+`dark` class，`oops-theme` 存 localStorage；layout 内联阻塞脚本在存储为 dark 时预设 class 防
+首屏闪烁，默认亮色。颜色一律走明/暗两套 CSS token（globals.css class-based dark variant），
+切换入口在首页侧栏底部与画布悬浮顶栏（AppHeader）。
 
 ### 5.3 i18n：locale 解析、词典分层与防回流
 
@@ -317,6 +329,15 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
 > `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
+>
+> `portfolio` 在 `assets` 上加 `saved_at`（收藏时间，null = 未收藏）与 `title`（用户命名），
+> 并新增 `tags`（全局标签词表，`name` 唯一）与 `asset_tags`（关联表，复合主键，两侧外键
+> `ON DELETE CASCADE`）两表（迁移 `0010`）。**收藏即在原资产上打标，不复制字节**
+> （零存储开销），代价是 `DELETE /api/sessions/:id` 的 GC 需跳过已收藏项
+> （`listKeysBySessionUnsaved` / `removeUnsavedBySession` 与无条件版本并存）；存活资产的
+> `session_id` 因 `ON DELETE SET NULL` 被置空，作品集展示其来源时呈现为未知。`saved_at`
+> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。创建设计的导出成果经
+> `POST /upload purpose=design` 落库为**无会话归属**资产（设计编辑器没有会话概念）。
 > `canvas-first-workbench` 增 `meta.referenceAssetId`（generate_image 血缘：引用的源图 assetId，
 > 参考图上传 `purpose=reference` 落 `kind=image` + `meta.purpose="reference"`，不追加聊天消息）。
 > `agent-session-memory` 新增 `messages.transcript`（LLM 视图）与 `chat_sessions.summary` /
@@ -331,9 +352,15 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 
 ### 7.1 管理面（admin console）
 
-独立应用 `apps/admin`（antd 栈，dev 端口 3001），与 web 共享同一 `oops_session`
-HMAC cookie；页面由 proxy 存在性检查 + layout `requireAdmin` 双层守卫。六张管理面：
+独立应用 `apps/admin`（antd 栈，dev 端口 3001），**自带登录页 `/login` 与独立的
+`oops_admin_session` 会话**（复用 `users` 表账号，`role=admin` 才发会话；web 端会话
+不被认，登录语义与部署形态无关）；页面由 proxy 存在性检查（无会话 → `/login`）+ layout
+`requireAdmin` 双层守卫。六张管理面：
 用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板。
+
+- **登录契约**：`POST /api/login` 同源校验 → 限频（10/60s）→ `authenticateAdmin`（密码 +
+  `role=admin` + `status=active`；失败一律"用户名或密码不正确"，不泄漏账号与角色）→
+  落 `auth.login` 审计 → 下发管理端会话 cookie。`role` 仍每请求判定：登录后被降级即 403。
 
 - **API 纪律**：每个 Route Handler 先 `requireAdmin`（401/403 结构化错误），输入 zod
   校验；**全部写操作 = 业务写入 + 同事务审计**（who / what / when / before / after），
@@ -343,7 +370,8 @@ HMAC cookie；页面由 proxy 存在性检查 + layout `requireAdmin` 双层守�
   写侧进程内代数 bump（admin 端写后本进程即时生效，web 端 ≤30s 收敛）；overlay
   读失败 fail-open 回落下层且失败结果不缓存。消费点：Agent 启停（web 侧过滤注册表）、
   模型启停、角色默认模型（main / summarizer）。
-- **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`user.status_change` / `invite.create` /
+- **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`auth.login`（管理员登录，覆盖面中
+  唯一的非写操作项）/ `user.status_change` / `invite.create` /
   `invite.revoke` / `credits.adjust` / `pricing.update` / `agent.toggle` / `model.config`
   （同时覆盖模型启停与角色默认模型）；审计可按动作 / 目标 / 操作者检索。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
@@ -376,7 +404,9 @@ oops/
 │   │       ├── auth/               # register / login / logout（邀请码 + 限频 + Set-Cookie）
 │   │       ├── profile/            # GET/PATCH 资料 + POST 改密（requireUser + 改密按 IP 限频）
 │   │       ├── sessions/route.ts   # 会话列表/新建（按认证用户隔离）
-│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联）
+│   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联；已收藏资产豁免）
+│   │       ├── assets/route.ts     # GET 作品集列表（游标分页 + 标签筛选）/ 批量收藏态（ids）
+│   │       ├── assets/[id]/route.ts# GET 单图详情（加工出口换址）/ PATCH 收藏·标题·标签 / DELETE 彻底删除
 │   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
@@ -385,7 +415,7 @@ oops/
 │   │       ├── storage/            # 存储抽象（S3 兼容，env 切换后端）
 │   │           ├── s3.ts           # S3Client 封装 + key 生成
 │   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
-│   │           ├── upload.ts       # 上传/画布导出处理（userId 必传）
+│   │           ├── upload.ts       # 上传处理：purpose=reference（参考图）/ =design（设计成果，无会话归属）/ 带 sessionId（画布派生导出）/ 缺省（userId-only）
 │   │   │   └── providers/          # 外部 Provider 接入
 │   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
 │   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider

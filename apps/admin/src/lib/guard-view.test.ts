@@ -13,12 +13,13 @@ vi.mock("@oops/db", () => ({ db: {} }));
 
 const findByIdMock = vi.fn<(id: string) => Promise<unknown>>();
 
-// 与 @oops/config 的 AUTH_SECRET 校验一致（≥32 字符）
+// 与 @oops/config 的密钥长度校验一致（≥32 字符）；守卫读管理端专用密钥与 cookie 名
 const SECRET = "admin-test-secret-0123456789abcdef";
 process.env.AUTH_SECRET = SECRET;
+process.env.ADMIN_AUTH_SECRET = SECRET;
 
 function cookie(value: string): string {
-  return `oops_session=${value}`;
+  return `oops_admin_session=${value}`;
 }
 
 function session(userId: string, tv = 0): string {

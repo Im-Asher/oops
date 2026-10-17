@@ -3,6 +3,7 @@
 import { Composer } from "@/components/chat/composer";
 import { PresetDialog } from "@/components/design/preset-dialog";
 import { LocaleToggle } from "@/components/locale-toggle";
+import { PortfolioPanel } from "@/components/portfolio/portfolio-panel";
 import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
 import {
@@ -96,6 +97,8 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   // 创建设计：尺寸前置设置弹窗（人工海报编辑器入口）。
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
+  /** 主区视图：创作落地页 / 作品集。作品集不占独立路由，侧栏切换即可。 */
+  const [view, setView] = useState<"home" | "portfolio">("home");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextFileIdRef = useRef(0);
 
@@ -157,7 +160,7 @@ export default function HomePage() {
         <div className="flex items-center gap-2 px-3 pb-4">
           <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
           <span
-            className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+            className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary"
             data-testid="app-version-badge"
             title={t("buildVersion", { version: APP_VERSION })}
           >
@@ -165,7 +168,13 @@ export default function HomePage() {
           </span>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label={t("mainNav")}>
-          <NavItem active href="/home" icon={LayoutDashboardIcon} label={t("navHome")} />
+          <NavItem
+            active={view === "home"}
+            href="/home"
+            icon={LayoutDashboardIcon}
+            label={t("navHome")}
+            onAction={() => setView("home")}
+          />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupCreate")}</p>
           <NavItem href="/canvas" icon={SparklesIcon} label={t("navCanvas")} />
           <NavItem
@@ -174,7 +183,12 @@ export default function HomePage() {
             onAction={() => setDesignDialogOpen(true)}
           />
           <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupLibrary")}</p>
-          <NavItem icon={ImageIcon} label={t("navPortfolio")} />
+          <NavItem
+            active={view === "portfolio"}
+            icon={ImageIcon}
+            label={t("navPortfolio")}
+            onAction={() => setView("portfolio")}
+          />
           <NavItem icon={ImagesIcon} label={t("navAssets")} />
           <NavItem icon={MessageSquareIcon} label={t("navMessages")} />
         </nav>
@@ -188,57 +202,65 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* 主区：创作横幅 + 创作输入框（垂直居中） */}
+      {/* 主区：作品集视图 或 创作落地页（横幅 + 输入框，垂直居中） */}
       <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
-          <section className="flex flex-col items-center gap-3 text-center">
-            <h1 className="text-3xl font-semibold text-foreground">{t("headline")}</h1>
-            <p className="text-sm text-muted-foreground">{t("subheadline")}</p>
-          </section>
+        {view === "portfolio" ? (
+          <PortfolioPanel />
+        ) : (
+          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
+            <section className="flex flex-col items-center gap-3 text-center">
+              <h1 className="text-3xl font-semibold text-foreground">{t("headline")}</h1>
+              <p className="text-sm text-muted-foreground">{t("subheadline")}</p>
+            </section>
 
-          <section>
-            <div
-              className={
-                submitting
-                  ? "scale-[0.99] opacity-60 transition-all duration-200"
-                  : "transition-all duration-200"
-              }
-            >
-              <Composer
-                agents={agents}
-                agentId={agentId}
-                busy={submitting}
-                hasSession={false}
-                onChange={setDraft}
-                onAgentChange={setAgentId}
-                onAttach={() => fileInputRef.current?.click()}
-                onRemovePendingFile={removeFile}
-                onSend={submitDirect}
-                pendingFiles={files.map((f) => ({ id: f.id, name: f.file.name }))}
-                value={draft}
-                variant="landing"
+            <section>
+              <div
+                className={
+                  submitting
+                    ? "scale-[0.99] opacity-60 transition-all duration-200"
+                    : "transition-all duration-200"
+                }
+              >
+                <Composer
+                  agents={agents}
+                  agentId={agentId}
+                  busy={submitting}
+                  hasSession={false}
+                  onChange={setDraft}
+                  onAgentChange={setAgentId}
+                  onAttach={() => fileInputRef.current?.click()}
+                  onRemovePendingFile={removeFile}
+                  onSend={submitDirect}
+                  pendingFiles={files.map((f) => ({ id: f.id, name: f.file.name }))}
+                  value={draft}
+                  variant="landing"
+                />
+              </div>
+              {fileError ? (
+                <p
+                  className="mt-2 px-1 text-xs text-red-500"
+                  data-testid="home-file-error"
+                  role="alert"
+                >
+                  {fileError}
+                </p>
+              ) : null}
+              <input
+                accept="image/*"
+                aria-hidden
+                className="hidden"
+                multiple
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+                ref={fileInputRef}
+                tabIndex={-1}
+                type="file"
               />
-            </div>
-            {fileError ? (
-              <p className="mt-2 px-1 text-xs text-red-500" data-testid="home-file-error" role="alert">
-                {fileError}
-              </p>
-            ) : null}
-            <input
-              accept="image/*"
-              aria-hidden
-              className="hidden"
-              multiple
-              onChange={(e) => {
-                addFiles(e.target.files);
-                e.target.value = "";
-              }}
-              ref={fileInputRef}
-              tabIndex={-1}
-              type="file"
-            />
-          </section>
-        </div>
+            </section>
+          </div>
+        )}
       </div>
 
       <PresetDialog onOpenChange={setDesignDialogOpen} open={designDialogOpen} />

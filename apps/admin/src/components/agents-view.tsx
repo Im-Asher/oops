@@ -4,7 +4,7 @@
 // 纪律同 users-view：开关以服务端返回为准（preventDefault 阻止乐观翻转）；
 // 30s TTL 跨进程生效窗口在来源列以 Tag 呈现（overlay 即本端已生效）。
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Popconfirm, Switch, Table, Tag, message } from "antd";
+import { Alert, App, Popconfirm, Switch, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslations } from "next-intl";
 
@@ -17,6 +17,8 @@ interface AgentRow {
 
 export default function AgentsView() {
   const t = useTranslations("common.section.agents");
+  // 经 App 上下文取 message：静态方法拿不到主题/上下文（antd 告警）
+  const { message } = App.useApp();
 
   const [rows, setRows] = useState<AgentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export default function AgentsView() {
 
   return (
     <div>
-      {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
       <Table<AgentRow> rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} />
     </div>
   );

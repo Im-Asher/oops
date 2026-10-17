@@ -43,6 +43,12 @@ beforeEach(() => {
       if (url === "/api/agents") {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(AGENTS) });
       }
+      if (url.startsWith("/api/assets")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ items: [], nextCursor: null }),
+        });
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve(null) });
     }),
   );
@@ -61,7 +67,7 @@ function imageFile(name: string): File {
 }
 
 describe("首页落地页", () => {
-  it("侧栏：AI 画布与创建设计可用（弹窗触发）、其余导航项置灰禁用", async () => {
+  it("侧栏：AI 画布/创建设计可用，其余导航项置灰禁用；作品集切换主区视图", async () => {
     renderWithI18n(<HomePage />);
     const canvasLink = await screen.findByText("AI 画布");
     expect(canvasLink.closest("a")?.getAttribute("href")).toBe("/canvas");
@@ -71,13 +77,25 @@ describe("首页落地页", () => {
     expect(await screen.findByText("新建设计")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    for (const label of ["作品集", "素材库", "消息中心", "设置"]) {
+    // 其余未实现的导航项仍为置灰禁用
+    for (const label of ["素材库", "消息中心", "设置"]) {
       expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
     }
     // 用户入口（头像触发）可达
     expect(screen.getByRole("button", { name: "用户菜单" })).toBeTruthy();
     // 语言切换入口与主题切换并列（双入口之一）
     expect(screen.getByRole("button", { name: "切换语言" })).toBeTruthy();
+  });
+
+  it("作品集：侧栏切换主区视图，不跳独立路由", async () => {
+    renderWithI18n(<HomePage />);
+    // 默认视图是创作落地页
+    expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
+    await userEvent.click(screen.getByText("作品集"));
+    // 切换到作品集面板：横幅消失，作品集空态出现
+    await waitFor(() => expect(screen.getByText("作品集还是空的")).toBeTruthy());
+    expect(screen.queryByText("用一句话，生成电商好图")).toBeNull();
+    expect(push).not.toHaveBeenCalledWith("/portfolio");
   });
 
   it("创作直发：提交携带文本 + send 标记跳 /canvas（空输入不可提交）", async () => {

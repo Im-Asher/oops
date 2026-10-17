@@ -102,6 +102,35 @@ describe("设计画布", () => {
   });
 });
 
+describe("设计画布平移", () => {
+  it("连续拖动：视图恒等于按下基线 + 自按下的总位移（不漂移、不回跳）", () => {
+    const { getState } = mountCanvas();
+    const container = screen.getByRole("application");
+    const startX = 200;
+    fireEvent.pointerDown(container, { button: 0, clientX: startX, clientY: 200, pointerId: 1 });
+    const x0 = getState().view.x;
+    // 向左连续拖动：每次移动的视图必须等于"自按下以来的总位移"，
+    // 若基线改用渲染后回写的 viewRef，会逐次叠加成 -10/-30/-60 的漂移（旧实现回跳源）。
+    for (const d of [-10, -20, -30, -40]) {
+      fireEvent.pointerMove(container, { clientX: startX + d, clientY: 200, pointerId: 1 });
+      expect(getState().view.x).toBeCloseTo(x0 + d);
+    }
+    fireEvent.pointerUp(container, { pointerId: 1 });
+  });
+
+  it("缩放后平移仍与指针同向且量值一致（无错位）", () => {
+    const { getState } = mountCanvas();
+    const container = screen.getByRole("application");
+    fireEvent.keyDown(container, { key: "+" });
+    expect(getState().view.scale).toBeGreaterThan(1);
+    fireEvent.pointerDown(container, { button: 0, clientX: 300, clientY: 300, pointerId: 1 });
+    const x0 = getState().view.x;
+    fireEvent.pointerMove(container, { clientX: 250, clientY: 300, pointerId: 1 });
+    expect(getState().view.x).toBeCloseTo(x0 - 50);
+    fireEvent.pointerUp(container, { pointerId: 1 });
+  });
+});
+
 describe("设计画布选择框手柄", () => {
   /** 单选正方形文本元素（300,300 100×100 fontSize 20），返回挂载句柄。 */
   function mountSquare() {
