@@ -272,7 +272,8 @@
       "exporting": "导出中…",
       "export": "导出",
       "revealResult": "有新结果，点击查看",
-      "openChat": "打开聊天"
+      "openChat": "打开聊天",
+      "resizeChatPanel": "调整聊天面板宽度"
     }
   },
   "chat": {

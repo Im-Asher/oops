@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render-with-i18n";
@@ -246,5 +246,57 @@ describe("canvas 页：选项卡点击应答（HITL）", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "促销主图" }));
     expect(chatCalls).toHaveLength(1);
+  });
+});
+
+describe("canvas 页：聊天面板宽度可调", () => {
+  /** 以 MouseEvent 模拟 pointer 事件（jsdom 未实现 PointerEvent，但 React 按 type 派发）。 */
+  function dispatchPointer(target: EventTarget, type: string, clientX: number) {
+    target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX }));
+  }
+
+  it("渲染右侧拖拽手柄（separator），初始宽度变量为默认 340px", async () => {
+    renderWithI18n(<ChatPage />);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    const handle = screen.getByTestId("chat-resize-handle");
+    expect(handle.getAttribute("role")).toBe("separator");
+    expect(handle.getAttribute("aria-orientation")).toBe("vertical");
+    const container = screen.getByTestId("chat-panel-container");
+    expect(container.style.getPropertyValue("--chat-width")).toBe("340px");
+  });
+
+  it("拖拽手柄向右改变宽度（未触顶时实时更新）", async () => {
+    renderWithI18n(<ChatPage />);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    const handle = screen.getByTestId("chat-resize-handle");
+    const container = screen.getByTestId("chat-panel-container");
+    // 默认窗口 1024，上限 512；向右拖 100px：340 -> 440
+    dispatchPointer(handle, "pointerdown", 0);
+    dispatchPointer(window, "pointermove", 100);
+    await waitFor(() =>
+      expect(container.style.getPropertyValue("--chat-width")).toBe("440px"),
+    );
+    dispatchPointer(window, "pointerup", 100);
+  });
+
+  it("窗口缩窄使半屏上限小于当前宽度时，宽度被钳制到上限", async () => {
+    const original = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 600 });
+    renderWithI18n(<ChatPage />);
+    await waitFor(() => expect(createCalls).toHaveLength(1));
+    const handle = screen.getByTestId("chat-resize-handle");
+    const container = screen.getByTestId("chat-panel-container");
+    // 挂载即钳制：默认 340 > 上限 300 -> 300
+    await waitFor(() =>
+      expect(container.style.getPropertyValue("--chat-width")).toBe("300px"),
+    );
+    // 继续右拖远超上限，仍被钳制在 300
+    dispatchPointer(handle, "pointerdown", 0);
+    dispatchPointer(window, "pointermove", 1000);
+    await waitFor(() =>
+      expect(container.style.getPropertyValue("--chat-width")).toBe("300px"),
+    );
+    dispatchPointer(window, "pointerup", 1000);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: original });
   });
 });

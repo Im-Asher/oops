@@ -272,7 +272,8 @@
       "exporting": "Exporting…",
       "export": "Export",
       "revealResult": "New result — click to view",
-      "openChat": "Open chat"
+      "openChat": "Open chat",
+      "resizeChatPanel": "Resize chat panel"
     }
   },
   "chat": {
