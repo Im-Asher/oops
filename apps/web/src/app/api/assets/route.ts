@@ -69,10 +69,14 @@ export async function GET(req: Request): Promise<Response> {
       return Response.json({ items: [] });
     }
     const rows = await createAssetRepo().getManyByIds(assetIds);
-    const owned = new Set(rows.filter((r) => r.userId === userId).map((r) => r.id));
+    // 注意：getManyByIds 返回的是"归属该用户的全部资产"，与是否收藏无关。
+    // 收藏态必须看 savedAt，否则每张自有图片都会被判为已收藏（星标恒亮）。
+    const savedMap = new Map(
+      rows.filter((r) => r.userId === userId).map((r) => [r.id, r.savedAt !== null]),
+    );
     // 未命中的按未收藏返回，客户端无需为每张图单独判空
     return Response.json({
-      items: assetIds.map((id) => ({ id, saved: owned.has(id) })),
+      items: assetIds.map((id) => ({ id, saved: savedMap.get(id) ?? false })),
     });
   }
 

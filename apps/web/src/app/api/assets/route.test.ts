@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   userId: null as string | null,
   savedRows: [] as unknown[],
-  manyRows: [] as { id: string; userId: string }[],
+  manyRows: [] as { id: string; userId: string; savedAt?: Date | null }[],
   tagLinks: [] as { assetId: string; tagId: string; name: string }[],
   createdTagId: "t1",
   listArgs: [] as unknown[],
@@ -156,13 +156,28 @@ describe("GET /api/assets", () => {
 
   describe("批量收藏态（ids）", () => {
     it("返回每张图的收藏态，未命中的标为未收藏", async () => {
-      h.manyRows = [{ id: "a1", userId: "u1" }];
+      h.manyRows = [{ id: "a1", userId: "u1", savedAt: new Date() }];
       const res = await GET(req("?saved&ids=a1,a2,a3"));
       const body = (await res.json()) as { items: { id: string; saved: boolean }[] };
       expect(body.items).toEqual([
         { id: "a1", saved: true },
         { id: "a2", saved: false },
         { id: "a3", saved: false },
+      ]);
+    });
+
+    it("自有但未收藏的资产返回 saved:false（星星不应默认点亮）", async () => {
+      // getManyByIds 返回的是"归属该用户的全部资产"，与收藏无关。
+      // 若只看归属就报 saved:true，画布上每张图都会显示成已收藏。
+      h.manyRows = [
+        { id: "a1", userId: "u1", savedAt: null },
+        { id: "a2", userId: "u1", savedAt: new Date() },
+      ];
+      const res = await GET(req("?saved&ids=a1,a2"));
+      const body = (await res.json()) as { items: { id: string; saved: boolean }[] };
+      expect(body.items).toEqual([
+        { id: "a1", saved: false },
+        { id: "a2", saved: true },
       ]);
     });
 
