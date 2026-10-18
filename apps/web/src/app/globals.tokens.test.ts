@@ -95,8 +95,14 @@ describe("globals.css 设计 token 契约", () => {
     expect(missing).toEqual([]);
   });
 
-  it("Step 2 依赖的四个 @utility 已注册（删掉任何一个，落地页以 unknown utility 报错）", () => {
-    for (const name of ["rounded-media", "rounded-pill", "bg-brand-gradient", "text-brand-gradient"]) {
+  it("落地页与侧栏依赖的 @utility 已注册（删掉任何一个会以 unknown utility 报错）", () => {
+    for (const name of [
+      "rounded-media",
+      "rounded-pill",
+      "bg-brand-gradient",
+      "text-brand-gradient",
+      "sidebar-scroll",
+    ]) {
       expect(css).toMatch(new RegExp(`@utility ${name}\\s*\\{`));
     }
   });

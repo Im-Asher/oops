@@ -454,10 +454,31 @@ Declared in `@theme inline` under Tailwind's spacing namespace, **never in `:roo
 | Element | Spec |
 | --- | --- |
 | Tile | 32px squircle (`--radius-lg`) holding a 16px icon |
-| Label | centered below the tile; `text-[11px]` expanded, `text-[10px]` collapsed, `whitespace-nowrap` |
-| Item height | ≈52px; 12px inline padding |
-| Group label | 11px at 70% opacity, centered; hidden in the rail, replaced by an `--brand-ink-800` hairline |
-| Footer | hairline above; settings entry, then the four function icons stacked and centered in **both** states |
+| Label | centered below the tile; `text-[11px]/leading-tight` expanded, `text-[10px]/leading-none` collapsed, `whitespace-nowrap` |
+| Item padding | `py-1` expanded, `py-0.5` collapsed (the rail carries the same 7 items in less height) |
+| Group label | expanded: a centered 10px tracked label flanked by two `--brand-ink-200` hairlines. Collapsed: the hairlines alone, no text |
+| Footer | hairline above. **Expanded**: one row of five icon buttons (settings · bell · theme · locale · avatar). **Collapsed**: a single column of the same five |
+
+The group label's hairlines are load-bearing, not decoration. An 11px centered gray word is nearly the same shape as a nav label, so without a rule on either side the "create" and "library" groups read as one undifferentiated list.
+
+#### B7.2.2a Vertical Budget
+
+The sidebar has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. Budget at a **565px** viewport (a short window — the case that actually broke):
+
+| Region | Expanded | Rail |
+| --- | --- | --- |
+| Container padding | 16 | 16 |
+| Brand header | 36 | 36 |
+| Nav content | 456 | 390 |
+| Footer | 49 | 157 |
+| **Total** | **557** | **599** |
+
+Expanded fits, so the panel never scrolls and 首页 is always the top item. The rail overruns at 565px and does scroll — accepted, because a 64px column holding 7 labeled items plus 5 footer controls has no other arrangement; from ~620px up it fits outright. **Overflow is the fallback, never the default** — if a change pushes the expanded total past the viewport, shrink a region rather than adding scroll.
+
+Two rules follow from the numbers:
+
+- The footer's expanded row costs 49px; the same five controls stacked cost 224px. Stacking them is what pushed the nav into overflow.
+- Never solve a height problem with `overflow-y-auto` alone. Radix restores focus to a nav trigger after a dialog closes, and the browser's `block:'nearest'` scroll then pushes 首页 out of view — the user cannot see where they are.
 
 #### B7.2.3 Color Hierarchy
 
@@ -477,8 +498,10 @@ Canva's per-app rainbow is an artifact of aggregating many brands. oops is one p
 Both states render the **same** nav item component; only `<aside>`'s width changes. Consequences:
 
 - Collapsing is a single `transition-[width]` on one element. Per-item re-layout during the animation is a defect.
-- The collapsed rail **keeps its text labels**. A 64px rail minus 16px padding leaves 48px, and four CJK glyphs at 10px occupy ≈40px — so the visible text can equal the `aria-label`, leaving no tooltip-only accessibility gap and no second label component.
+- The collapsed rail **keeps its text labels**. A 64px rail minus 12px padding leaves 52px, and four CJK glyphs at 10px occupy ≈40px — so the visible text can equal the `aria-label`, leaving no tooltip-only accessibility gap and no second label component.
 - Current view carries `aria-current="page"`.
+- The **footer** is the one region that legitimately differs between states: five controls cannot share a 52px row, so the rail stacks them while the panel keeps them in a row. Reference (Canva) does the same.
+- The nav scrolls only when the budget in B7.2.2a is exceeded, and its scrollbar is the `sidebar-scroll` utility — a 6px transparent-track bar. The default scrollbar overlaps `border-r` and reads as a double rule.
 
 #### B7.2.5 Narrow Viewport
 

@@ -266,6 +266,25 @@
   color: transparent;
 }
 
+/* 侧栏导航区的滚动条（DESIGN.md B7.2.2）：232px 宽的栏里系统默认滚动条会压在
+   border-r 上像双线。窄轨内容确实可能高于视口（7 项 + 5 个 footer 控件），故保留
+   滚动能力，但把滑块收细并让轨道透明——溢出是兜底，不该是常态观感。 */
+@utility sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: var(--radius-pill);
+    background-color: var(--border);
+  }
+}
+
 /* D2 / spec：落地页强制亮色单主题——无切换入口，也不受 html.dark 影响。
    显式覆盖语义层为 :root 同款亮色值，访客持久化的暗色偏好渗不进 / 子树；
    值与 :root 一字不差，语义层换色（Step 3）时两处需同步。 */

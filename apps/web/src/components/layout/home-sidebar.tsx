@@ -166,7 +166,9 @@ function NavTile({
 }) {
   const t = useTranslations("home");
   const shell = cn(
-    "flex w-full flex-col items-center gap-1.5 rounded-lg px-1 py-1.5 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring/50",
+    "flex w-full flex-col items-center gap-1 rounded-lg px-1 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring/50",
+    // 垂直预算（B7.2.2）：窄轨与面板的项高不同，否则 7 项 + footer 在矮视口必然溢出
+    collapsed ? "py-0.5" : "py-1",
     disabled ? "cursor-not-allowed opacity-40" : active ? "" : "hover:bg-accent/50",
   );
   const content = (
@@ -185,9 +187,9 @@ function NavTile({
       </span>
       <span
         className={cn(
-          // 窄轨内 4 个中文字约 40px，52px 可用宽度足够，故一律不截断（B7.2.2）
-          "whitespace-nowrap leading-tight",
-          collapsed ? "text-[10px]" : "text-[11px]",
+          // 窄轨内 4 个中文字约 40px，44px 可用宽度足够，故一律不截断（B7.2.2）
+          "whitespace-nowrap",
+          collapsed ? "text-[10px] leading-none" : "text-[11px] leading-tight",
           active ? "font-medium text-foreground" : "text-muted-foreground",
         )}
       >
@@ -246,13 +248,13 @@ function SidebarBody({
 }) {
   const t = useTranslations("home");
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-1.5 py-3">
+    <div className="flex min-h-0 flex-1 flex-col px-1.5 py-2">
       {collapsed ? (
-        <div className="flex justify-center pb-3">
+        <div className="flex justify-center pb-2">
           {onToggleCollapse ? <SidebarToggle action="expand" onClick={onToggleCollapse} /> : null}
         </div>
       ) : (
-        <div className="flex items-center gap-2 pb-3">
+        <div className="flex items-center gap-2 pb-2">
           <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
           <span
             className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary"
@@ -269,7 +271,10 @@ function SidebarBody({
         </div>
       )}
 
-      <nav aria-label={t("mainNav")} className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2">
+      <nav
+        aria-label={t("mainNav")}
+        className="sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
+      >
         {NAV_GROUPS.map((group, index) => (
           <div key={group.labelKey ?? `group-${index}`}>
             {group.labelKey ? (
@@ -279,9 +284,21 @@ function SidebarBody({
                   className="mx-auto my-2 h-px w-8 bg-brand-ink-200 dark:bg-brand-ink-800"
                 />
               ) : (
-                <p className="px-1 pb-1 pt-3 text-center text-[11px] text-muted-foreground/70">
-                  {t(group.labelKey)}
-                </p>
+                // 两侧发丝线 + 小字距标题：11px 居中裸文字与导航项标签几乎同形，
+                // 少了分隔就分不出「创建组」与「库组」（B7.2.2）
+                <div className="mt-2 mb-1 flex items-center gap-1.5 px-0.5">
+                  <span
+                    aria-hidden
+                    className="h-px flex-1 bg-brand-ink-200 dark:bg-brand-ink-800"
+                  />
+                  <span className="text-[10px] leading-none tracking-[0.08em] text-muted-foreground/70">
+                    {t(group.labelKey)}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="h-px flex-1 bg-brand-ink-200 dark:bg-brand-ink-800"
+                  />
+                </div>
               )
             ) : null}
             <div className="flex flex-col gap-0.5">
@@ -304,23 +321,32 @@ function SidebarBody({
         ))}
       </nav>
 
-      <div className="flex flex-col items-center gap-1 border-t border-border pt-3">
-        <NavTile
-          active={false}
-          collapsed={collapsed}
+      {/* footer：展开态一行、折叠轨一列。5 个控件在 64px 宽度里排成一行放不下，
+          而竖排一列要吃掉 ~170px，把 nav 挤到溢出并让「首页」被滚出视口（B7.2.2）。 */}
+      <div
+        className={cn(
+          "flex items-center border-t border-border pt-2",
+          collapsed ? "flex-col gap-0.5" : "flex-row justify-center gap-1",
+        )}
+      >
+        <Button
+          aria-disabled
+          aria-label={t("navSettings")}
+          className="disabled:opacity-40"
+          data-testid="nav-settings"
           disabled
-          icon={SettingsIcon}
-          label={t("navSettings")}
-          onActivate={() => {}}
-          testId="nav-settings"
-          tone="neutral"
-        />
-        <div className="mt-1 flex flex-col items-center gap-1">
-          <NotificationBell feed={notifications} onOpen={() => onActivate(MESSAGES_ENTRY)} />
-          <ThemeToggle />
-          <LocaleToggle />
-          <UserMenu />
-        </div>
+          size={collapsed ? "icon-sm" : "icon"}
+          // 可访问名取 aria-label（设置），title 只解释为何不可用——若只留 title，
+          // 读屏念出来的是「敬请期待」，用户不知道这个按钮是什么
+          title={t("comingSoon")}
+          variant="ghost"
+        >
+          <SettingsIcon />
+        </Button>
+        <NotificationBell feed={notifications} onOpen={() => onActivate(MESSAGES_ENTRY)} />
+        <ThemeToggle className={collapsed ? "size-7" : "size-8"} />
+        <LocaleToggle className={collapsed ? "size-7" : "size-8"} />
+        <UserMenu className={collapsed ? "size-8" : undefined} />
       </div>
     </div>
   );

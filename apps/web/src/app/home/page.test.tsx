@@ -286,6 +286,32 @@ describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
     }
   });
 
+  /**
+   * 回归锁：footer 曾把 5 个控件竖排 + 「设置」当一级导航 tile，footer 从 49px 涨到
+   * 224px，把 nav 挤到溢出——Radix 弹层关闭后焦点归位触发浏览器滚动，「首页」被推出
+   * 视口，当前位置指示彻底消失。jsdom 无布局引擎，测不出像素高度，故此处锁住产生该
+   * 高度的结构性事实：展开态 footer 是「设置图标 + 四个功能图标」同级的图标行，
+   * 「设置」不再是带文字标签的导航项。高度预算见 DESIGN.md B7.2.2a。
+   */
+  it("footer 在两态都是图标控件区：设置不再作为带标签的导航项", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+
+    const settings = screen.getByTestId("nav-settings");
+    expect(settings.textContent).toBe("");
+    // 可访问名来自 aria-label（设置），不是 title（敬请期待）
+    expect(settings.getAttribute("aria-label")).toBe("设置");
+    expect(settings.getAttribute("title")).toBe("敬请期待");
+    // 「设置」标签只属于 nav 语义，footer 不再重复渲染它
+    expect(screen.queryByText("设置")).toBeNull();
+    expect(screen.getByTestId("notifications-bell").parentElement).toBe(settings.parentElement);
+
+    // 折叠轨同样是纯图标区（不引入文字标签，64px 轨只够 28px 控件）
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    expect((screen.getByTestId("nav-settings") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("设置")).toBeNull();
+  });
+
   it("Cmd/Ctrl+B 切换折叠；在输入框内打字时不劫持", async () => {
     renderWithI18n(<HomePage />);
     const input = await screen.findByLabelText("消息输入");

@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { resolveDisplayName } from "@/lib/nickname";
+import { cn } from "cn";
 import { LogOutIcon, UserRoundIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -97,8 +98,9 @@ export function UserMenuContent() {
 
 /**
  * 用户入口（原工具条底部）：头像触发 + 用户菜单内容。
+ * className 供窄形态（首页侧栏折叠轨）缩小命中区，画布 AppHeader 沿用默认 40px。
  */
-export function UserMenu() {
+export function UserMenu({ className }: { className?: string }) {
   const t = useTranslations("chat.userMenu");
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
 
@@ -123,7 +125,10 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label={t("label")}
-          className="size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground"
+          className={cn(
+            "size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground",
+            className,
+          )}
           size="icon"
           variant="ghost"
         >
