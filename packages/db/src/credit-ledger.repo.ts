@@ -194,8 +194,10 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
 
     async getLatestBalanceRecoveryAt(userId) {
       // 正向流水三类：grant 发放 / release 冻结释放 / adjust 且为正（后台调增）
+      // 聚合 max(timestamptz) 由 pg 以字符串返回（不会走列类型的反序列化），
+      // 故按 string 取再显式转 Date：直接断言 Date 会让下游与 Date 比较恒为 false。
       const [row] = await db
-        .select({ at: sql<Date | null>`max(${creditLedger.createdAt})` })
+        .select({ at: sql<string | null>`max(${creditLedger.createdAt})` })
         .from(creditLedger)
         .where(
           and(
@@ -206,7 +208,7 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
             ),
           ),
         );
-      return row?.at ?? null;
+      return row?.at ? new Date(row.at) : null;
     },
 
     async getPrice(key) {
