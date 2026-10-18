@@ -1,55 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "@/test/render-with-i18n";
+import type {
+  NotificationItem,
+  NotificationsFeed,
+} from "@/lib/notifications/use-notifications";
 import { NotificationsPanel } from "./notifications-panel";
 
-interface Row {
-  id: string;
-  source: string;
-  category: string;
-  level: string;
-  title: string;
-  body: string;
-  i18nKey: string | null;
-  i18nParams: Record<string, unknown> | null;
-  createdAt: string;
-  readAt: string | null;
-}
-
-const h = vi.hoisted(() => ({
-  unread: 0 as number,
-  rows: [] as Row[],
-  listStatus: 200,
-}));
-
-const fetchMock = vi.fn();
-
-function defaultFetch(input: RequestInfo | URL, init?: RequestInit) {
-  const url = String(input);
-  if (url.includes("unread-count")) {
-    return Promise.resolve({ ok: true, json: async () => ({ unreadCount: h.unread }) });
-  }
-  if (url.startsWith("/api/notifications?")) {
-    return Promise.resolve({
-      ok: h.listStatus < 400,
-      status: h.listStatus,
-      json: async () =>
-        h.listStatus >= 400
-          ? { error: { code: "BOOM", message: "boom" } }
-          : { items: h.rows, total: h.rows.length },
-    });
-  }
-  if (init?.method === "PATCH") {
-    return Promise.resolve({ ok: true, json: async () => ({ unreadCount: 0 }) });
-  }
-  if (init?.method === "POST") {
-    return Promise.resolve({ ok: true, json: async () => ({ ok: true, marked: 2 }) });
-  }
-  return Promise.resolve({ ok: true, json: async () => ({}) });
-}
-
-function row(over: Partial<Row> = {}): Row {
+function item(over: Partial<NotificationItem> = {}): NotificationItem {
   return {
     id: "n1",
     source: "system",
@@ -65,71 +24,91 @@ function row(over: Partial<Row> = {}): Row {
   };
 }
 
-beforeEach(() => {
-  h.unread = 0;
-  h.rows = [];
-  h.listStatus = 200;
-  fetchMock.mockReset();
-  fetchMock.mockImplementation(defaultFetch);
-  vi.stubGlobal("fetch", fetchMock);
-});
+/** 面板是纯视图：注入 feed stub，断言只落在渲染与回调上。 */
+function makeFeed(over: Partial<NotificationsFeed> = {}): NotificationsFeed {
+  return {
+    items: [],
+    total: 0,
+    unreadCount: 0,
+    state: "ready",
+    error: null,
+    source: "all",
+    setSource: vi.fn(),
+    retry: vi.fn(),
+    markRead: vi.fn(async () => {}),
+    markAllRead: vi.fn(async () => {}),
+    ...over,
+  };
+}
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
 describe("NotificationsPanel", () => {
-  it("系统消息按词典渲染标题与正文（带 balance 插值）", async () => {
-    h.rows = [row()];
-    renderWithI18n(<NotificationsPanel />);
+  it("系统消息按词典渲染标题与正文（带 balance 插值）", () => {
+    renderWithI18n(<NotificationsPanel feed={makeFeed({ items: [item()], total: 1 })} />);
 
-    expect(await screen.findByText("积分已耗尽")).toBeTruthy();
-    expect(
-      screen.getByText("当前余额 0，已无法继续生成，请联系管理员补充积分。"),
-    ).toBeTruthy();
+    // 词典值而非库里中文原文：标题走 credits.exhaustedTitle，正文走 credits.exhausted
+    expect(screen.getByText("积分已耗尽")).toBeTruthy();
+    expect(screen.getByText("当前余额 0，已无法继续生成，请联系管理员补充积分。")).toBeTruthy();
   });
 
-  it("词典未登记的类别回退消息主体的中文原文", async () => {
-    h.rows = [
-      row({
-        category: "credits.mystery",
-        i18nKey: "notifications.credits.mystery",
-        i18nParams: null,
-        title: "库里的标题",
-        body: "库里的正文",
-      }),
-    ];
-    renderWithI18n(<NotificationsPanel />);
+  it("词典未登记的类别回退消息主体的中文原文", () => {
+    renderWithI18n(
+      <NotificationsPanel
+        feed={makeFeed({
+          items: [
+            item({
+              category: "credits.mystery",
+              i18nKey: "notifications.credits.mystery",
+              i18nParams: null,
+              title: "库里的标题",
+              body: "库里的正文",
+            }),
+          ],
+          total: 1,
+        })}
+      />,
+    );
 
-    expect(await screen.findByText("库里的标题")).toBeTruthy();
+    expect(screen.getByText("库里的标题")).toBeTruthy();
     expect(screen.getByText("库里的正文")).toBeTruthy();
   });
 
-  it("管理员消息（无 i18nKey）原样展示", async () => {
-    h.rows = [
-      row({
-        source: "admin",
-        category: "admin.broadcast",
-        i18nKey: null,
-        i18nParams: null,
-        title: "停机维护通知",
-        body: "今晚 02:00 停机 10 分钟",
-      }),
-    ];
-    renderWithI18n(<NotificationsPanel />);
+  it("管理员消息（无 i18nKey）原样展示", () => {
+    renderWithI18n(
+      <NotificationsPanel
+        feed={makeFeed({
+          items: [
+            item({
+              source: "admin",
+              category: "admin.broadcast",
+              i18nKey: null,
+              i18nParams: null,
+              title: "停机维护通知",
+              body: "今晚 02:00 停机 10 分钟",
+            }),
+          ],
+          total: 1,
+        })}
+      />,
+    );
 
-    expect(await screen.findByText("停机维护通知")).toBeTruthy();
+    expect(screen.getByText("停机维护通知")).toBeTruthy();
     expect(screen.getByText("今晚 02:00 停机 10 分钟")).toBeTruthy();
   });
 
-  it("未读与已读可区分，点击未读条目即标记已读", async () => {
-    h.rows = [row({ id: "u1" }), row({ id: "r1", readAt: "2026-10-18T09:00:00.000Z" })];
-    h.unread = 1;
-    renderWithI18n(<NotificationsPanel />);
+  it("未读与已读可区分；点击未读条目回调 markRead，已读条目不可点", () => {
+    const feed = makeFeed({
+      items: [item({ id: "u1" }), item({ id: "r1", readAt: "2026-10-18T09:00:00.000Z" })],
+      total: 2,
+      unreadCount: 1,
+    });
+    renderWithI18n(<NotificationsPanel feed={feed} />);
 
-    const unread = await screen.findByTestId("notification-u1");
+    const unread = screen.getByTestId("notification-u1");
     const read = screen.getByTestId("notification-r1");
     expect(unread.getAttribute("data-read")).toBe("unread");
     expect(read.getAttribute("data-read")).toBe("read");
@@ -137,62 +116,59 @@ describe("NotificationsPanel", () => {
     expect((read as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(unread);
-    await waitFor(() => {
-      const patch = fetchMock.mock.calls.find(
-        (c) => String(c[0]).endsWith("/api/notifications/u1") && c[1]?.method === "PATCH",
-      );
-      expect(patch).toBeTruthy();
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("notification-u1").getAttribute("data-read")).toBe("read");
-    });
+    expect(feed.markRead).toHaveBeenCalledWith("u1");
   });
 
-  it("未读数为 0 时禁用全部已读；点击后清零", async () => {
-    h.rows = [row()];
-    h.unread = 1;
-    renderWithI18n(<NotificationsPanel />);
-
-    const button = await screen.findByTestId("notifications-mark-all");
-    expect((button as HTMLButtonElement).disabled).toBe(false);
+  it("未读数为 0 时禁用全部已读；有点击时回调 markAllRead", () => {
+    const feed = makeFeed({ items: [item()], total: 1, unreadCount: 1 });
+    const { unmount } = renderWithI18n(<NotificationsPanel feed={feed} />);
+    const button = screen.getByTestId("notifications-mark-all") as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
     fireEvent.click(button);
-
-    await waitFor(() => {
-      const call = fetchMock.mock.calls.find((c) => String(c[0]).includes("read-all"));
-      expect(call?.[1]).toMatchObject({ method: "POST" });
-    });
-    await waitFor(() => {
-      expect(
-        (screen.getByTestId("notifications-mark-all") as HTMLButtonElement).disabled,
-      ).toBe(true);
-    });
-    expect(screen.queryByTestId("notifications-unread")).toBeNull();
-  });
-
-  it("切来源筛选会带上 source 重新取列表", async () => {
-    h.rows = [row()];
-    renderWithI18n(<NotificationsPanel />);
-    await screen.findByTestId("notifications-list");
-
-    fireEvent.click(screen.getByTestId("notifications-filter-admin"));
-    await waitFor(() => {
-      const calls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("?page=1"));
-      expect(String(calls.at(-1)?.[0])).toContain("source=admin");
-    });
-    expect(
-      screen.getByTestId("notifications-filter-admin").getAttribute("aria-pressed"),
-    ).toBe("true");
-  });
-
-  it("空态与错误态文案", async () => {
-    h.rows = [];
-    const { unmount } = renderWithI18n(<NotificationsPanel />);
-    expect(await screen.findByText("还没有任何消息")).toBeTruthy();
+    expect(feed.markAllRead).toHaveBeenCalledTimes(1);
     unmount();
 
-    h.listStatus = 500;
-    renderWithI18n(<NotificationsPanel />);
-    expect(await screen.findByRole("alert")).toBeTruthy();
-    expect(screen.getByText("重试")).toBeTruthy();
+    renderWithI18n(<NotificationsPanel feed={makeFeed()} />);
+    expect(
+      (screen.getByTestId("notifications-mark-all") as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("切来源筛选回调 setSource", () => {
+    const feed = makeFeed({ items: [item()], total: 1 });
+    renderWithI18n(<NotificationsPanel feed={feed} />);
+
+    // 当前筛选为 all，故三项都不高亮；点击把目标来源交回给父级
+    expect(screen.getByTestId("notifications-filter-all").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByTestId("notifications-filter-admin"));
+    expect(feed.setSource).toHaveBeenCalledWith("admin");
+  });
+
+  it("空态按筛选给不同文案；错误态给告警与重试", () => {
+    const { unmount } = renderWithI18n(<NotificationsPanel feed={makeFeed()} />);
+    expect(screen.getByText("还没有任何消息")).toBeTruthy();
+    unmount();
+
+    renderWithI18n(
+      <NotificationsPanel feed={makeFeed({ source: "admin" })} />,
+    );
+    expect(screen.getByText("该来源下暂无消息")).toBeTruthy();
+  });
+
+  it("error 态展示错误文案与重试入口", () => {
+    const feed = makeFeed({ state: "error", error: "消息加载失败，请重试" });
+    renderWithI18n(<NotificationsPanel feed={feed} />);
+
+    expect(screen.getByRole("alert").textContent).toBe("消息加载失败，请重试");
+    fireEvent.click(screen.getByText("重试"));
+    expect(feed.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("loading 态不渲染列表", () => {
+    const { container } = renderWithI18n(
+      <NotificationsPanel feed={makeFeed({ state: "loading" })} />,
+    );
+    expect(screen.queryByTestId("notifications-list")).toBeNull();
+    expect(container.querySelector(".animate-spin")).toBeTruthy();
   });
 });

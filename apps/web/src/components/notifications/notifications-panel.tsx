@@ -8,10 +8,10 @@
 import { Loader2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import {
-  useNotifications,
-  type NotificationItem,
-  type NotificationSourceFilter,
+import type {
+  NotificationItem,
+  NotificationSourceFilter,
+  NotificationsFeed,
 } from "@/lib/notifications/use-notifications";
 
 /** 筛选项与词典键成对声明，避免模板字符串拼键丢掉类型检查。 */
@@ -40,11 +40,14 @@ function interpolationParams(
   return out;
 }
 
-export function NotificationsPanel() {
+/**
+ * 纯展示组件：取数由 /home 持有并注入，铃铛与本视图共用同一份状态，
+ * 免掉两处各挂一个 hook 造成的双份轮询（4.2 的共享状态约定）。
+ */
+export function NotificationsPanel({ feed }: { feed: NotificationsFeed }) {
   const t = useTranslations("notifications");
   const th = useTranslations("home");
   const locale = useLocale();
-  const feed = useNotifications((k) => t(k));
 
   /**
    * 本地化文案。这里按 category 显式配对键位，而不是拿 i18nKey 去撞词典：

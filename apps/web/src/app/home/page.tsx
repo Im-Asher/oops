@@ -3,6 +3,8 @@
 import { Composer } from "@/components/chat/composer";
 import { PresetDialog } from "@/components/design/preset-dialog";
 import { LocaleToggle } from "@/components/locale-toggle";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { NotificationsPanel } from "@/components/notifications/notifications-panel";
 import { PortfolioPanel } from "@/components/portfolio/portfolio-panel";
 import { ThemeToggle } from "@/components/theme-provider";
 import { UserMenu } from "@/components/chat/user-menu";
@@ -20,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { setPendingHandoffFiles } from "@/lib/chat/home-handoff";
+import { useNotifications } from "@/lib/notifications/use-notifications";
 import { APP_VERSION } from "@/lib/version";
 import type { AgentInfo } from "@/types/chat";
 
@@ -86,6 +89,7 @@ function NavItem({
  */
 export default function HomePage() {
   const t = useTranslations("home");
+  const tn = useTranslations("notifications");
   const router = useRouter();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [draft, setDraft] = useState("");
@@ -97,8 +101,10 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   // 创建设计：尺寸前置设置弹窗（人工海报编辑器入口）。
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
-  /** 主区视图：创作落地页 / 作品集。作品集不占独立路由，侧栏切换即可。 */
-  const [view, setView] = useState<"home" | "portfolio">("home");
+  /** 主区视图：创作落地页 / 作品集 / 消息中心。后两者不占独立路由，侧栏切换即可（D10）。 */
+  const [view, setView] = useState<"home" | "portfolio" | "messages">("home");
+  // 铃铛与消息中心共用同一份取数状态：挂一次 hook、只跑一个 60s 轮询（D11）
+  const notifications = useNotifications((k) => tn(k));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextFileIdRef = useRef(0);
 
@@ -190,11 +196,17 @@ export default function HomePage() {
             onAction={() => setView("portfolio")}
           />
           <NavItem icon={ImagesIcon} label={t("navAssets")} />
-          <NavItem icon={MessageSquareIcon} label={t("navMessages")} />
+          <NavItem
+            active={view === "messages"}
+            icon={MessageSquareIcon}
+            label={t("navMessages")}
+            onAction={() => setView("messages")}
+          />
         </nav>
         <div className="flex items-center gap-1 border-t border-border pt-3">
           <NavItem icon={SettingsIcon} label={t("navSettings")} />
           <div className="ml-auto flex items-center gap-0.5 pr-1">
+            <NotificationBell feed={notifications} onOpen={() => setView("messages")} />
             <ThemeToggle />
             <LocaleToggle />
             <UserMenu />
@@ -202,10 +214,12 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* 主区：作品集视图 或 创作落地页（横幅 + 输入框，垂直居中） */}
+      {/* 主区：作品集 / 消息中心视图，或创作落地页（横幅 + 输入框，垂直居中） */}
       <div className="min-w-0 flex-1 overflow-y-auto">
         {view === "portfolio" ? (
           <PortfolioPanel />
+        ) : view === "messages" ? (
+          <NotificationsPanel feed={notifications} />
         ) : (
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
             <section className="flex flex-col items-center gap-3 text-center">

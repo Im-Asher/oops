@@ -49,6 +49,16 @@ beforeEach(() => {
           json: () => Promise.resolve({ items: [], nextCursor: null }),
         });
       }
+      // 消息中心列表：空；铃铛未读数：0
+      if (url.startsWith("/api/notifications?")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ items: [], total: 0 }),
+        });
+      }
+      if (url.includes("/api/notifications/unread-count")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ unreadCount: 0 }) });
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve(null) });
     }),
   );
@@ -77,14 +87,32 @@ describe("首页落地页", () => {
     expect(await screen.findByText("新建设计")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    // 其余未实现的导航项仍为置灰禁用
-    for (const label of ["素材库", "消息中心", "设置"]) {
+    // 其余未实现的导航项仍为置灰禁用（消息中心已启用，见下一例）
+    for (const label of ["素材库", "设置"]) {
       expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
     }
+    // 铃铛入口常驻侧栏底栏
+    expect(screen.getByTestId("notifications-bell")).toBeTruthy();
     // 用户入口（头像触发）可达
     expect(screen.getByRole("button", { name: "用户菜单" })).toBeTruthy();
     // 语言切换入口与主题切换并列（双入口之一）
     expect(screen.getByRole("button", { name: "切换语言" })).toBeTruthy();
+  });
+
+  it("消息中心：侧栏切换主区视图，不跳独立路由；铃铛计数随已读归零", async () => {
+    renderWithI18n(<HomePage />);
+    expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
+
+    // 侧栏「消息中心」不再是禁用态
+    const navBtn = screen.getByText("消息中心") as HTMLButtonElement;
+    expect(navBtn.disabled).toBe(false);
+    await userEvent.click(navBtn);
+
+    expect(await screen.findByText("还没有任何消息")).toBeTruthy();
+    expect(screen.queryByText("用一句话，生成电商好图")).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+    // 同一份状态：视图内未读数为 0 时铃铛也不带角标
+    expect(screen.queryByTestId("notifications-bell-count")).toBeNull();
   });
 
   it("作品集：侧栏切换主区视图，不跳独立路由", async () => {
