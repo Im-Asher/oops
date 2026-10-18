@@ -48,8 +48,11 @@ export interface CreditLedgerRepo {
    * + frozen 流水插入。调用方须在同一事务内完成任务创建，余额不足抛错整体回滚。
    */
   freeze(input: FreezeInput): Promise<CreditLedgerEntry>;
-  /** 结算：按任务定位冻结条目，退差 delta = 冻结额 − 实际成本（actualCost 缺省 = 冻结额），条目转 settled。 */
-  settle(input: { taskId: string; actualCost?: number }): Promise<void>;
+  /**
+   * 结算：按任务定位冻结条目，退差 delta = 冻结额 − 实际成本（actualCost 缺省 = 冻结额），条目转 settled。
+   * 返回被结算的冻结条目（携带 userId，供调用方复查结算后余额）；无冻结条目时返回 null。
+   */
+  settle(input: { taskId: string; actualCost?: number }): Promise<CreditLedgerEntry | null>;
   /** 按任务释放：返还全部冻结额 + 条目转 released + release 流水。 */
   releaseByTask(input: { taskId: string }): Promise<void>;
   /** 按条目释放（对账兜底用：任务可能已被删，taskId 被 FK 置空无法按任务定位）。 */
@@ -132,7 +135,7 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .from(creditLedger)
         .where(and(eq(creditLedger.taskId, taskId), eq(creditLedger.status, "frozen")))
         .limit(1);
-      if (!entry) return; // 无冻结条目（理论不可达）：幂等跳过，不产生流水
+      if (!entry) return null; // 无冻结条目（理论不可达）：幂等跳过，不产生流水
       const frozen = -entry.amount; // amount 为负存冻结额
       const delta = frozen - (actualCost ?? frozen);
       if (delta !== 0) {
@@ -148,6 +151,7 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .update(creditLedger)
         .set({ status: "settled" })
         .where(eq(creditLedger.id, entry.id));
+      return entry;
     },
 
     async releaseByTask({ taskId }) {

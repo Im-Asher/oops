@@ -7,6 +7,7 @@ import {
 } from "@oops/db/credit-ledger.repo";
 import { withAudit } from "@oops/db/admin-audit.repo";
 import { createTaskRepo, type TaskRepo } from "@oops/db/task.repo";
+import { notificationsService } from "../notifications/service";
 import { TaskError } from "../tasks/task-error";
 
 /** 新用户初始积分（分）；0007 迁移的存量回填额须与此一致。 */
@@ -74,6 +75,8 @@ export interface CreditsServiceDeps {
   runTx?: <T>(fn: (tx: DbClient) => Promise<T>) => Promise<T>;
   /** 事务内仓储工厂：缺省真实 repo 绑定 tx；单测注入 mock 以断言调用序。 */
   makeTxRepos?: (tx: DbClient) => { tasks: TaskRepo; ledger: CreditLedgerRepo };
+  /** 结算后余额复查的积分通知钩子；缺省为 best-effort 包装，单测注入 spy。 */
+  notifyCreditsState?: (userId: string, balance: number) => Promise<void>;
 }
 
 export function createCreditsService(deps: CreditsServiceDeps = {}): CreditsService {
@@ -82,6 +85,7 @@ export function createCreditsService(deps: CreditsServiceDeps = {}): CreditsServ
   const runTx = deps.runTx ?? ((fn) => defaultDb.transaction(fn));
   const makeTxRepos =
     deps.makeTxRepos ?? ((tx: DbClient) => ({ tasks: createTaskRepo(tx), ledger: createCreditLedgerRepo(tx) }));
+  const notifyCreditsState = deps.notifyCreditsState ?? notificationsService.notifyCreditsStateSafe;
 
   return {
     async freezeForTask(input) {
@@ -117,7 +121,20 @@ export function createCreditsService(deps: CreditsServiceDeps = {}): CreditsServ
     },
 
     // actualCost 缺省 = 冻结额（一口价），repo 内部定位冻结条目
-    settle: (taskId, actualCost) => ledger.settle({ taskId, actualCost }),
+    async settle(taskId, actualCost) {
+      const entry = await ledger.settle({ taskId, actualCost });
+      if (!entry) return;
+      // 结算后复查余额是「余额跌破预警线」的真实时刻，也是预警级通知唯一的触发点
+      // （生成闸门只在 ≤ 0 拒绝，够不到 0 < 余额 ≤ 预警线这一档）。
+      // 刻意不挂 freeze：冻结只是预扣，结算退差后余额才定，挂 freeze 会先发出一条
+      // 并不存在的预警，并被去重压掉本该在真正跌破时发出的那一条。
+      // best-effort：结算已落库，复查失败只记日志，绝不把已成功的结算变成失败。
+      try {
+        await notifyCreditsState(entry.userId, await ledger.getBalance(entry.userId));
+      } catch (err) {
+        console.error("[credits] 结算后积分通知复查失败:", err);
+      }
+    },
 
     release: (taskId) => ledger.releaseByTask({ taskId }),
 
