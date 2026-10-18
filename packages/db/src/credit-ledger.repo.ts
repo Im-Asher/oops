@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNull,
@@ -60,6 +61,12 @@ export interface CreditLedgerRepo {
    */
   adjust(input: { userId: string; amount: number; type: "grant" | "adjust"; note?: string }): Promise<number>;
   getBalance(userId: string): Promise<number>;
+  /**
+   * 最近一次余额回升的时刻（发放 / 后台调增 / 冻结释放），无则 null。
+   * 积分通知的「已复位」判据：与最近一条同类通知比较，账本晚于通知即视为已回升
+   * （append-only 账本已完整记录事实，无需额外状态列，见 design.md D6）。
+   */
+  getLatestBalanceRecoveryAt(userId: string): Promise<Date | null>;
   getPrice(key: string): Promise<number | null>;
   listLeakedFrozen(): Promise<LeakedFrozen[]>;
   /** 积分流水查询（createdAt 倒序分页）：用户/类型/时间范围过滤，管理台流水页用。 */
@@ -183,6 +190,23 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .where(eq(users.id, userId))
         .limit(1);
       return row?.balance ?? 0;
+    },
+
+    async getLatestBalanceRecoveryAt(userId) {
+      // 正向流水三类：grant 发放 / release 冻结释放 / adjust 且为正（后台调增）
+      const [row] = await db
+        .select({ at: sql<Date | null>`max(${creditLedger.createdAt})` })
+        .from(creditLedger)
+        .where(
+          and(
+            eq(creditLedger.userId, userId),
+            or(
+              inArray(creditLedger.type, ["grant", "release"]),
+              and(eq(creditLedger.type, "adjust"), gt(creditLedger.amount, 0)),
+            ),
+          ),
+        );
+      return row?.at ?? null;
     },
 
     async getPrice(key) {

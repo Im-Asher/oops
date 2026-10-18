@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { makeMockDb } from "@oops/db/mock-db";
 import type {
   AdminNotificationView,
   NotificationRepo,
 } from "@oops/db/notification.repo";
 import {
+  CREDITS_LOW_THRESHOLD,
   createNotificationsService,
   NotificationError,
   RETENTION_DAYS,
@@ -51,14 +52,21 @@ const adminInput = {
 describe("notifications service", () => {
   let mock: ReturnType<typeof makeMockDb>;
   let repo: MockRepo;
+  let ledger: {
+    getLatestBalanceRecoveryAt: Mock<(userId: string) => Promise<Date | null>>;
+  };
 
   const makeSvc = (overrides: Partial<Record<keyof NotificationRepo, unknown>> = {}) => {
     repo = makeRepo(overrides);
+    ledger = { getLatestBalanceRecoveryAt: vi.fn(async (_userId: string) => null as Date | null) };
     mock = makeMockDb({ pendingValues: { id: "n1", adminUserId: "admin-1" } });
     return createNotificationsService({
       notifications: repo as unknown as NotificationRepo,
       runTx: (fn) => fn(mock.db),
-      makeTxRepos: () => ({ notifications: repo as unknown as NotificationRepo }),
+      makeTxRepos: () => ({
+        notifications: repo as unknown as NotificationRepo,
+        ledger,
+      }),
     });
   };
 
@@ -205,6 +213,97 @@ describe("notifications service", () => {
       const expected = before - RETENTION_DAYS * 24 * 60 * 60 * 1000;
       expect(cutoff.getTime()).toBeGreaterThan(expected - 5_000);
       expect(cutoff.getTime()).toBeLessThanOrEqual(expected + 5_000);
+    });
+  });
+
+  describe("notifyCreditsState（两级阈值 + 去重复位）", () => {
+    it("高于预警线不通知", async () => {
+      const svc = makeSvc();
+      await expect(svc.notifyCreditsState("u1", CREDITS_LOW_THRESHOLD + 10)).resolves.toEqual({
+        notified: false,
+        reason: "above_threshold",
+      });
+      expect(repo.createWithDelivery).not.toHaveBeenCalled();
+    });
+
+    it("归零发耗尽通知（critical + 词典键 + 余额参数）", async () => {
+      const svc = makeSvc();
+      await expect(svc.notifyCreditsState("u1", 0)).resolves.toEqual({
+        notified: true,
+        category: "credits.exhausted",
+      });
+      expect(repo.createWithDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "system",
+          category: "credits.exhausted",
+          level: "critical",
+          i18nKey: "notifications.credits.exhausted",
+          i18nParams: { balance: 0 },
+          audience: "users",
+          targetUserIds: ["u1"],
+        }),
+      );
+    });
+
+    it("跌破预警线但仍为正发预警通知（warning）", async () => {
+      const svc = makeSvc();
+      await expect(svc.notifyCreditsState("u1", CREDITS_LOW_THRESHOLD - 5)).resolves.toEqual({
+        notified: true,
+        category: "credits.low",
+      });
+      expect(repo.createWithDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({ level: "warning", i18nKey: "notifications.credits.low" }),
+      );
+    });
+
+    it("已有同类通知且账本无回升 → 静默丢弃不重复发", async () => {
+      const svc = makeSvc({
+        findLatestCategoryAt: vi.fn(async () => new Date("2026-10-18T00:00:00Z")),
+      });
+      await expect(svc.notifyCreditsState("u1", 0)).resolves.toEqual({
+        notified: false,
+        reason: "already_notified",
+      });
+      expect(repo.createWithDelivery).not.toHaveBeenCalled();
+    });
+
+    it("账本回升晚于最近通知 → 允许再次通知", async () => {
+      const svc = makeSvc({
+        findLatestCategoryAt: vi.fn(async () => new Date("2026-10-18T00:00:00Z")),
+      });
+      ledger.getLatestBalanceRecoveryAt.mockResolvedValue(new Date("2026-10-18T06:00:00Z"));
+      await expect(svc.notifyCreditsState("u1", 0)).resolves.toEqual({
+        notified: true,
+        category: "credits.exhausted",
+      });
+      expect(repo.createWithDelivery).toHaveBeenCalled();
+    });
+
+    it("账本回升早于最近通知 → 仍在同一周期，丢弃", async () => {
+      const svc = makeSvc({
+        findLatestCategoryAt: vi.fn(async () => new Date("2026-10-18T06:00:00Z")),
+      });
+      ledger.getLatestBalanceRecoveryAt.mockResolvedValue(new Date("2026-10-18T00:00:00Z"));
+      await expect(svc.notifyCreditsState("u1", 0)).resolves.toEqual({
+        notified: false,
+        reason: "already_notified",
+      });
+      expect(repo.createWithDelivery).not.toHaveBeenCalled();
+    });
+
+    it("判定前先取会话级 advisory lock", async () => {
+      const svc = makeSvc();
+      await svc.notifyCreditsState("u1", 0);
+      expect(mock.state.calls[0]?.op).toBe("execute");
+    });
+
+    it("Safe 包装吞掉异常只记日志", async () => {
+      const svc = makeSvc();
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      repo.findLatestCategoryAt.mockRejectedValueOnce(new Error("db down"));
+      await expect(svc.notifyCreditsStateSafe("u1", 0)).resolves.toBeUndefined();
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
     });
   });
 });

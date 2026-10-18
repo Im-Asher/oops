@@ -7,6 +7,7 @@ import { sanitizeTranscript } from "@/server/agent/transcript";
 import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { requireUser } from "@oops/auth/require-user";
 import { creditsService } from "@oops/domain/credits/service";
+import { notificationsService } from "@oops/domain/notifications/service";
 import { createAssetRepo } from "@oops/db/asset.repo";
 import { createMessageRepo } from "@oops/db/message.repo";
 import { createSessionRepo } from "@oops/db/session.repo";
@@ -69,6 +70,14 @@ export async function POST(req: Request): Promise<Response> {
   // 正确性边界仍由冻结时条件 UPDATE 硬校验兜底，此处仅是体验层预检。
   const gate = await creditsService.checkGate(userId);
   if (!gate.ok) {
+    // 顺带投递积分通知（warning / exhausted 两级，去重见 domain 服务）。
+    // 预检边界：通知失败 MUST NOT 改变拒绝结果（credits spec「生成闸门」），
+    // 故此处兜住异常——即便 Safe 包装本身失效，402 依旧照发。
+    try {
+      await notificationsService.notifyCreditsStateSafe(userId, gate.balance);
+    } catch (err) {
+      console.error("[chat] 积分通知投递失败:", err);
+    }
     return Response.json(
       { error: { code: "INSUFFICIENT_CREDITS", message: "积分余额不足，无法生成" } },
       { status: 402 },
