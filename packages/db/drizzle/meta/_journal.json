@@ -78,6 +78,13 @@
       "when": 1792221616814,
       "tag": "0010_gorgeous_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792311139273,
+      "tag": "0011_nasty_roughhouse",
+      "breakpoints": true
     }
   ]
 }
