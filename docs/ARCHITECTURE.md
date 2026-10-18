@@ -183,7 +183,7 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，素材库与消息中心置灰禁用；主区创作横幅、
+**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计 / 消息中心可用，素材库置灰禁用；主区创作横幅、
 创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
 （顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
@@ -201,6 +201,16 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 任意外部图片源。设计侧以新增图层落地（复用 `designReducer` 的 `addElements`，自带
 `pushHistory` 故可撤销），不覆盖既有设计稿；资产已删只内联提示，设计稿保持原样。
 设计导出勾选入库失败时只警告：浏览器下载已完成，附加动作不得阻断首要意图。
+
+**消息中心**（`/home` 主区视图 + 侧栏底栏铃铛）：同样**不占独立路由**，
+`view: "home" | "portfolio" | "messages"`，侧栏切换主区而非跳转。取数收敛在一个
+hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并注入铃铛与视图，
+**只跑一个 60s 轮询**（多标签页不重复请求）：未读计数轮询，列表按来源筛选一次取完；
+`document.hidden` 时暂停，切回可见立即补拉一次，轮询失败静默保留上次计数（不为角标打扰用户）。
+系统消息按 `category` 与词典键**显式配对**渲染（`credits.low` / `credits.exhausted`
+各配 title + body 两键），未登记类别回退消息主体保存的中文原文——不拿 `i18n_key` 直接撞词典，
+因为 next-intl v4 没有 `t.has`，未知键只会打一条 onError 再返回键名。
+管理端下发（`source=admin`）无 i18n_key，标题正文一律原样展示。
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -310,6 +320,18 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
                         `model.<providerId>.<modelId>.enabled`(bool) /
                         `model.roleDefaults.<role>`({providerId,modelId})，
                         zod 校验写入；是配置三层链的 DB overlay 层）
+notifications 消息主体  id(uuid), source(text system|admin), category(text),
+                        level(text info|warning|critical), title(text), body(text),
+                        i18n_key(text?), i18n_params(jsonb?),
+                        audience(text all|users), created_by(text?, 管理员逻辑引用),
+                        revoked_at(timestamptz?), created_at
+                        （写时扇出：内容只存一份，逐人投递态在 user_notifications；
+                        撤回只置 revoked_at，用户侧立即不可见，管理端统计保留）
+user_notifications
+              用户投递  user_id(text), notification_id(uuid→notifications, 级联删),
+                        read_at(timestamptz?), PK(user_id, notification_id)
+                        （投递即「可见且未读」；已读 = read_at 非空。user_id 不设外键：
+                        users.id 是 uuid 而所有 *_user_id 列一律 text）
 ```
 
 枚举取值：
@@ -322,6 +344,16 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
 - `credit_ledger_type`：`grant` / `freeze` / `settle` / `release` / `adjust`
 - `credit_ledger_status`：`frozen` / `settled` / `released`（仅 freeze 条目持有）
+
+通知相关列一律 `text` + 应用层常量（`NOTIFICATION_SOURCES` / `_CATEGORIES` /
+`_LEVELS` / `_AUDIENCES`，见 `packages/db/src/notification.repo.ts`）：动作集与类别集
+随产品增长，`pgEnum` 改型需 DDL。取值：
+
+- `notifications.source`：`system` / `admin`
+- `notifications.level`：`info` / `warning` / `critical`
+- `notifications.audience`：`all` / `users`
+- `notifications.category`：`credits.low` / `credits.exhausted`（系统，积分两级阈值）
+  / `admin.broadcast`（管理员全体广播）/ `admin.direct`（管理员定向）
 
 > 注：`chat-image-gen` 已落地：① `chat_sessions` 新增 `agent_id` 列（迁移 `0001`）；
 > ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
@@ -349,14 +381,23 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 > `add-admin-console` 新增 `admin_audit_log` / `app_config` 表与 `invite_codes.revoked_at`
 > 列（迁移 `0008`）；`users.role` 在更早的抽包阶段加入（迁移 `0006`）。
 > 审计动作用 text + 应用层常量（不用 pgEnum——动作集随管理面增长，改型需 DDL）。
+> `add-message-center` 新增 `notifications` / `user_notifications` 两表（迁移 `0011`）。
+> 投递模型是**写时扇出**：消息主体一份内容，`user_notifications` 一人一行存已读态
+> （500/批插入），因此「谁收到了、谁读了」是直接查询而非运行时 join 扩散；
+> 撤回只置 `notifications.revoked_at`，用户侧列表/计数立即过滤，管理端的
+> 目标人数与已读明细仍可回答「撤回前多少人读过」。积分两类系统消息的
+> 去重与复位不引入状态列：比较「最近一条同类通知时刻」与「账本最近正向流水时刻」，
+> 配合事务级 `pg_advisory_xact_lock(hashtext(userId))` 消除并发双写窗口。
+> 保留期清理（已读且超 90 天）挂在 `apps/web/src/instrumentation.ts` 启动钩子。
 
 ### 7.1 管理面（admin console）
 
 独立应用 `apps/admin`（antd 栈，dev 端口 3001），**自带登录页 `/login` 与独立的
 `oops_admin_session` 会话**（复用 `users` 表账号，`role=admin` 才发会话；web 端会话
 不被认，登录语义与部署形态无关）；页面由 proxy 存在性检查（无会话 → `/login`）+ layout
-`requireAdmin` 双层守卫。六张管理面：
-用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板。
+`requireAdmin` 双层守卫。七张管理面：
+用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板 /
+消息管理（下发广播·定向、已读明细、撤回）。
 
 - **登录契约**：`POST /api/login` 同源校验 → 限频（10/60s）→ `authenticateAdmin`（密码 +
   `role=admin` + `status=active`；失败一律"用户名或密码不正确"，不泄漏账号与角色）→
@@ -373,7 +414,9 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 - **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`auth.login`（管理员登录，覆盖面中
   唯一的非写操作项）/ `user.status_change` / `invite.create` /
   `invite.revoke` / `credits.adjust` / `pricing.update` / `agent.toggle` / `model.config`
-  （同时覆盖模型启停与角色默认模型）；审计可按动作 / 目标 / 操作者检索。
+  （同时覆盖模型启停与角色默认模型）/ `message.send` / `message.revoke`（目标类型
+  `message`，与消息投递同事务落审计——「消息已发但审计缺失」不可能发生）；
+  审计可按动作 / 目标 / 操作者检索。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
@@ -407,7 +450,11 @@ oops/
 │   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联；已收藏资产豁免）
 │   │       ├── assets/route.ts     # GET 作品集列表（游标分页 + 标签筛选）/ 批量收藏态（ids）
 │   │       ├── assets/[id]/route.ts# GET 单图详情（加工出口换址）/ PATCH 收藏·标题·标签 / DELETE 彻底删除
-│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
+│   │       ├── notifications/      # 站内信：route.ts GET 列表（来源筛选 + 分页）/
+│   │       │   │                   #   unread-count/route.ts 未读计数（铃铛 60s 轮询）/
+│   │       │   │                   #   [id]/route.ts PATCH 标记已读（撤回后 404）/ read-all/route.ts 全部已读
+│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式；
+│   │                              #   积分不足 402 前 best-effort 投递「已耗尽」通知）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
 │   │   ├── db/                     # → @oops/db（packages/db：schema + 6 仓储 + drizzle/ 迁移与 drizzle.config.ts 共址）
@@ -438,8 +485,8 @@ oops/
 │   ├── src/
 │   │   ├── proxy.ts                # Edge 层引导（oops_session 存在性 → /gate；非安全边界）
 │   │   ├── app/
-│   │   │   ├── (console)/          # 门卫（requireAdminFromCookieHeader）+ AdminShell（Sider 六面菜单 +
-│   │   │   │                       #   头部身份/退出 form）+ 六面占位页（users/invite-codes/points/agents/models/audit）
+│   │   │   ├── (console)/          # 门卫（requireAdminFromCookieHeader）+ AdminShell（Sider 七面菜单 +
+│   │   │   │                       #   头部身份/退出 form）+ 七面页面（users/invite-codes/points/agents/models/audit/dashboard/messages）
 │   │   │   ├── gate/page.tsx       # 无 cookie 引导页（指路 web 端登录）
 │   │   │   ├── api/logout/route.ts # POST 清会话 cookie（Max-Age=0）+ 307 回 web 首页
 │   │   │   └── layout.tsx          # 文档壳（AntdRegistry + next-intl + ConfigProvider zhCN）
