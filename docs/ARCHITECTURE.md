@@ -212,6 +212,17 @@ hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并�
 因为 next-intl v4 没有 `t.has`，未知键只会打一条 onError 再返回键名。
 管理端下发（`source=admin`）无 i18n_key，标题正文一律原样展示。
 
+**侧栏形态与折叠**（spec home-landing「侧栏折叠态」、DESIGN.md B7.2）：侧栏从 `/home` 页面
+内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（纯展示，不碰 `view`、不碰路由、
+不取数），状态与浏览器副作用收敛在 `src/lib/layout/use-sidebar-collapse.ts`
+（`collapsed` / `drawerOpen` / `isNarrow` + localStorage + `Cmd/Ctrl+B` + `matchMedia`）。
+导航项一律「图标在上、文字在下」竖排堆叠，展开（232px）与折叠（64px）**共用同一组件**，
+切换只是 `<aside>` 的单元素 `width` 过渡，故折叠只重渲染侧栏子树、主区不参与。
+折叠态保留文字标签（可见文本即 `aria-label`，不留 tooltip-only 的无障碍缺口），品牌标识与
+版本徽标只在展开态呈现。窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉
+唤出（`components/ui/sheet.tsx`，无新依赖；焦点陷阱 / `aria-modal` / 滚动锁定交给 Radix）。
+视觉规范（tile 几何、分组色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
+
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
 内存暂存）交接。画布页用 `useSearchParams`（路由状态）读取参数——不读 `window.location`（SPA 挂载时其

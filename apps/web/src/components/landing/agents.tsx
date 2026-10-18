@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 
-// B7.4：类别只以 6px 前导色点标注于中性 chip 上，不做彩色填充——
+// B7.5：类别只以 6px 前导色点标注于中性 chip 上，不做彩色填充——
 // 最高对比永远属于主行动。coral 与 error 撞色（B2.3）不用，第三类走过渡蓝。
 const AGENTS = [
   {

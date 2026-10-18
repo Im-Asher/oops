@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { takePendingHandoffFiles } from "@/lib/chat/home-handoff";
@@ -34,7 +34,44 @@ const AGENTS = {
   ],
 };
 
+const SIDEBAR_KEY = "oops-sidebar-collapsed";
+
+/** 显式桩住 matchMedia：jsdom 不做媒体查询求值，桌面/窄屏两条分支需各自可控。 */
+function stubMatchMedia(matches: boolean) {
+  const listeners = new Set<(event: MediaQueryListEvent) => void>();
+  const mql = {
+    addEventListener: (_type: string, cb: (event: MediaQueryListEvent) => void) => {
+      listeners.add(cb);
+    },
+    addListener: () => {},
+    dispatchEvent: () => false,
+    matches,
+    media: "(max-width: 767.98px)",
+    onchange: null,
+    removeEventListener: (_type: string, cb: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(cb);
+    },
+    removeListener: () => {},
+  };
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => (query === mql.media ? mql : { ...mql, matches: false })),
+  );
+  return {
+    /** 模拟用户拖动窗口跨过 768px */
+    setMatches(next: boolean) {
+      mql.matches = next;
+      act(() => {
+        listeners.forEach((cb) => cb({ matches: next } as MediaQueryListEvent));
+      });
+    },
+  };
+}
+
 beforeEach(() => {
+  stubMatchMedia(false);
+  // 折叠态跨刷新保持，用例间必须隔离，否则后一条会读到前一条的落盘值
+  localStorage.clear();
   // 路由感知桩：仅 /api/agents 返回列表，其余接口按空数据处理
   vi.stubGlobal(
     "fetch",
@@ -79,17 +116,18 @@ function imageFile(name: string): File {
 describe("首页落地页", () => {
   it("侧栏：AI 画布/创建设计可用，其余导航项置灰禁用；作品集切换主区视图", async () => {
     renderWithI18n(<HomePage />);
-    const canvasLink = await screen.findByText("AI 画布");
-    expect(canvasLink.closest("a")?.getAttribute("href")).toBe("/canvas");
-    const designBtn = screen.getByText("创建设计") as HTMLButtonElement;
+    const canvasLink = await screen.findByTestId("nav-canvas");
+    expect(canvasLink.getAttribute("href")).toBe("/canvas");
+    // 竖排改造后标签包在内层 span 里，按钮语义只能经 testid 取
+    const designBtn = screen.getByTestId("nav-create-design") as HTMLButtonElement;
     expect(designBtn.disabled).toBe(false);
     await userEvent.click(designBtn);
     expect(await screen.findByText("新建设计")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     // 其余未实现的导航项仍为置灰禁用（消息中心已启用，见下一例）
-    for (const label of ["素材库", "设置"]) {
-      expect((screen.getByText(label) as HTMLButtonElement).disabled).toBe(true);
+    for (const id of ["nav-assets", "nav-settings"]) {
+      expect((screen.getByTestId(id) as HTMLButtonElement).disabled).toBe(true);
     }
     // 铃铛入口常驻侧栏底栏
     expect(screen.getByTestId("notifications-bell")).toBeTruthy();
@@ -104,7 +142,7 @@ describe("首页落地页", () => {
     expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
 
     // 侧栏「消息中心」不再是禁用态
-    const navBtn = screen.getByText("消息中心") as HTMLButtonElement;
+    const navBtn = screen.getByTestId("nav-messages") as HTMLButtonElement;
     expect(navBtn.disabled).toBe(false);
     await userEvent.click(navBtn);
 
@@ -119,7 +157,7 @@ describe("首页落地页", () => {
     renderWithI18n(<HomePage />);
     // 默认视图是创作落地页
     expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
-    await userEvent.click(screen.getByText("作品集"));
+    await userEvent.click(screen.getByTestId("nav-portfolio"));
     // 切换到作品集面板：横幅消失，作品集空态出现
     await waitFor(() => expect(screen.getByText("作品集还是空的")).toBeTruthy());
     expect(screen.queryByText("用一句话，生成电商好图")).toBeNull();
@@ -204,5 +242,117 @@ describe("首页落地页", () => {
     const badge = await screen.findByTestId("app-version-badge");
     expect(badge.textContent).toBe(`v${APP_VERSION}`);
     expect(screen.getByText("oops")).toBeTruthy();
+  });
+});
+
+describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
+  const sidebar = () => screen.getByTestId("home-sidebar");
+
+  it("默认展开：品牌标识与版本徽标在位，导航项竖排带标签", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+    expect(sidebar().getAttribute("data-collapsed")).toBe("false");
+    expect(screen.getByTestId("app-version-badge")).toBeTruthy();
+    expect(screen.getByText("创建设计")).toBeTruthy();
+  });
+
+  it("折叠钮切换：宽度态翻转，标签仍在，品牌标识让位给展开钮", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    expect(sidebar().getAttribute("data-collapsed")).toBe("true");
+    // 折叠态保留可见标签，故窄轨下 aria 名与可见文本一致（无 tooltip-only 缺口）
+    expect(screen.getByText("创建设计")).toBeTruthy();
+    expect(screen.queryByTestId("app-version-badge")).toBeNull();
+    expect(screen.queryByText("oops")).toBeNull();
+
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    expect(sidebar().getAttribute("data-collapsed")).toBe("false");
+    expect(screen.getByTestId("app-version-badge")).toBeTruthy();
+  });
+
+  it("当前视图项带 aria-current，置灰项两态都仍是 disabled", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+    expect(screen.getByTestId("nav-home").getAttribute("aria-current")).toBe("page");
+    expect(screen.getByTestId("nav-portfolio").getAttribute("aria-current")).toBeNull();
+
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    for (const id of ["nav-assets", "nav-settings"]) {
+      const el = screen.getByTestId(id) as HTMLButtonElement;
+      expect(el.disabled).toBe(true);
+      expect(el.getAttribute("aria-disabled")).toBe("true");
+    }
+  });
+
+  it("Cmd/Ctrl+B 切换折叠；在输入框内打字时不劫持", async () => {
+    renderWithI18n(<HomePage />);
+    const input = await screen.findByLabelText("消息输入");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "b" });
+    expect(sidebar().getAttribute("data-collapsed")).toBe("true");
+
+    // 输入态：组合键属于用户文本，不得折叠侧栏
+    fireEvent.keyDown(input, { ctrlKey: true, key: "b" });
+    expect(sidebar().getAttribute("data-collapsed")).toBe("true");
+
+    fireEvent.keyDown(window, { key: "b" });
+    expect(sidebar().getAttribute("data-collapsed")).toBe("true");
+  });
+
+  it("折叠态落盘并在下次挂载时恢复", async () => {
+    const { unmount } = renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    expect(localStorage.getItem(SIDEBAR_KEY)).toBe("1");
+    unmount();
+
+    renderWithI18n(<HomePage />);
+    await waitFor(() => expect(sidebar().getAttribute("data-collapsed")).toBe("true"));
+  });
+
+  it("窄屏：侧栏离开文档流，浮动按钮唤出抽屉，Esc 关闭", async () => {
+    stubMatchMedia(true);
+    renderWithI18n(<HomePage />);
+
+    await screen.findByTestId("sidebar-open-button");
+    expect(screen.queryByTestId("home-sidebar")).toBeNull();
+
+    await userEvent.click(screen.getByTestId("sidebar-open-button"));
+    expect(await screen.findByTestId("nav-home")).toBeTruthy();
+    // 抽屉内为展开形态：品牌标识在位
+    expect(screen.getByTestId("app-version-badge")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("nav-home")).toBeNull());
+  });
+
+  it("窄屏抽屉内切主区视图后自动收起", async () => {
+    stubMatchMedia(true);
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("sidebar-open-button");
+    await userEvent.click(screen.getByTestId("sidebar-open-button"));
+    await userEvent.click(await screen.findByTestId("nav-portfolio"));
+
+    expect(await screen.findByText("作品集还是空的")).toBeTruthy();
+    expect(screen.queryByTestId("nav-home")).toBeNull();
+  });
+
+  it("抽屉开着时把窗口拉回桌面：改走常驻侧栏，抽屉开合态不残留", async () => {
+    const mql = stubMatchMedia(true);
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("sidebar-open-button");
+    await userEvent.click(screen.getByTestId("sidebar-open-button"));
+    expect(await screen.findByTestId("nav-home")).toBeTruthy();
+
+    mql.setMatches(false);
+    await waitFor(() => expect(screen.getByTestId("home-sidebar")).toBeTruthy());
+    expect(screen.queryByTestId("sidebar-open-button")).toBeNull();
+
+    // 再次缩窄时抽屉应为关闭态，不能凭空自动打开
+    mql.setMatches(true);
+    await waitFor(() => expect(screen.getByTestId("sidebar-open-button")).toBeTruthy());
+    expect(screen.queryByTestId("nav-home")).toBeNull();
   });
 });

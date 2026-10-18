@@ -57,8 +57,8 @@ Canva is the friendliest face in design tooling: Adobe looks professional and fo
 | Motion 180/280/420ms | PRODUCT_DESIGN Principle 5 mandates a single 200ms rhythm | Baseline becomes 200ms (B6) |
 | 1320px container | `/home` is 768px, `/canvas` is full-bleed | Specify per surface (B7) |
 | Pro / Magic moments | **oops has no Pro tier and no Magic Studio** | Delete outright — a design system must not describe products that do not exist |
-| 5 category accents | 2 built-in agents today | Reduce to 3, and render as dots rather than colored fills (B7.4) |
-| No admin app | `apps/admin` uses antd, no Tailwind | Add a token mapping (B7.5) |
+| 5 category accents | 2 built-in agents today | Reduce to 3, and render as dots rather than colored fills (B7.5) |
+| No admin app | `apps/admin` uses antd, no Tailwind | Add a token mapping (B7.6) |
 
 ---
 
@@ -436,24 +436,76 @@ Rules: at most 3 blobs per viewport; never under body text (contrast), only behi
 - Under `prefers-reduced-motion: reduce`, entrances become instant and the crossfade becomes a hard cut. Blobs stay — they do not move anyway.
 - No looping animation anywhere on the landing page, hero included.
 
-### B7.2 Chat + Canvas (immersive)
+### B7.2 Application Sidebar `/home` (collapsible)
+
+Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation) + `apps/web/src/lib/layout/use-sidebar-collapse.ts` (state).
+
+#### B7.2.1 Width
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--spacing-sidebar` | 232px | expanded panel → `w-sidebar` |
+| `--spacing-sidebar-rail` | 64px | collapsed rail → `w-sidebar-rail` |
+
+Declared in `@theme inline` under Tailwind's spacing namespace, **never in `:root`**: `:root`'s semantic layer is mirrored verbatim by `.landing-root`, and the token guard in `globals.tokens.test.ts` turns red on any divergence. A width token added to `:root` alone breaks that mirror.
+
+#### B7.2.2 Nav Item Geometry
+
+| Element | Spec |
+| --- | --- |
+| Tile | 32px squircle (`--radius-lg`) holding a 16px icon |
+| Label | centered below the tile; `text-[11px]` expanded, `text-[10px]` collapsed, `whitespace-nowrap` |
+| Item height | ≈52px; 12px inline padding |
+| Group label | 11px at 70% opacity, centered; hidden in the rail, replaced by an `--brand-ink-800` hairline |
+| Footer | hairline above; settings entry, then the four function icons stacked and centered in **both** states |
+
+#### B7.2.3 Color Hierarchy
+
+The tile carries hierarchy, not personality:
+
+| State | Fill | Glyph |
+| --- | --- | --- |
+| Create group | `bg-brand-violet-500/12` | `text-brand-violet-700` (dark: `-300`) |
+| Library group | `bg-sidebar-accent` | `text-muted-foreground` |
+| Current | `bg-primary` | `text-primary-foreground` (the 6.2:1 pair from B2.4) |
+| Disabled | 40% opacity, no hover feedback | `cursor-not-allowed` |
+
+Canva's per-app rainbow is an artifact of aggregating many brands. oops is one product: a hand-picked hue set would break B2.1's naming rule, B2.6's chrome rule, and the contrast floor, for no communicative gain. Squircle geometry plus group hue plus a solid current tile reproduce the reference's visual language without that cost.
+
+#### B7.2.4 One Component, Two Widths
+
+Both states render the **same** nav item component; only `<aside>`'s width changes. Consequences:
+
+- Collapsing is a single `transition-[width]` on one element. Per-item re-layout during the animation is a defect.
+- The collapsed rail **keeps its text labels**. A 64px rail minus 16px padding leaves 48px, and four CJK glyphs at 10px occupy ≈40px — so the visible text can equal the `aria-label`, leaving no tooltip-only accessibility gap and no second label component.
+- Current view carries `aria-current="page"`.
+
+#### B7.2.5 Narrow Viewport
+
+Below 768px the sidebar leaves the document flow (`fixed inset-y-0`, off-canvas) and opens as an overlay sheet from a floating 40px menu button; the main area takes the full width. The overlay, `Escape`, and a main-view switch all dismiss it. Radix `Dialog` provides the focus trap, `aria-modal`, and scroll lock — hand-rolled `keydown` plus a backdrop div is not an acceptable substitute.
+
+#### B7.2.6 Motion
+
+`transition-[width]` on `--duration-slow` (320ms — the "panel expansion" step in B6) with `--ease-standard`; `motion-reduce:transition-none` degrades to an instant swap. A fourth duration step is a defect (B6).
+
+### B7.3 Chat + Canvas (immersive)
 
 - Stage: `--brand-ink-950` plus a `radial-gradient` dot grid (currently hardcoded `rgba(255,255,255,0.07)` — should become a token).
 - No brand color inside the stage (see B2.6).
 - Floating chat panel: translucent `--brand-ink-900` with backdrop blur; focus ring in cyan.
 - Zoom and pan never re-encode images; animation is limited to container transforms.
 
-### B7.3 Design Editor (tooling)
+### B7.4 Design Editor (tooling)
 
 - Density over whitespace: tight panels, 28–32px control heights.
 - Colors *inside* the canvas are **user content**, outside this palette's scope (the swatch constants in `design-right-panel.tsx` are content, not chrome — they are compliant).
 - Documents may opt into the serif family (`--font-editorial`), kept separate from the UI family.
 
-### B7.4 Agent Labels
+### B7.5 Agent Labels
 
 The agent count will grow, but there are only **three** category colors: atmosphere → cyan family, poster → violet family, custom → coral (decorative). Render as a **neutral chip with a 6px leading color dot**, not a colored fill — highest contrast always belongs to the primary action (Principle 5).
 
-### B7.5 admin (antd mapping)
+### B7.6 admin (antd mapping)
 
 `apps/admin` uses antd and does not consume Tailwind tokens, so the mapping must be explicit or the two apps silently diverge:
 

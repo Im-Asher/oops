@@ -54,6 +54,19 @@ Key characteristics:
   best-effort everywhere: a failure must never change a 402 rejection or turn
   a settled task into a failed one. Retention (read + >90d) is purged from
   `apps/web/src/instrumentation.ts` at startup.
+- **Collapsible app sidebar** — `/home`'s left sidebar is a single component
+  (`components/layout/home-sidebar.tsx`) whose nav items stack vertically
+  (icon above label) in **both** states; collapsing to a 64px rail changes only
+  the `<aside>` width, so folding never re-lays-out the items and never
+  re-renders the main area. The collapsed rail **keeps its text labels** — the
+  visible text is the accessible name, so no tooltip-only a11y gap opens. State
+  (collapsed / narrow-viewport drawer / `Cmd/Ctrl+B` / localStorage) lives in
+  `lib/layout/use-sidebar-collapse.ts`; the wordmark and build-version badge
+  appear only in the expanded state. Below 768px the sidebar leaves the
+  document flow and opens as a Radix Dialog sheet
+  (`components/ui/sheet.tsx`, no new dependency). Geometry, group hues and the
+  `--spacing-sidebar*` width tokens are specified in `docs/DESIGN.md` B7.2 —
+  change them there first.
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.
@@ -128,7 +141,7 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   │   │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
 │   │   │   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
 │   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
-│   │   ├── components/     # React components (client)
+│   │   ├── components/     # React components (client)；layout/ 放跨页面壳层（home-sidebar 等）
 │   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
 │   │   ├── lib/            # Shared utilities (client-safe)
 │   │   └── types/          # Shared TypeScript types
