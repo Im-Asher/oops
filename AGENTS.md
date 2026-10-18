@@ -40,6 +40,20 @@ Key characteristics:
   spelling cannot fragment. Processing entry points pass `assetId` (never a URL)
   through `GET /api/assets/:id`, which checks ownership before handing out an
   address — a URL param would let a user inject an arbitrary external image.
+- **Message center** — in-app notifications rendered as a view inside `/home`
+  (sidebar switches views; the bell sits in the sidebar footer). Delivery is
+  **write-time fan-out**: one `notifications` row holds the content, one
+  `user_notifications` row per recipient holds the read state, so "who
+  received it / who read it" is a query rather than a runtime join spread.
+  Revoking only stamps `revokedAt` — invisible to the user immediately, while
+  the admin console keeps target/read counts for the record. Credits notices
+  are two-level (`credits.low` on settlement, `credits.exhausted` at the 402
+  gate); dedup/reset is derived from the append-only ledger timeline (no
+  extra state column) and serialized per user with a transaction-level
+  `pg_advisory_xact_lock(hashtext(userId))`. Notification writes are
+  best-effort everywhere: a failure must never change a 402 rejection or turn
+  a settled task into a failed one. Retention (read + >90d) is purged from
+  `apps/web/src/instrumentation.ts` at startup.
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.
@@ -93,8 +107,8 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 pnpm workspace monorepo. The web app lives in `apps/web/` (package
 `@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
 antd-only UI stack, dev port 3001, guarded by the same `oops_session` cookie;
-six management surfaces live since M2: users / invite codes / credits ops /
-agent toggles / model config / dashboard+audit); `packages/` holds shared
+seven management surfaces live since M2: users / invite codes / credits ops /
+agent toggles / model config / dashboard+audit / message center); `packages/` holds shared
 packages. Unless
 written with a repo-root prefix, all app paths in the sections below are
 **relative to `apps/web/`** (admin paths use explicit `apps/admin/` prefixes).
