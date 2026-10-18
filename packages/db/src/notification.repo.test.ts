@@ -139,10 +139,29 @@ describe("notification repo", () => {
     const detail = await createNotificationRepo(mock.db).getAdminDetail("n1");
     expect(detail?.notification.id).toBe("n1");
     expect(detail?.readBy).toEqual([]);
-    expect(mock.state.calls.at(-1)?.op).toBe("select.from.innerJoin.where.orderBy");
+    // 已读行为空时不再查用户资料（users.id 是 uuid，user_id 是 text，不能 join）
+    expect(mock.state.calls.at(-1)?.op).toBe("select.from.where.orderBy");
 
     const empty = makeMockDb({ selectQueue: [[]] });
     await expect(createNotificationRepo(empty.db).getAdminDetail("nope")).resolves.toBeNull();
+  });
+
+  it("getAdminDetail 的已读明细用两次查询 + JS 映射取用户名", async () => {
+    const readAt = new Date("2026-10-18T08:30:00.000Z");
+    const mock = makeMockDb({
+      selectQueue: [
+        [{ id: "n1", targetCount: 1, readCount: 1 }],
+        [{ userId: "u1", readAt }],
+        [{ id: "u1", username: "alice", displayName: "Alice" }],
+      ],
+    });
+    const detail = await createNotificationRepo(mock.db).getAdminDetail("n1");
+    expect(detail?.readBy).toEqual([
+      { userId: "u1", username: "alice", displayName: "Alice", readAt },
+    ]);
+    // 明细与资料分两条查：不存在 uuid = text 的无效比较
+    expect(mock.state.calls.at(-2)?.op).toBe("select.from.where.orderBy");
+    expect(mock.state.calls.at(-1)?.op).toBe("select.from.where");
   });
 
   it("revoke 置位 revokedAt", async () => {

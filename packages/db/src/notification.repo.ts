@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   lt,
@@ -358,12 +359,9 @@ export function createNotificationRepo(db: DbClient = defaultDb): NotificationRe
       const readRows = await db
         .select({
           userId: userNotifications.userId,
-          username: users.username,
-          displayName: users.displayName,
           readAt: userNotifications.readAt,
         })
         .from(userNotifications)
-        .innerJoin(users, eq(users.id, userNotifications.userId))
         .where(
           and(
             eq(userNotifications.notificationId, id),
@@ -371,9 +369,27 @@ export function createNotificationRepo(db: DbClient = defaultDb): NotificationRe
           ),
         )
         .orderBy(asc(userNotifications.readAt));
+
+      // users.id 是 uuid 而 user_notifications.user_id 是 text，直接 join 会被 PG
+      // 判为「uuid = text」无有效比较（同 credit-ledger.listAll 的坑）：改为两次查询 + JS 映射
+      const profiles =
+        readRows.length === 0
+          ? []
+          : await db
+              .select({ id: users.id, username: users.username, displayName: users.displayName })
+              .from(users)
+              .where(inArray(users.id, readRows.map((r) => r.userId)));
+      const profileById = new Map(profiles.map((p) => [p.id, p]));
+
       return {
         notification,
-        readBy: readRows.map((r) => ({ ...r, readAt: r.readAt as Date })),
+        readBy: readRows.map((r) => ({
+          userId: r.userId,
+          // 用户行缺失只在将来支持删用户时才可能出现（MVP 无此路径），此处不静默吞掉
+          username: profileById.get(r.userId)?.username ?? "",
+          displayName: profileById.get(r.userId)?.displayName ?? null,
+          readAt: r.readAt as Date,
+        })),
       };
     },
 
