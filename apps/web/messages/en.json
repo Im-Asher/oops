@@ -513,6 +513,7 @@
     "bellLabel": "Messages ({count} unread)",
     "unreadCount": "{count} unread",
     "markAllRead": "Mark all as read",
+    "retry": "Retry",
     "empty": "No messages yet",
     "emptyFiltered": "No messages from this source",
     "loadFailed": "Failed to load messages, please retry",

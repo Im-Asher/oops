@@ -513,6 +513,7 @@
     "bellLabel": "消息中心（{count} 条未读）",
     "unreadCount": "{count} 条未读",
     "markAllRead": "全部已读",
+    "retry": "重试",
     "empty": "还没有任何消息",
     "emptyFiltered": "该来源下暂无消息",
     "loadFailed": "消息加载失败，请重试",
