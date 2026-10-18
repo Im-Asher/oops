@@ -503,6 +503,26 @@
       "tooManyTags": "标签过多"
     }
   },
+  "notifications": {
+    "credits": {
+      "lowTitle": "积分即将耗尽",
+      "low": "当前余额 {balance}，已低于预警线。余额耗尽后将无法继续生成。",
+      "exhaustedTitle": "积分已耗尽",
+      "exhausted": "当前余额 {balance}，已无法继续生成，请联系管理员补充积分。"
+    },
+    "bellLabel": "消息中心（{count} 条未读）",
+    "unreadCount": "{count} 条未读",
+    "markAllRead": "全部已读",
+    "empty": "还没有任何消息",
+    "emptyFiltered": "该来源下暂无消息",
+    "loadFailed": "消息加载失败，请重试",
+    "filter": {
+      "label": "来源筛选",
+      "all": "全部",
+      "system": "系统通知",
+      "admin": "管理员消息"
+    }
+  },
   "design": {
     "page": {
       "back": "返回",
