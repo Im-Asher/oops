@@ -170,10 +170,10 @@
     "buildVersion": "构建版本 {version}",
     "mainNav": "主导航",
     "navHome": "首页",
-    "groupCreate": "创建",
+    "groupCreate": "创作",
     "navCanvas": "AI 画布",
-    "navCreateDesign": "创建设计",
-    "groupLibrary": "库",
+    "navLayoutDesign": "排版设计",
+    "groupLibrary": "图库",
     "navPortfolio": "作品集",
     "navAssets": "素材库",
     "navMessages": "消息中心",
@@ -227,7 +227,7 @@
     "stage": {
       "label": "画布，可缩放、平移与拖动作品",
       "saveToPortfolio": "存作品集",
-      "sendToDesign": "转至创建设计",
+      "sendToDesign": "转至排版设计",
       "itemAlt": "画布作品",
       "generating": "生成中…",
       "failed": "生成失败",
@@ -460,7 +460,7 @@
       "subtitle": "{count} 件作品",
       "empty": {
         "title": "作品集还是空的",
-        "hint": "在画布或创建设计中点击星标，把满意的图存进来"
+        "hint": "在画布或排版设计中点击星标，把满意的图存进来"
       },
       "loadFailed": "加载失败",
       "retry": "重试",

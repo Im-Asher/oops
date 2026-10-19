@@ -19,7 +19,7 @@ interface HomePendingFile {
 }
 
 /**
- * 首页落地页（spec/home-landing）：左侧栏（首页/创建分组/用户入口）+ 垂直居中的
+ * 首页落地页（spec/home-landing）：左侧两级栏（首页 / 创作 / 图库 + 二级项）+ 垂直居中的
  * 创作横幅与完整创作 composer（Agent 选择/附件）。提交即直发：跳 /canvas 后
  * 由画布侧新建会话并自动发送（含附件为参考图）。
  */
@@ -35,9 +35,10 @@ export default function HomePage() {
   const [fileError, setFileError] = useState<string | null>(null);
   // 直发乐观态：按钮转圈 + 输入卡弱化 + 路由锁（跳转期间不可再触发）。
   const [submitting, setSubmitting] = useState(false);
-  // 创建设计：尺寸前置设置弹窗（人工海报编辑器入口）。
+  // 排版设计：尺寸前置设置弹窗（人工海报编辑器入口）。
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
-  /** 主区视图：创作落地页 / 作品集 / 消息中心。后两者不占独立路由，侧栏切换即可（D10）。 */
+  /** 主区视图：创作落地页 / 作品集 / 消息中心。后两者不占独立路由，侧栏切换即可（D10）。
+   *  消息中心在导航树里没有条目 —— 唯一入口是侧栏底栏铃铛，由它切到这里。 */
   const [view, setView] = useState<HomeView>("home");
   // 铃铛与消息中心共用同一份取数状态：挂一次 hook、只跑一个 60s 轮询（D11）
   const notifications = useNotifications((k) => tn(k));
@@ -97,8 +98,8 @@ export default function HomePage() {
 
   return (
     <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
-      {/* 左侧栏：首页 / 创建分组（AI画布、创建设计弹窗可用）/ 其他导航项置灰 / 底部用户入口。
-          折叠/抽屉状态由侧栏内部持有，故此处切换侧栏不会重渲染主区。 */}
+      {/* 左侧两级栏：一级项 首页 / 创作 / 图库，二级项随所属组展开；
+          折叠/抽屉/展开态由侧栏内部持有，故此处切换侧栏不会重渲染主区。 */}
       <HomeSidebar
         notifications={notifications}
         onOpenDesign={() => setDesignDialogOpen(true)}

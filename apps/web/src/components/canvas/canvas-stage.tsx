@@ -39,7 +39,7 @@ interface CanvasStageProps {
   /** 作品集收藏态查询：按 assetId 判断该条目是否已收藏。 */
   isSaved?: (assetId: string) => boolean;
   onToggleSaved?: (item: CanvasItem) => void;
-  /** 转至创建设计：以新增图层落地，不影响现有设计稿。 */
+  /** 转至排版设计：以新增图层落地，不影响现有设计稿。 */
   onToDesign?: (item: CanvasItem) => void;
 }
 

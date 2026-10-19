@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { takePendingHandoffFiles } from "@/lib/chat/home-handoff";
@@ -113,22 +113,37 @@ function imageFile(name: string): File {
   return new File(["data"], name, { type: "image/png" });
 }
 
+/** 切换一级组的展开态（单开：展开一个即收起另一个）。 */
+async function toggleGroup(id: "create" | "library") {
+  await userEvent.click(screen.getByTestId(`nav-${id}`));
+}
+
+/** 导航树内携带当前位置标记的行数。铃铛在 nav 之外，不计入。 */
+function navCurrentCount(): number {
+  return document.querySelectorAll('nav [aria-current="page"]').length;
+}
+
+function navRow(id: string): HTMLElement {
+  return screen.getByTestId(`nav-${id}`);
+}
+
 describe("首页落地页", () => {
-  it("侧栏：AI 画布/创建设计可用，其余导航项置灰禁用；作品集切换主区视图", async () => {
+  it("侧栏两级结构：AI 画布/排版设计可用，素材库置灰；作品集切主区视图", async () => {
     renderWithI18n(<HomePage />);
     const canvasLink = await screen.findByTestId("nav-canvas");
     expect(canvasLink.getAttribute("href")).toBe("/canvas");
     // 竖排改造后标签包在内层 span 里，按钮语义只能经 testid 取
-    const designBtn = screen.getByTestId("nav-create-design") as HTMLButtonElement;
+    const designBtn = screen.getByTestId("nav-layout-design") as HTMLButtonElement;
     expect(designBtn.disabled).toBe(false);
     await userEvent.click(designBtn);
     expect(await screen.findByText("新建设计")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    // 其余未实现的导航项仍为置灰禁用（消息中心已启用，见下一例）
-    for (const id of ["nav-assets", "nav-settings"]) {
-      expect((screen.getByTestId(id) as HTMLButtonElement).disabled).toBe(true);
-    }
+
+    // 图库组默认收起，展开后素材库仍是置灰占位
+    await toggleGroup("library");
+    expect((screen.getByTestId("nav-assets") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("nav-settings") as HTMLButtonElement).disabled).toBe(true);
     // 铃铛入口常驻侧栏底栏
     expect(screen.getByTestId("notifications-bell")).toBeTruthy();
     // 用户入口（头像触发）可达
@@ -137,26 +152,33 @@ describe("首页落地页", () => {
     expect(screen.getByRole("button", { name: "切换语言" })).toBeTruthy();
   });
 
-  it("消息中心：侧栏切换主区视图，不跳独立路由；铃铛计数随已读归零", async () => {
+  it("消息中心：不在导航树内，铃铛是唯一入口并承担当前位置标记", async () => {
     renderWithI18n(<HomePage />);
     expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
 
-    // 侧栏「消息中心」不再是禁用态
-    const navBtn = screen.getByTestId("nav-messages") as HTMLButtonElement;
-    expect(navBtn.disabled).toBe(false);
-    await userEvent.click(navBtn);
+    // 导航树里没有消息中心项：铃铛承担入口（spec home-landing）
+    expect(screen.queryByTestId("nav-messages")).toBeNull();
+    const bell = screen.getByTestId("notifications-bell");
+    expect(bell.getAttribute("aria-current")).toBeNull();
 
+    await userEvent.click(bell);
     expect(await screen.findByText("还没有任何消息")).toBeTruthy();
     expect(screen.queryByText("用一句话，生成电商好图")).toBeNull();
     expect(push).not.toHaveBeenCalled();
+    // 当前位置由铃铛指示；导航行此时不应有任何 current 标记
+    expect(bell.getAttribute("aria-current")).toBe("page");
+    expect(navCurrentCount()).toBe(0);
     // 同一份状态：视图内未读数为 0 时铃铛也不带角标
     expect(screen.queryByTestId("notifications-bell-count")).toBeNull();
   });
 
-  it("作品集：侧栏切换主区视图，不跳独立路由", async () => {
+  it("作品集：图库组二级项切主区视图，不跳独立路由", async () => {
     renderWithI18n(<HomePage />);
-    // 默认视图是创作落地页
+    // 默认视图是创作落地页，默认展开的是创作组
     expect(await screen.findByText("用一句话，生成电商好图")).toBeTruthy();
+    expect(navRow("create").getAttribute("aria-expanded")).toBe("true");
+
+    await toggleGroup("library");
     await userEvent.click(screen.getByTestId("nav-portfolio"));
     // 切换到作品集面板：横幅消失，作品集空态出现
     await waitFor(() => expect(screen.getByText("作品集还是空的")).toBeTruthy());
@@ -245,6 +267,120 @@ describe("首页落地页", () => {
   });
 });
 
+/**
+ * 两级导航的结构不变量（spec home-landing「侧栏两级导航结构」「展开状态的单开不变量」
+ * 「当前所在位置的指示」）。jsdom 无布局引擎，故这里锁的是能断言的结构事实：
+ * aria 状态、二级项是否挂载、当前标记的唯一性。
+ */
+describe("侧栏两级结构", () => {
+  it("默认展开创作组：二级项挂载且一级项带 aria-expanded", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-create");
+
+    expect(navRow("create").getAttribute("aria-expanded")).toBe("true");
+    expect(navRow("library").getAttribute("aria-expanded")).toBe("false");
+    // 创作组的两个二级项在 DOM 里
+    expect(screen.getByTestId("nav-canvas")).toBeTruthy();
+    expect(screen.getByTestId("nav-layout-design")).toBeTruthy();
+    // 图库组收起 → 其二级项不存在
+    expect(screen.queryByTestId("nav-portfolio")).toBeNull();
+    expect(screen.queryByTestId("nav-assets")).toBeNull();
+  });
+
+  it("一级项只切展开态：不导航也不改主区视图", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByText("用一句话，生成电商好图");
+
+    await userEvent.click(navRow("create"));
+    expect(navRow("create").getAttribute("aria-expanded")).toBe("false");
+    // 主区未变，路由未变
+    expect(screen.getByText("用一句话，生成电商好图")).toBeTruthy();
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("nav-canvas")).toBeNull();
+
+    // 再点回来恢复
+    await userEvent.click(navRow("create"));
+    expect(navRow("create").getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByTestId("nav-canvas")).toBeTruthy();
+  });
+
+  it("单开不变量：展开一组即收起另一组", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-create");
+
+    await toggleGroup("library");
+    expect(navRow("library").getAttribute("aria-expanded")).toBe("true");
+    expect(navRow("create").getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("nav-portfolio")).toBeTruthy();
+    expect(screen.queryByTestId("nav-canvas")).toBeNull();
+  });
+
+  it("当前标记唯一：首页视图由一级叶子承担", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-home");
+
+    expect(navRow("home").getAttribute("aria-current")).toBe("page");
+    expect(navCurrentCount()).toBe(1);
+    // 展开中的组与其二级项都不带当前标记
+    expect(navRow("create").getAttribute("aria-current")).toBeNull();
+    expect(navRow("canvas").getAttribute("aria-current")).toBeNull();
+  });
+
+  it("所属组收起时由一级项代行当前标记（当前位置不消失）", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-create");
+    await toggleGroup("library");
+    await userEvent.click(screen.getByTestId("nav-portfolio"));
+    await waitFor(() => expect(screen.getByText("作品集还是空的")).toBeTruthy());
+    expect(navRow("portfolio").getAttribute("aria-current")).toBe("page");
+    expect(navCurrentCount()).toBe(1);
+
+    // 手动收起当前项所属组：二级项消失，一级项接管标记
+    await toggleGroup("library");
+    expect(screen.queryByTestId("nav-portfolio")).toBeNull();
+    expect(navRow("library").getAttribute("aria-current")).toBe("page");
+    expect(navRow("library").getAttribute("aria-expanded")).toBe("false");
+    expect(navCurrentCount()).toBe(1);
+    // 主区仍是作品集，标记没有跟视图脱节
+    expect(screen.getByText("作品集还是空的")).toBeTruthy();
+  });
+
+  it("展开态在会话内保持：切视图不擅自收起用户打开的组", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-create");
+    await toggleGroup("library");
+
+    await userEvent.click(navRow("home"));
+    await waitFor(() => expect(screen.getByText("用一句话，生成电商好图")).toBeTruthy());
+    expect(navRow("library").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("占位项两态都禁用：展开态与折叠轨里都是 disabled", async () => {
+    renderWithI18n(<HomePage />);
+    await screen.findByTestId("nav-create");
+    await toggleGroup("library");
+
+    const assets = screen.getByTestId("nav-assets") as HTMLButtonElement;
+    expect(assets.disabled).toBe(true);
+    expect(assets.getAttribute("aria-disabled")).toBe("true");
+    expect(assets.getAttribute("title")).toBe("敬请期待");
+
+    await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    const railAssets = screen.getByTestId("nav-assets") as HTMLButtonElement;
+    expect(railAssets.disabled).toBe(true);
+  });
+
+  it("切展开态不重渲染主区：主区仍是同一个 DOM 节点", async () => {
+    renderWithI18n(<HomePage />);
+    const headline = await screen.findByText("用一句话，生成电商好图");
+    const homeRow = screen.getByTestId("nav-home");
+
+    await toggleGroup("library");
+    expect(screen.getByText("用一句话，生成电商好图")).toBe(headline);
+    expect(screen.getByTestId("nav-home")).toBe(homeRow);
+  });
+});
+
 describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
   const sidebar = () => screen.getByTestId("home-sidebar");
 
@@ -253,7 +389,7 @@ describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
     await screen.findByTestId("nav-home");
     expect(sidebar().getAttribute("data-collapsed")).toBe("false");
     expect(screen.getByTestId("app-version-badge")).toBeTruthy();
-    expect(screen.getByText("创建设计")).toBeTruthy();
+    expect(screen.getByText("排版设计")).toBeTruthy();
   });
 
   it("折叠钮切换：宽度态翻转，标签仍在，品牌标识让位给展开钮", async () => {
@@ -263,7 +399,7 @@ describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
     await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
     expect(sidebar().getAttribute("data-collapsed")).toBe("true");
     // 折叠态保留可见标签，故窄轨下 aria 名与可见文本一致（无 tooltip-only 缺口）
-    expect(screen.getByText("创建设计")).toBeTruthy();
+    expect(screen.getByText("排版设计")).toBeTruthy();
     expect(screen.queryByTestId("app-version-badge")).toBeNull();
     expect(screen.queryByText("oops")).toBeNull();
 
@@ -272,12 +408,17 @@ describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
     expect(screen.getByTestId("app-version-badge")).toBeTruthy();
   });
 
-  it("当前视图项带 aria-current，置灰项两态都仍是 disabled", async () => {
+  it("当前项带 aria-current，置灰项两态都仍是 disabled", async () => {
     renderWithI18n(<HomePage />);
     await screen.findByTestId("nav-home");
     expect(screen.getByTestId("nav-home").getAttribute("aria-current")).toBe("page");
+    // 收起的组内二级项不存在，故无从查它的 current 标记
+    expect(screen.queryByTestId("nav-portfolio")).toBeNull();
+
+    await toggleGroup("library");
     expect(screen.getByTestId("nav-portfolio").getAttribute("aria-current")).toBeNull();
 
+    // 折叠不改展开态：图库组仍是展开的，占位项在轨内同样 disabled
     await userEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
     for (const id of ["nav-assets", "nav-settings"]) {
       const el = screen.getByTestId(id) as HTMLButtonElement;
@@ -354,11 +495,16 @@ describe("侧栏折叠态（spec home-landing / DESIGN.md B7.2）", () => {
     await waitFor(() => expect(screen.queryByTestId("nav-home")).toBeNull());
   });
 
-  it("窄屏抽屉内切主区视图后自动收起", async () => {
+  it("窄屏抽屉内两级导航可用，切主区视图后自动收起", async () => {
     stubMatchMedia(true);
     renderWithI18n(<HomePage />);
     await screen.findByTestId("sidebar-open-button");
     await userEvent.click(screen.getByTestId("sidebar-open-button"));
+
+    // 抽屉内同样默认展开创作组，可切到图库并选中作品集
+    const drawerNav = await screen.findByRole("navigation", { name: "主导航" });
+    expect(within(drawerNav).getByTestId("nav-create").getAttribute("aria-expanded")).toBe("true");
+    await userEvent.click(screen.getByTestId("nav-library"));
     await userEvent.click(await screen.findByTestId("nav-portfolio"));
 
     expect(await screen.findByText("作品集还是空的")).toBeTruthy();
