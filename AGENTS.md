@@ -54,16 +54,27 @@ Key characteristics:
   best-effort everywhere: a failure must never change a 402 rejection or turn
   a settled task into a failed one. Retention (read + >90d) is purged from
   `apps/web/src/instrumentation.ts` at startup.
-- **Collapsible app sidebar** — `/home`'s left sidebar is a single component
-  (`components/layout/home-sidebar.tsx`) whose nav items stack vertically
-  (icon above label) in **both** states; collapsing to a 64px rail changes only
+- **Two-level collapsible app sidebar** — `/home`'s left sidebar is a single
+  component (`components/layout/home-sidebar.tsx`) holding a **two-level** nav:
+  L1 = 首页 / 创作 / 图库, L2 = 创作›AI 画布·排版设计 and 图库›作品集·素材库.
+  **L1 is a pure disclosure** (`aria-expanded`, at most one group open, default
+  创作, state held inside the sidebar so toggling never re-renders the main
+  area) — it must not navigate, because 创作's two children are full-page routes
+  and a navigating L1 would leave `/home` before the second level could ever be
+  seen. Nav items stack vertically (icon above label) in **both** states and
+  both levels share one tile component; collapsing to a 64px rail changes only
   the `<aside>` width, so folding never re-lays-out the items and never
   re-renders the main area. The collapsed rail **keeps its text labels** — the
-  visible text is the accessible name, so no tooltip-only a11y gap opens. State
-  (collapsed / narrow-viewport drawer / `Cmd/Ctrl+B` / localStorage) lives in
-  `lib/layout/use-sidebar-collapse.ts`; the wordmark and build-version badge
-  appear only in the expanded state. Below 768px the sidebar leaves the
-  document flow and opens as a Radix Dialog sheet
+  visible text is the accessible name, so no tooltip-only a11y gap opens — and
+  expresses L2 affiliation with a leading rule instead of an indent. Exactly one
+  nav row carries `aria-current="page"` at a time; if the current child's group is
+  collapsed, the child unmounts and its **L1 takes the mark over** so the
+  current-location anchor never disappears. 消息中心 has **no nav row**: the
+  footer bell is its only entry and carries `aria-current` while that view is up.
+  Collapse state (collapsed / narrow-viewport drawer / `Cmd/Ctrl+B` /
+  localStorage) lives in `lib/layout/use-sidebar-collapse.ts`; the wordmark and
+  build-version badge appear only in the expanded state. Below 768px the sidebar
+  leaves the document flow and opens as a Radix Dialog sheet
   (`components/ui/sheet.tsx`, no new dependency). Geometry, group hues and the
   `--spacing-sidebar*` width tokens are specified in `docs/DESIGN.md` B7.2 —
   change them there first.

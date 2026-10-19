@@ -34,7 +34,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
 | 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
-| 前端骨架 | 三页结构：`/home` 轻量落地页（侧栏导航 + 创作输入/Agent 卡片入口 + 创建设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
+| 前端骨架 | 三页结构：`/home` 轻量落地页（两级侧栏 + 创作输入/Agent 卡片入口 + 排版设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
 | 主题 | 手写 ThemeProvider（零依赖）：html `dark` class 切换 + localStorage（`oops-theme`）持久化 + layout 首屏阻塞脚本防闪烁；明暗两套 CSS token |
 | i18n | next-intl cookie 模式（无 URL 路由）：zh/en 双语；层 A UI 文案进词典，层 B LLM 文本由 agent 语言跟随；防回流 = typed messages + lint 禁裸中文 + zh↔en 键对齐单测 |
 
@@ -183,8 +183,9 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计 / 消息中心可用，素材库置灰禁用；主区创作横幅、
-创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
+**路由结构**：`/home` 落地页（**两级侧栏**：一级项 首页 / 创作 / 图库，二级项 创作›AI 画布·排版设计、
+图库›作品集·素材库；一级项是纯展开控件，素材库置灰禁用；主区创作横幅、创作输入与 Agent 卡片）
++ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
 （顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
 触发，携 `?w=&h=` 建页）+
@@ -195,7 +196,7 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 **作品集与加工出口**（`/home` 主区作品集视图）：作品集是跨会话聚合视图——**条目即原资产本身**，
 由 `assets.saved_at` 打标实现，非副本（见 §7）。三条入口：AI 画布卡片 hover 星标、
-创建设计导出面板「同时存入作品集」勾选、首页侧栏 `navPortfolio`。加工出口一律传
+排版设计导出面板「同时存入作品集」勾选、首页侧栏 图库›作品集。加工出口一律传
 `assetId` 而非图片 URL（`/canvas?assetId=`、`/design?assetId=`），服务端经
 `GET /api/assets/:id` 校验归属后才给出 `/files/*` 地址——传URL 会让用户手改参数注入
 任意外部图片源。设计侧以新增图层落地（复用 `designReducer` 的 `addElements`，自带
@@ -203,7 +204,9 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 设计导出勾选入库失败时只警告：浏览器下载已完成，附加动作不得阻断首要意图。
 
 **消息中心**（`/home` 主区视图 + 侧栏底栏铃铛）：同样**不占独立路由**，
-`view: "home" | "portfolio" | "messages"`，侧栏切换主区而非跳转。取数收敛在一个
+`view: "home" | "portfolio" | "messages"`，切主区而非跳转。**铃铛是唯一入口**——导航树里没有
+消息中心项（它在两个 L1 分组里都无处安放），故铃铛在该视图下带 `aria-current="page"`，
+与作品集/首页的当前位置指示方式统一。取数收敛在一个
 hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并注入铃铛与视图，
 **只跑一个 60s 轮询**（多标签页不重复请求）：未读计数轮询，列表按来源筛选一次取完；
 `document.hidden` 时暂停，切回可见立即补拉一次，轮询失败静默保留上次计数（不为角标打扰用户）。
@@ -212,16 +215,25 @@ hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并�
 因为 next-intl v4 没有 `t.has`，未知键只会打一条 onError 再返回键名。
 管理端下发（`source=admin`）无 i18n_key，标题正文一律原样展示。
 
-**侧栏形态与折叠**（spec home-landing「侧栏折叠态」、DESIGN.md B7.2）：侧栏从 `/home` 页面
-内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（纯展示，不碰 `view`、不碰路由、
-不取数），状态与浏览器副作用收敛在 `src/lib/layout/use-sidebar-collapse.ts`
+**侧栏形态与折叠**（spec home-landing「侧栏两级导航结构」「展开状态的单开不变量」
+「当前所在位置的指示」、DESIGN.md B7.2）：侧栏从 `/home` 页面
+内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（除展开态外纯展示，不碰 `view`、不碰路由、
+不取数），折叠状态与浏览器副作用收敛在 `src/lib/layout/use-sidebar-collapse.ts`
 （`collapsed` / `drawerOpen` / `isNarrow` + localStorage + `Cmd/Ctrl+B` + `matchMedia`）。
-导航项一律「图标在上、文字在下」竖排堆叠，展开（232px）与折叠（64px）**共用同一组件**，
+**两级语义**：一级项（首页 / 创作 / 图库）是纯 disclosure（`aria-expanded`），二级项才是导航目的地；
+单开（`openGroup: "create" | "library" | null`，默认 `create`，**不落盘** —— 有可推导的默认值）。
+一级项**不得**兼作导航：创作的两个子项都是整页路由，点击即离开 `/home`，该组将永远看不到展开态。
+展开态刻意留在侧栏内部（不进 `page.tsx`），否则切展开态会重渲染主区。
+导航项一律「图标在上、文字在下」竖排堆叠，一级与二级**共用同一 tile 组件**（层级只由 chevron、
+缩进与组色相区分），展开（232px）与折叠（64px）**共用同一组件**，
 切换只是 `<aside>` 的单元素 `width` 过渡，故折叠只重渲染侧栏子树、主区不参与。
-折叠态保留文字标签（可见文本即 `aria-label`，不留 tooltip-only 的无障碍缺口），品牌标识与
-版本徽标只在展开态呈现。窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉
+折叠态保留文字标签（可见文本即 `aria-label`，不留 tooltip-only 的无障碍缺口），二级项的从属关系
+在轨内改由前导刻线表达（44px 内容框放不下 16px 缩进）；品牌标识与
+版本徽标只在展开态呈现。**恰好一个导航行带 `aria-current="page"`**：当前子项可见时标记它，
+所属组被收起时由其一级项代行（否则收起当前组会让用户失去当前位置锚点）。
+窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉
 唤出（`components/ui/sheet.tsx`，无新依赖；焦点陷阱 / `aria-modal` / 滚动锁定交给 Radix）。
-视觉规范（tile 几何、分组色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
+视觉规范（tile 几何、chevron/缩进、分组色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -379,7 +391,7 @@ user_notifications
 > （零存储开销），代价是 `DELETE /api/sessions/:id` 的 GC 需跳过已收藏项
 > （`listKeysBySessionUnsaved` / `removeUnsavedBySession` 与无条件版本并存）；存活资产的
 > `session_id` 因 `ON DELETE SET NULL` 被置空，作品集展示其来源时呈现为未知。`saved_at`
-> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。创建设计的导出成果经
+> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。排版设计的导出成果经
 > `POST /upload purpose=design` 落库为**无会话归属**资产（设计编辑器没有会话概念）。
 > `canvas-first-workbench` 增 `meta.referenceAssetId`（generate_image 血缘：引用的源图 assetId，
 > 参考图上传 `purpose=reference` 落 `kind=image` + `meta.purpose="reference"`，不追加聊天消息）。

@@ -436,9 +436,22 @@ Rules: at most 3 blobs per viewport; never under body text (contrast), only behi
 - Under `prefers-reduced-motion: reduce`, entrances become instant and the crossfade becomes a hard cut. Blobs stay — they do not move anyway.
 - No looping animation anywhere on the landing page, hero included.
 
-### B7.2 Application Sidebar `/home` (collapsible)
+### B7.2 Application Sidebar `/home` (collapsible, two levels)
 
-Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation) + `apps/web/src/lib/layout/use-sidebar-collapse.ts` (state).
+Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation + expanded-group state) + `apps/web/src/lib/layout/use-sidebar-collapse.ts` (collapse state).
+
+Information architecture — L1 is a **disclosure, not a destination**:
+
+| L1 | L2 |
+| --- | --- |
+| 首页 | — (leaf link) |
+| 创作 | AI 画布 (`/canvas`) · 排版设计 (size dialog → `/design?w=&h=`) |
+| 图库 | 作品集 (main-area view) · 素材库 (placeholder, disabled) |
+
+At most one group is expanded at a time (`openGroup`: `create` | `library` | `null`, default `create`, **not** persisted — it has a derivable default, unlike `collapsed`). Two consequences worth keeping:
+
+- **L1 must not navigate.** 创作's two children are full-page routes, so a "jump to the group's first child" L1 would leave `/home` on click and that group could never be seen expanded — the second level would not exist on screen at all.
+- **The bell is the only entry to 消息中心**, which is a main-area view like 作品集 but has no nav row; the bell carries `aria-current` while that view is up, so all three main-area views indicate their location the same way.
 
 #### B7.2.1 Width
 
@@ -453,31 +466,44 @@ Declared in `@theme inline` under Tailwind's spacing namespace, **never in `:roo
 
 | Element | Spec |
 | --- | --- |
-| Tile | 32px squircle (`--radius-lg`) holding a 16px icon |
+| Tile | 32px squircle (`--radius-lg`) holding a 16px icon. **One tile component for both levels and both widths** |
 | Label | centered below the tile; `text-[11px]/leading-tight` expanded, `text-[10px]/leading-none` collapsed, `whitespace-nowrap` |
-| Item padding | `py-1` expanded, `py-0.5` collapsed (the rail carries the same 7 items in less height) |
-| Group label | expanded: a centered 10px tracked label flanked by two `--brand-ink-200` hairlines. Collapsed: the hairlines alone, no text |
+| Item padding | `py-1` expanded, `py-0.5` collapsed |
+| L1 (group) | the same tile plus a 12px chevron pinned to the item's **right edge** (`right-1`, on the tile's centerline). Expanded state only — see below |
+| L2 (child) | the same tile, `pl-4` in the panel. The rail's 44px content box cannot spare 16px, so the indent becomes a 1px × 12px leading rule (`-left-2`): affiliation stays visible, labels stay untruncated |
+| Group separator | a centered 32px (`w-8`) `--brand-ink-200` hairline with 8px clearance above and below, **between the two groups only** |
 | Footer | hairline above. **Expanded**: one row of five icon buttons (settings · bell · theme · locale · avatar). **Collapsed**: a single column of the same five |
 
-The group label's hairlines are load-bearing, not decoration. An 11px centered gray word is nearly the same shape as a nav label, so without a rule on either side the "create" and "library" groups read as one undifferentiated list.
+Three rules follow:
+
+- **The chevron is absolutely positioned, not in the label row.** Sharing the row would push the label off the tile's centerline and break alignment with its siblings; pinning it to the item's right edge costs the panel nothing (220px of usable width against a 32px tile).
+- **The chevron does not render in the rail.** 52px minus 12px padding leaves 44px, already nearly filled by a four-glyph 10px label (≈40px). The L2 leading rule carries affiliation there instead. `aria-expanded` survives in both states — losing the affordance must not lose the semantics.
+- **The hairline is load-bearing, not decoration.** An 11px centered gray label is nearly the same shape as a nav label, so without a rule between them the two groups read as one undifferentiated list. It sits *between* groups only — the first one needs no separator.
 
 #### B7.2.2a Vertical Budget
 
-The sidebar has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. Budget at a **565px** viewport (a short window — the case that actually broke):
+The sidebar has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. Budget at a **565px** viewport (a short window — the case that actually broke), with **one group expanded** (single-open makes that the worst case):
 
 | Region | Expanded | Rail |
 | --- | --- | --- |
 | Container padding | 16 | 16 |
 | Brand header | 36 | 36 |
-| Nav content | 456 | 390 |
-| Footer | 49 | 157 |
-| **Total** | **557** | **599** |
+| Nav content | 315 | 275 |
+| Footer | 49 | 165 |
+| **Total** | **416** | **492** |
 
-Expanded fits, so the panel never scrolls and 首页 is always the top item. The rail overruns at 565px and does scroll — accepted, because a 64px column holding 7 labeled items plus 5 footer controls has no other arrangement; from ~620px up it fits outright. **Overflow is the fallback, never the default** — if a change pushes the expanded total past the viewport, shrink a region rather than adding scroll.
+Derivation, so a reviewer can re-check it without a browser:
+
+- Nav item = padding + tile + gap + label → expanded `8 + 32 + 4 + 14 = 58`; rail `4 + 32 + 4 + 10 = 50`.
+- Expanded nav = 首页 `58` + 创作组 (`58 + 2 + 58×2 + 2 = 178`) + 图库组 (`17` hairline `+ 58` L1 `= 75`) + two 2px column gaps = **315**.
+- Rail nav = `50 + (50 + 2 + 50×2 + 2 = 154) + 67 + 4` = **275**.
+- Footer expanded = `8 (pt-2) + 1 (border) + 40 (avatar size-10, the tallest of the five)` = **49**; rail = `9 + 28 + 32 + 28 + 28 + 32 + 4×2` = **165**.
+
+Folding flat items into one open group is what bought the headroom: the previous inventory (6 tiles + 2 decorative group labels = 8 row-equivalents) totalled 557 / 599. Both states now clear 565px outright, so the panel never scrolls and 首页 is always the top item. **Overflow is the fallback, never the default** — if a change pushes a total past the viewport, shrink a region rather than adding scroll.
 
 Two rules follow from the numbers:
 
-- The footer's expanded row costs 49px; the same five controls stacked cost 224px. Stacking them is what pushed the nav into overflow.
+- The footer's expanded row costs 49px; the same five controls stacked cost 165px. Stacking them is what pushes the rail toward overflow first.
 - Never solve a height problem with `overflow-y-auto` alone. Radix restores focus to a nav trigger after a dialog closes, and the browser's `block:'nearest'` scroll then pushes 首页 out of view — the user cannot see where they are.
 
 #### B7.2.3 Color Hierarchy
@@ -486,20 +512,24 @@ The tile carries hierarchy, not personality:
 
 | State | Fill | Glyph |
 | --- | --- | --- |
-| Create group | `bg-brand-violet-500/12` | `text-brand-violet-700` (dark: `-300`) |
-| Library group | `bg-sidebar-accent` | `text-muted-foreground` |
+| 创作 group (L1) | `bg-brand-violet-500/12` | `text-brand-violet-700` (dark: `-300`) |
+| 图库 group (L1) | `bg-sidebar-accent` | `text-muted-foreground` |
 | Current | `bg-primary` | `text-primary-foreground` (the 6.2:1 pair from B2.4) |
 | Disabled | 40% opacity, no hover feedback | `cursor-not-allowed` |
+
+Group hue rides on **L1**; L2 children are always neutral, so the reading is "violet section, neutral items" rather than two competing color families at the same depth.
+
+The two fills never overlap: an expanded L1 shows its group hue, while the L1 that **stands in for a hidden current child** shows `bg-primary`. A group therefore never looks "selected" and "current" at once, and the current location survives the group being collapsed.
 
 Canva's per-app rainbow is an artifact of aggregating many brands. oops is one product: a hand-picked hue set would break B2.1's naming rule, B2.6's chrome rule, and the contrast floor, for no communicative gain. Squircle geometry plus group hue plus a solid current tile reproduce the reference's visual language without that cost.
 
 #### B7.2.4 One Component, Two Widths
 
-Both states render the **same** nav item component; only `<aside>`'s width changes. Consequences:
+Both states render the **same** nav item component; only `<aside>`'s width changes. Both levels render that same component too — hierarchy is expressed by chevron, indent, and hue, never by a second item geometry. Consequences:
 
 - Collapsing is a single `transition-[width]` on one element. Per-item re-layout during the animation is a defect.
 - The collapsed rail **keeps its text labels**. A 64px rail minus 12px padding leaves 52px, and four CJK glyphs at 10px occupy ≈40px — so the visible text can equal the `aria-label`, leaving no tooltip-only accessibility gap and no second label component.
-- Current view carries `aria-current="page"`.
+- Current view carries `aria-current="page"`, and **exactly one nav row carries it at a time**. When the current child's group is collapsed, the child is unmounted and its **L1 takes the mark over** — otherwise collapsing the group would erase the current-location anchor this document keeps insisting on.
 - The **footer** is the one region that legitimately differs between states: five controls cannot share a 52px row, so the rail stacks them while the panel keeps them in a row. Reference (Canva) does the same.
 - The nav scrolls only when the budget in B7.2.2a is exceeded, and its scrollbar is the `sidebar-scroll` utility — a 6px transparent-track bar. The default scrollbar overlaps `border-r` and reads as a double rule.
 
