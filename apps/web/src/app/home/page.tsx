@@ -98,8 +98,8 @@ export default function HomePage() {
 
   return (
     <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
-      {/* 左侧两级栏：一级项 首页 / 创作 / 图库，二级项随所属组展开；
-          折叠/抽屉/展开态由侧栏内部持有，故此处切换侧栏不会重渲染主区。 */}
+      {/* 左侧常驻一级列 + 覆盖式二级抽屉：一级项 首页 / 创作 / 图库，二级项只在该组
+          的抽屉里出现。抽屉开合由侧栏内部持有，故此处切换侧栏不会重渲染主区。 */}
       <HomeSidebar
         notifications={notifications}
         onOpenDesign={() => setDesignDialogOpen(true)}

@@ -215,25 +215,15 @@ hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并�
 因为 next-intl v4 没有 `t.has`，未知键只会打一条 onError 再返回键名。
 管理端下发（`source=admin`）无 i18n_key，标题正文一律原样展示。
 
-**侧栏形态与折叠**（spec home-landing「侧栏两级导航结构」「展开状态的单开不变量」
-「当前所在位置的指示」、DESIGN.md B7.2）：侧栏从 `/home` 页面
-内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（除展开态外纯展示，不碰 `view`、不碰路由、
-不取数），折叠状态与浏览器副作用收敛在 `src/lib/layout/use-sidebar-collapse.ts`
-（`collapsed` / `drawerOpen` / `isNarrow` + localStorage + `Cmd/Ctrl+B` + `matchMedia`）。
-**两级语义**：一级项（首页 / 创作 / 图库）是纯 disclosure（`aria-expanded`），二级项才是导航目的地；
-单开（`openGroup: "create" | "library" | null`，默认 `create`，**不落盘** —— 有可推导的默认值）。
-一级项**不得**兼作导航：创作的两个子项都是整页路由，点击即离开 `/home`，该组将永远看不到展开态。
-展开态刻意留在侧栏内部（不进 `page.tsx`），否则切展开态会重渲染主区。
-导航项一律「图标在上、文字在下」竖排堆叠，一级与二级**共用同一 tile 组件**（层级只由 chevron、
-缩进与组色相区分），展开（232px）与折叠（64px）**共用同一组件**，
-切换只是 `<aside>` 的单元素 `width` 过渡，故折叠只重渲染侧栏子树、主区不参与。
-折叠态保留文字标签（可见文本即 `aria-label`，不留 tooltip-only 的无障碍缺口），二级项的从属关系
-在轨内改由前导刻线表达（44px 内容框放不下 16px 缩进）；品牌标识与
-版本徽标只在展开态呈现。**恰好一个导航行带 `aria-current="page"`**：当前子项可见时标记它，
-所属组被收起时由其一级项代行（否则收起当前组会让用户失去当前位置锚点）。
-窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉
-唤出（`components/ui/sheet.tsx`，无新依赖；焦点陷阱 / `aria-modal` / 滚动锁定交给 Radix）。
-视觉规范（tile 几何、chevron/缩进、分组色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
+**侧栏形态**（spec home-landing「一级列与二级面板结构」「一级项展开面板并落到默认子项」「二级面板的开合约束」「当前位置的委托标记」、DESIGN.md B7.2）：侧栏从 `/home` 页面内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（除面板开合外纯展示，不碰 `view`、不碰路由、不取数）；窄屏抽屉状态与 `Cmd/Ctrl+B` 快捷键收敛在 `src/lib/layout/use-sidebar-layout.ts`（`drawerOpen` / `isNarrow` + `matchMedia`；**无 localStorage** —— rail 是常量，没有折叠态）。形态照抄一处实测参照（Canva 项目页，1440×900，2026-10-19 直接读 DOM）：**二级面板是 rail 的 flex 兄弟节点，占布局宽度把主区挤窄**（1121px → 857px），**不是浮层**；rail 64px、面板 264px、面板行高 40px。
+**两级语义**：一级项（首页 / 创作 / 图库）常驻 64px 一级列；二级项只在该组的**并排二级面板**里出现。一级行只有**一个**可激活目标：激活它 = 展开本组面板 + 落到该组 `primaryId` 声明的默认子项（不靠数组顺序推断）；行内**没有展开控件 / chevron / 第二个目标**，故一级行是纯按钮而非链接。**落派只在当前页内执行**：图库 → 切主区为作品集；创作 → 不动（其默认子项是整页路由 `/canvas`，自动跳转会连同刚展开的面板一起被卸载，用户就退不回排版设计）。面板内激活二级项**不**收起面板，重复激活同一一级项也**不**收起。
+面板的全局开合在**一级列顶部的线性开关**（参照实测：36×36 按钮，带 `aria-expanded`/`aria-controls`，重新打开时恢复上一次展开的组，与 `Cmd/Ctrl+B` 共用同一个 `togglePanel()`）。
+面板状态保留在侧栏内部（不进 `page.tsx`，否则切面板会重渲染主区）、**不落盘**、初值 `null`；收起态 = 宽度 0 + `inert` + `aria-hidden`，**内容不卸载**（否则关闭过渡擦的是一条空条）。
+色相只标记当前位置，非当前一级项与全部二级项中性。**两个标识分开**：填色 tile 标记当前所在**分区**（跟随用户激活的那个 L1，与主区视图解耦）；`aria-current="page"` 标记**最深的选中项**，且**恰好一个**（一级列 + 面板内二级项合计）：面板展开时标记面板内的二级项，面板收起（其项已移出可访问性树）时由其一级项代行。点「创作」会让它的 tile 亮起来而主区仍是落地页 —— 若从视图推导高亮，创作就会永远暗着（这正是过去的脏脏）。
+产品标识与**构建版本**只在**二级面板顶部**（一级列顶部只剩面板开关），不在用户菜单；主题、语言、设置在用户菜单内。一级列底部仅铃铛 + 头像，**纵向排列**（上铃铛下头像）。
+窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉唤出（`components/ui/sheet.tsx`，无新依赖；焦点陷阱 / `aria-modal` / 滚动锁定交给 Radix）；抽屉内以**分组标题 + 平铺二级项**呈现、无展开控件也无浮层——模态 Dialog 会给兄弟节点加 `aria-hidden`，portaled 浮层会落在焦点陷阱之外，且该分支没有常驻面板可开、一级项也已不再导航。
+视觉规范（tile 几何、面板列规则、色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
+
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -553,10 +543,10 @@ oops/
 
 ## 10. 构建版本徽标
 
-首页侧栏展示构建版本（`src/lib/version.ts`）：构建时注入的 `NEXT_PUBLIC_APP_VERSION`
-优先，缺失时回退 `package.json` 的 `version`，不注入也能正常构建与展示（无需数据库配置）。
-构建/运行环境需同时注入该变量以保持 SSR 与客户端一致（详见 `src/lib/version.ts` 注释）。
-可选在构建命令中覆盖，例如从 git tag 派生：
+构建版本展示在 `/home` 用户菜单内（`src/lib/version.ts`）：构建时注入的
+`NEXT_PUBLIC_APP_VERSION` 优先，缺失时回退 `package.json` 的 `version`，不注入也能正常构建与展示
+（无需数据库配置）。构建/运行环境需同时注入该变量以保持 SSR 与客户端一致
+（详见 `src/lib/version.ts` 注释）。可选在构建命令中覆盖，例如从 git tag 派生：
 
 ```bash
 NEXT_PUBLIC_APP_VERSION=$(git describe --tags --always) pnpm build

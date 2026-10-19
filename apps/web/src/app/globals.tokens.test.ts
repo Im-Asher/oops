@@ -141,17 +141,20 @@ describe("globals.css 设计 token 契约", () => {
     expect(drift).toEqual([]);
   });
 
-  it("侧栏宽度 token 走 @theme 间距命名空间产出 w-sidebar / w-sidebar-rail（DESIGN.md B7.2.1）", () => {
-    expect(css).toMatch(/--spacing-sidebar:\s*232px\s*;/);
+  it("侧栏宽度 token 走 @theme 间距命名空间产出 w-sidebar-rail / w-sidebar-drawer（DESIGN.md B7.2.1）", () => {
+    // 64 / 264 取自 Canva 项目页实测（design D3）：一级列 64px、二级面板 264px
     expect(css).toMatch(/--spacing-sidebar-rail:\s*64px\s*;/);
+    expect(css).toMatch(/--spacing-sidebar-drawer:\s*264px\s*;/);
+    // 折叠态退役后 232px 的 --spacing-sidebar 不再产出工具类，残留即红
+    expect(css).not.toMatch(/--spacing-sidebar:/);
     // 落进 :root 会让上一条的 .landing-root 镜像守卫变红，故在此显式钉死
     const root = blockVars(":root");
-    expect(root.has("--spacing-sidebar")).toBe(false);
     expect(root.has("--spacing-sidebar-rail")).toBe(false);
+    expect(root.has("--spacing-sidebar-drawer")).toBe(false);
     // 必须落在 @theme inline 内，否则不产出工具类
     const theme = css.match(/@theme inline\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-    expect(theme).toContain("--spacing-sidebar:");
     expect(theme).toContain("--spacing-sidebar-rail:");
+    expect(theme).toContain("--spacing-sidebar-drawer:");
   });
 
   it("B2.6/B2.1：canvas 与 design 组件不再使用 Tailwind 内置紫，点阵走 --stage-dot", () => {

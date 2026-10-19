@@ -66,11 +66,13 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
 
-  /* 应用侧栏宽度（DESIGN.md B7.2.1）：走 Tailwind 间距命名空间产出 w-sidebar /
-     w-sidebar-rail。刻意不进 :root —— :root 语义层被 .landing-root 逐键镜像，
-     只落一处的 token 会让 globals.tokens.test.ts 的镜像守卫变红。 */
-  --spacing-sidebar: 232px;
+  /* 应用侧栏宽度（DESIGN.md B7.2.1）：走 Tailwind 间距命名空间产出 w-sidebar-rail /
+     w-sidebar-drawer。刻意不进 :root —— :root 语义层被 .landing-root 逐键镜像，
+     只落一处的 token 会让 globals.tokens.test.ts 的镜像守卫变红。
+     rail 是常驻的一级列（常量，不再有折叠态）；drawer 是与它并排的二级面板宽度 ——
+     占布局宽度、挤压主区，不是浮层，故与窄屏覆盖抽屉复用同一宽度。 */
   --spacing-sidebar-rail: 64px;
+  --spacing-sidebar-drawer: 264px;
 
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);

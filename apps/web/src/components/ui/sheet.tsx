@@ -41,9 +41,9 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
 
 const SIDE_CLASSES = {
   bottom: "inset-x-0 bottom-0 border-t data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
-  left: "inset-y-0 left-0 h-full w-sidebar max-w-[85vw] border-r data-open:slide-in-from-left data-closed:slide-out-to-left",
+  left: "inset-y-0 left-0 h-full w-sidebar-drawer max-w-[85vw] border-r data-open:slide-in-from-left data-closed:slide-out-to-left",
   right:
-    "inset-y-0 right-0 h-full w-sidebar max-w-[85vw] border-l data-open:slide-in-from-right data-closed:slide-out-to-right",
+    "inset-y-0 right-0 h-full w-sidebar-drawer max-w-[85vw] border-l data-open:slide-in-from-right data-closed:slide-out-to-right",
   top: "inset-x-0 top-0 border-b data-open:slide-in-from-top data-closed:slide-out-to-top",
 } as const;
 

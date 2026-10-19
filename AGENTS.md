@@ -54,30 +54,57 @@ Key characteristics:
   best-effort everywhere: a failure must never change a 402 rejection or turn
   a settled task into a failed one. Retention (read + >90d) is purged from
   `apps/web/src/instrumentation.ts` at startup.
-- **Two-level collapsible app sidebar** — `/home`'s left sidebar is a single
-  component (`components/layout/home-sidebar.tsx`) holding a **two-level** nav:
-  L1 = 首页 / 创作 / 图库, L2 = 创作›AI 画布·排版设计 and 图库›作品集·素材库.
-  **L1 is a pure disclosure** (`aria-expanded`, at most one group open, default
-  创作, state held inside the sidebar so toggling never re-renders the main
-  area) — it must not navigate, because 创作's two children are full-page routes
-  and a navigating L1 would leave `/home` before the second level could ever be
-  seen. Nav items stack vertically (icon above label) in **both** states and
-  both levels share one tile component; collapsing to a 64px rail changes only
-  the `<aside>` width, so folding never re-lays-out the items and never
-  re-renders the main area. The collapsed rail **keeps its text labels** — the
-  visible text is the accessible name, so no tooltip-only a11y gap opens — and
-  expresses L2 affiliation with a leading rule instead of an indent. Exactly one
-  nav row carries `aria-current="page"` at a time; if the current child's group is
-  collapsed, the child unmounts and its **L1 takes the mark over** so the
-  current-location anchor never disappears. 消息中心 has **no nav row**: the
-  footer bell is its only entry and carries `aria-current` while that view is up.
-  Collapse state (collapsed / narrow-viewport drawer / `Cmd/Ctrl+B` /
-  localStorage) lives in `lib/layout/use-sidebar-collapse.ts`; the wordmark and
-  build-version badge appear only in the expanded state. Below 768px the sidebar
-  leaves the document flow and opens as a Radix Dialog sheet
-  (`components/ui/sheet.tsx`, no new dependency). Geometry, group hues and the
-  `--spacing-sidebar*` width tokens are specified in `docs/DESIGN.md` B7.2 —
-  change them there first.
+- **Resident-rail app sidebar with an adjacent L2 panel** — `/home`'s left sidebar
+  is a single component (`components/layout/home-sidebar.tsx`) holding a **two-level**
+  nav: L1 = 首页 / 创作 / 图库, L2 = 创作›AI 画布·排版设计 and 图库›作品集·素材库.
+  The shape is copied from a measured reference (Canva projects page, 2026-10-19) and
+  the rules below are the ones that measurement settled:
+  - **The L2 panel is a flex sibling of the rail, not a floating overlay.** It occupies
+    layout width and squeezes the main area (measured 1121px → 857px). Nothing may
+    reintroduce an overlay here — the previous implementation did and it was wrong.
+  - **An L1 row has exactly one activatable target: activating it opens that group's
+    panel and lands on the group's `primaryId` child** (declared in the data, never
+    inferred from array order). There is **no chevron and no second control per row**, so
+    L1 rows are plain buttons, not links; a leaf L1 (首页) collapses the panel instead.
+    Activating a panel row does **not** collapse the panel, and neither does
+    re-activating the same L1.
+  - **Landing on the default child happens only in-page.** 作品集 is a main-area view, so
+    图库 switches to it; AI 画布 is a whole-page route, so 创作 opens its panel and stays.
+    Auto-navigating there would remove the panel the user just opened and leave no way to
+    reach 排版设计. Rule: *apply the default child's effect within the current page.*
+  - **The panel's global open/close is a linear switch at the top of the rail** (beside
+    the wordmark, `aria-expanded` + `aria-controls`), matching the reference's 36×36
+    「切换侧边导航栏」 button. Reopening restores the group that was open last; it shares
+    one `togglePanel()` with `Cmd/Ctrl+B`. It is absent below 768px, where there is no
+    resident panel.
+
+  - Panel state lives inside the sidebar (opening it must not re-render the main area),
+    is never persisted, and starts closed. Collapsed means width 0 + `inert` +
+    `aria-hidden`, **not** unmounted — otherwise the closing transition wipes an empty
+    strip.
+  - **Two indicators, deliberately separate.** The filled tile marks the current **section**
+    and follows the L1 the user activated, *not* the main view — clicking 创作 selects its
+    default child (AI 画布) while the main area stays on the landing page, so a
+    view-derived highlight would leave 创作 dark. `aria-current="page"` marks the deepest
+    selected item, and exactly one nav row carries it (rail L1 and panel L2 counted
+    together); when the panel is collapsed its items leave the accessibility tree and the
+    **L1 takes the mark over**, so the current-location anchor never disappears.
+    消息中心 has **no nav row**: the footer bell is its only entry and carries
+    `aria-current` while that view is up.
+  - Nav items keep their visible text labels (the visible text is the accessible name,
+    so no tooltip-only a11y gap opens). The rail footer keeps only bell and avatar;
+    theme, locale and settings live in the user menu. The **wordmark and build-version
+    badge appear only at the top of the L2 panel** — a 64px column cannot hold them, and the
+    reference puts its brand there. The footer is a **vertical** stack: bell above, avatar
+    below.
+  - Narrow-viewport sheet state and the `Cmd/Ctrl+B` shortcut live in
+    `lib/layout/use-sidebar-layout.ts`. Below 768px the sidebar leaves the document flow
+    and opens as a Radix Dialog sheet (`components/ui/sheet.tsx`, no new dependency) that
+    lists **group headings plus flat L2 rows** — L1 is a non-interactive heading there, no
+    disclosure control and no floating layer, since a modal dialog marks its siblings
+    `aria-hidden` and there is no resident panel to expand.
+  - Geometry, hue rules and the `--spacing-sidebar*` width tokens (rail 64px, panel
+    264px) are specified in `docs/DESIGN.md` B7.2 —
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.

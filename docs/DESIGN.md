@@ -436,110 +436,115 @@ Rules: at most 3 blobs per viewport; never under body text (contrast), only behi
 - Under `prefers-reduced-motion: reduce`, entrances become instant and the crossfade becomes a hard cut. Blobs stay — they do not move anyway.
 - No looping animation anywhere on the landing page, hero included.
 
-### B7.2 Application Sidebar `/home` (collapsible, two levels)
+### B7.2 Application Sidebar `/home` (resident rail + adjacent panel)
 
-Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation + expanded-group state) + `apps/web/src/lib/layout/use-sidebar-collapse.ts` (collapse state).
+Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation + open-panel state) + `apps/web/src/lib/layout/use-sidebar-layout.ts` (narrow-viewport sheet + the disclosure shortcut).
 
-Information architecture — L1 is a **disclosure, not a destination**:
+Reference measurement (Canva projects page, 1440x900, live DOM, 2026-10-19): rail **64px**, item 64x52; panel **264px**, row 40px; the panel is a **push column** — with it open the main area goes 1121px to 857px, and closing restores it; clicking an L1 opens that section's panel and lands on its first L2; clicking the same L1 again does **not** collapse it; clicking a different L1 collapses it.
 
-| L1 | L2 |
-| --- | --- |
-| 首页 | — (leaf link) |
-| 创作 | AI 画布 (`/canvas`) · 排版设计 (size dialog → `/design?w=&h=`) |
-| 图库 | 作品集 (main-area view) · 素材库 (placeholder, disabled) |
+Information architecture — **L1 is a destination that also opens its panel**:
 
-At most one group is expanded at a time (`openGroup`: `create` | `library` | `null`, default `create`, **not** persisted — it has a derivable default, unlike `collapsed`). Two consequences worth keeping:
+| L1 | Navigates to | L2 (panel only) |
+| --- | --- | --- |
+| 首页 | the landing view, collapsing the panel | — (leaf) |
+| 创作 | *(no in-page default)* | AI 画布 · 排版设计 (size dialog to `/design?w=&h=`) |
+| 图库 | 作品集 (main-area view) | 作品集 · 素材库 (placeholder, disabled) |
 
-- **L1 must not navigate.** 创作's two children are full-page routes, so a "jump to the group's first child" L1 would leave `/home` on click and that group could never be seen expanded — the second level would not exist on screen at all.
-- **The bell is the only entry to 消息中心**, which is a main-area view like 作品集 but has no nav row; the bell carries `aria-current` while that view is up, so all three main-area views indicate their location the same way.
+Each group's **default child is declared in the data** (`primaryId`), never inferred from array order — a reorder must not silently change where 创作 leads.
+
+- **The panel is a sibling, not an overlay.** It occupies layout width and squeezes the main area; it never floats above the main content. Three consequences worth keeping:
+  - **L2 never shares the column.** Affiliation is structural (column vs adjacent column) rather than an indent. The earlier same-column variant proved the indent route cannot carry it: `pl-4` inside an `items-center` flex container yields an 8px shift, and brand-hued children read as one violet slab.
+  - **The panel opens on L1 activation, not on a per-row control.** There is **no chevron and no second target per row** — a row with two activatable targets reads as one control to a screen reader, and the reference implementation has no such control. Activating 首页 has no panel to open, so it collapses the current one.
+- **The panel's global open/close lives in a linear switch at the top of the rail**, beside the wordmark, measured on the reference as a 36×36 button labelled 「切换侧边导航栏」 (toggling the main area 1361px ↔ 1097px). It carries `aria-expanded` + `aria-controls`; reopening restores the group that was open last. It shares one `togglePanel()` with `Cmd/Ctrl+B`, so the two never diverge. Below 768px it disappears — there is no resident panel to toggle.
+  - **The bell is the only entry to 消息中心**, a main-area view like 作品集 with no nav row; the bell carries `aria-current` while that view is up.
+
+**Landing on the default child happens only in-page.** Activating 图库 switches the main area to 作品集; activating 创作 opens the panel and **stays put**. Reason: 创作's first L2 (AI 画布) is a full-page route that carries no app sidebar, so auto-navigating would remove the panel the user just opened — and they could never reach 排版设计. The rule is uniform, not a special case: *apply the default child's effect **within the current page**; a whole-page destination waits for an explicit click.* Hence L1 rows are plain buttons, not links.
 
 #### B7.2.1 Width
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--spacing-sidebar` | 232px | expanded panel → `w-sidebar` |
-| `--spacing-sidebar-rail` | 64px | collapsed rail → `w-sidebar-rail` |
+| `--spacing-sidebar-rail` | 64px | the resident L1 column → `w-sidebar-rail` |
+| `--spacing-sidebar-drawer` | 264px | the L2 panel and the narrow-viewport sheet → `w-sidebar-drawer` |
 
 Declared in `@theme inline` under Tailwind's spacing namespace, **never in `:root`**: `:root`'s semantic layer is mirrored verbatim by `.landing-root`, and the token guard in `globals.tokens.test.ts` turns red on any divergence. A width token added to `:root` alone breaks that mirror.
+
+The rail is a **constant** — there is no collapsed state, so there is no second geometry to keep in sync. The panel shares one width token with the narrow sheet: both are "the second column", and a sheet narrower than 264px would truncate four-character labels.
 
 #### B7.2.2 Nav Item Geometry
 
 | Element | Spec |
 | --- | --- |
-| Tile | 32px squircle (`--radius-lg`) holding a 16px icon. **One tile component for both levels and both widths** |
-| Label | centered below the tile; `text-[11px]/leading-tight` expanded, `text-[10px]/leading-none` collapsed, `whitespace-nowrap` |
-| Item padding | `py-1` expanded, `py-0.5` collapsed |
-| L1 (group) | the same tile plus a 12px chevron pinned to the item's **right edge** (`right-1`, on the tile's centerline). Expanded state only — see below |
-| L2 (child) | the same tile, `pl-4` in the panel. The rail's 44px content box cannot spare 16px, so the indent becomes a 1px × 12px leading rule (`-left-2`): affiliation stays visible, labels stay untruncated |
+| Rail target | `w-full` column in the rail's 56px content box: 32px squircle tile (`--radius-lg`) holding a 16px icon, `py-1`, label `text-[11px]/leading-tight` below, `whitespace-nowrap`. About 58px tall |
+| Panel item | horizontal row, `h-10` (40px), `px-3`, `gap-2`: 14px icon in a 24px box + `text-[13px]` label |
+| Narrow sheet | the same horizontal row component; children indent with `ml-4` (margin, not padding — padding inside an `items-center` row reads as half its value) |
 | Group separator | a centered 32px (`w-8`) `--brand-ink-200` hairline with 8px clearance above and below, **between the two groups only** |
-| Footer | hairline above. **Expanded**: one row of five icon buttons (settings · bell · theme · locale · avatar). **Collapsed**: a single column of the same five |
+| Rail top | the panel switch only (`size-7` icon button, `PanelLeftOpen`/`PanelLeftClose`) — **no wordmark, no version**: a 64px column cannot hold them, and the reference puts its brand at the top of the panel |
+| Panel top | wordmark `oops` + the build-version badge (`text-[11px] tabular-nums`), `px-3 py-3` |
+| Footer | hairline above, then a **vertical** stack of two controls — bell above, avatar below (`gap-1`). Theme, locale and settings moved into the user menu |
 
-Three rules follow:
-
-- **The chevron is absolutely positioned, not in the label row.** Sharing the row would push the label off the tile's centerline and break alignment with its siblings; pinning it to the item's right edge costs the panel nothing (220px of usable width against a 32px tile).
-- **The chevron does not render in the rail.** 52px minus 12px padding leaves 44px, already nearly filled by a four-glyph 10px label (≈40px). The L2 leading rule carries affiliation there instead. `aria-expanded` survives in both states — losing the affordance must not lose the semantics.
-- **The hairline is load-bearing, not decoration.** An 11px centered gray label is nearly the same shape as a nav label, so without a rule between them the two groups read as one undifferentiated list. It sits *between* groups only — the first one needs no separator.
+- **The chevron is gone entirely** — not moved, not restyled. It only made sense while a row had two targets; with one target per row there is nothing to expand *from*, and a decorative affordance on a non-interactive element is worse than none.
+- **The hairline is load-bearing, not decoration.** An 11px centered gray label is nearly the same shape as a nav label, so without a rule between them 创作 and 图库 read as one undifferentiated list. It sits *between* groups only.
 
 #### B7.2.2a Vertical Budget
 
-The sidebar has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. Budget at a **565px** viewport (a short window — the case that actually broke), with **one group expanded** (single-open makes that the worst case):
+The rail has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. There is only **one** state to budget (the panel is a separate column with its own height), at a **565px** viewport (a short window — the case that actually broke):
 
-| Region | Expanded | Rail |
-| --- | --- | --- |
-| Container padding | 16 | 16 |
-| Brand header | 36 | 36 |
-| Nav content | 315 | 275 |
-| Footer | 49 | 165 |
-| **Total** | **416** | **492** |
+| Region | Rail |
+| --- | --- |
+| Container padding | 16 |
+| Rail top | 36 |
+| Nav content | 189 |
+| Footer | 77 |
+| **Total** | **318** |
 
 Derivation, so a reviewer can re-check it without a browser:
 
-- Nav item = padding + tile + gap + label → expanded `8 + 32 + 4 + 14 = 58`; rail `4 + 32 + 4 + 10 = 50`.
-- Expanded nav = 首页 `58` + 创作组 (`58 + 2 + 58×2 + 2 = 178`) + 图库组 (`17` hairline `+ 58` L1 `= 75`) + two 2px column gaps = **315**.
-- Rail nav = `50 + (50 + 2 + 50×2 + 2 = 154) + 67 + 4` = **275**.
-- Footer expanded = `8 (pt-2) + 1 (border) + 40 (avatar size-10, the tallest of the five)` = **49**; rail = `9 + 28 + 32 + 28 + 28 + 32 + 4×2` = **165**.
+- Rail target = `8 (py-1) + 32 (tile) + 4 (gap) + 14 (label) = 58`.
+- Nav = 首页 `58` + `2` gap + 创作 `58` + `2` gap + hairline `17 (1 + 8 + 8)` + 图库 `58` = **195**.
+- Footer = `8 (pt-2) + 1 (border) + 32 (bell) + 4 (gap-1) + 32 (avatar size-8)` = **77** — a column stacks, so the rail can afford it.
+- Rail top = `28 (size-7 button) + 8 (pb-2)` = **36**; the version badge used to sit here and now lives in the user menu.
 
-Folding flat items into one open group is what bought the headroom: the previous inventory (6 tiles + 2 decorative group labels = 8 row-equivalents) totalled 557 / 599. Both states now clear 565px outright, so the panel never scrolls and 首页 is always the top item. **Overflow is the fallback, never the default** — if a change pushes a total past the viewport, shrink a region rather than adding scroll.
-
-Two rules follow from the numbers:
-
-- The footer's expanded row costs 49px; the same five controls stacked cost 165px. Stacking them is what pushes the rail toward overflow first.
-- Never solve a height problem with `overflow-y-auto` alone. Radix restores focus to a nav trigger after a dialog closes, and the browser's `block:'nearest'` scroll then pushes 首页 out of view — the user cannot see where they are.
+Moving L2 out of the rail is what bought the headroom. **Overflow is the fallback, never the default**: if a change pushes the total past the viewport, shrink a region rather than adding scroll. Never solve a height problem with `overflow-y-auto` alone — closing the panel returns focus to the nav row, and the browser's `block:'nearest'` scroll then pushes 首页 out of view, so the user cannot see where they are.
 
 #### B7.2.3 Color Hierarchy
 
-The tile carries hierarchy, not personality:
-
 | State | Fill | Glyph |
 | --- | --- | --- |
-| 创作 group (L1) | `bg-brand-violet-500/12` | `text-brand-violet-700` (dark: `-300`) |
-| 图库 group (L1) | `bg-sidebar-accent` | `text-muted-foreground` |
-| Current | `bg-primary` | `text-primary-foreground` (the 6.2:1 pair from B2.4) |
+| Current rail item | `bg-primary` tile | `text-primary-foreground` (the 6.2:1 pair from B2.4) |
+| Current panel item | full-row `bg-primary/10` pill | `text-primary` + `font-medium` |
+| Any other item | transparent, `hover:bg-accent/60` | `text-muted-foreground` |
 | Disabled | 40% opacity, no hover feedback | `cursor-not-allowed` |
 
-Group hue rides on **L1**; L2 children are always neutral, so the reading is "violet section, neutral items" rather than two competing color families at the same depth.
+**Hue marks the current location and nothing else.** The earlier group hue (violet 创作 / neutral 图库) existed to separate siblings inside one column; grouping is now expressed by structure (two adjacent columns), so tinting sibling L1 items is noise — and the panel sits flush against the rail, where a hue difference would assert a relationship that no longer exists. This also settles a code/doc conflict: the implementation gave 创作's children `brand` while this section specified the opposite.
 
-The two fills never overlap: an expanded L1 shows its group hue, while the L1 that **stands in for a hidden current child** shows `bg-primary`. A group therefore never looks "selected" and "current" at once, and the current location survives the group being collapsed.
+The two fills never overlap: the L1 that stands in for a hidden current child shows the filled tile, while an open panel marks the child itself.
 
-Canva's per-app rainbow is an artifact of aggregating many brands. oops is one product: a hand-picked hue set would break B2.1's naming rule, B2.6's chrome rule, and the contrast floor, for no communicative gain. Squircle geometry plus group hue plus a solid current tile reproduce the reference's visual language without that cost.
+#### B7.2.4 One Component, One Width
 
-#### B7.2.4 One Component, Two Widths
+A single nav item component per orientation (rail column, panel row) serves every L1 and L2 row, so hierarchy is expressed by **placement** — which column the row lives in — never by a second item geometry or an indent. Consequences:
 
-Both states render the **same** nav item component; only `<aside>`'s width changes. Both levels render that same component too — hierarchy is expressed by chevron, indent, and hue, never by a second item geometry. Consequences:
-
-- Collapsing is a single `transition-[width]` on one element. Per-item re-layout during the animation is a defect.
-- The collapsed rail **keeps its text labels**. A 64px rail minus 12px padding leaves 52px, and four CJK glyphs at 10px occupy ≈40px — so the visible text can equal the `aria-label`, leaving no tooltip-only accessibility gap and no second label component.
-- Current view carries `aria-current="page"`, and **exactly one nav row carries it at a time**. When the current child's group is collapsed, the child is unmounted and its **L1 takes the mark over** — otherwise collapsing the group would erase the current-location anchor this document keeps insisting on.
-- The **footer** is the one region that legitimately differs between states: five controls cannot share a 52px row, so the rail stacks them while the panel keeps them in a row. Reference (Canva) does the same.
+- The rail has no width transition, so per-item re-layout during an animation is impossible.
+- The rail **keeps its text labels**. Two CJK glyphs at 11px occupy about 22px inside a 56px target, so the visible text equals the `aria-label`, leaving no tooltip-only accessibility gap.
+- **Two distinct indicators, never one.** The filled tile marks the current **section** (whichever L1 the user last activated — decoupled from the main view, see below); `aria-current="page"` marks the **deepest selected item**, and **exactly one nav row carries it at a time** (rail L1 and panel L2 counted together). Selecting 创作 therefore lights its tile while `aria-current` sits on 作布内的 AI 画布 — which is what the reference does when both its rail item and 所有项盈亮. When the panel is collapsed its items leave the accessibility tree (`inert` + `aria-hidden`), so the **L1 takes the mark over** — otherwise collapsing the panel would erase the current-location anchor this document keeps insisting on.
+- **The current section is state, not a derivation of the main view.** Clicking 创作 selects its default child (AI 画布) while the main area stays on the landing page, because that child is a whole-page route with no in-page form. Deriving the highlight from the view alone would leave 创作 dark — the exact bug that made the rail look broken. The panel renders a second `<nav>` landmark with its own label (`{group}的二级导航`) rather than an anonymous region.
+- The **footer** is the one region that differs from the old panel: the rail has room for a column, so it keeps only bell · avatar and preferences moved into the user menu.
 - The nav scrolls only when the budget in B7.2.2a is exceeded, and its scrollbar is the `sidebar-scroll` utility — a 6px transparent-track bar. The default scrollbar overlaps `border-r` and reads as a double rule.
 
-#### B7.2.5 Narrow Viewport
+#### B7.2.5 The Panel Is a Column, Not an Overlay
 
-Below 768px the sidebar leaves the document flow (`fixed inset-y-0`, off-canvas) and opens as an overlay sheet from a floating 40px menu button; the main area takes the full width. The overlay, `Escape`, and a main-view switch all dismiss it. Radix `Dialog` provides the focus trap, `aria-modal`, and scroll lock — hand-rolled `keydown` plus a backdrop div is not an acceptable substitute.
+The panel is a flex sibling of the rail inside the page's flex container, sized by one width transition:
+
+- **Opening and closing animate `width`** (`w-0` to `w-sidebar-drawer`) on `--duration-slow` (320ms) with `--ease-standard`, `motion-reduce:transition-none`. The panel's *content* keeps a fixed 264px width inside an `overflow-hidden` wrapper, so the transition is a horizontal wipe rather than a text reflow.
+- **Content is not unmounted on close.** If it were, the 320ms in which the main area returns to full width would show an empty strip. The last opened group stays mounted and is hidden by width 0 plus `inert` + `aria-hidden` — which is also what keeps it out of the tab order and the accessibility tree while collapsed, a hard requirement because "collapsed" here means "present in the DOM".
+- **Activating a panel row does not collapse the panel.** With push semantics, collapsing on every selection would make the main area jump on each navigation.
+- **Re-activating the same L1 does not collapse it either** (measured). To close the panel: activate 首页, or press `Cmd/Ctrl+B`. There is no close button — the reference has none, and the panel is one keystroke or one click away.
+
+Narrow viewport (<768px) is a different rendering branch, not a second design: the sidebar leaves the document flow (`fixed inset-y-0`) and opens as a Radix `Dialog` sheet from a floating 40px menu button. Inside that modal sheet the levels are listed as **group headings plus flat L2 rows** — no disclosure control, no floating layer — because a modal dialog marks its siblings `aria-hidden`, so a portaled overlay would be invisible to screen readers and outside the focus trap, and because there is no resident panel here while L1 no longer navigates: an activatable L1 row would only promise a panel that cannot exist. The same data drives both branches. `Escape`, the close button and any navigation dismiss the sheet.
 
 #### B7.2.6 Motion
 
-`transition-[width]` on `--duration-slow` (320ms — the "panel expansion" step in B6) with `--ease-standard`; `motion-reduce:transition-none` degrades to an instant swap. A fourth duration step is a defect (B6).
+The panel's `width` transition is the "panel expansion" step in B6: `--duration-slow` (320ms) with `--ease-standard`, `motion-reduce:transition-none`. A fourth duration step is a defect (B6). The rail itself never animates — there is no width to animate.
 
 ### B7.3 Chat + Canvas (immersive)
 
