@@ -41,11 +41,12 @@ describe("inlineFileRefs（沙箱渲染的图片内联）", () => {
     expect(out.match(/data:image\/jpeg;base64,/g)).toHaveLength(2);
   });
 
-  it("读取失败的引用保持原样（渲染时拦截不致命）", async () => {
+  it("读取失败的引用被剥离（无浏览器下残留相对路径只会得到空图）", async () => {
     const html = '<img src="/files/assets/missing.png"><img src="/files/assets/x.png">';
     h.objects["assets/x.png"] = { body: [1], contentType: "image/png" };
     const out = await inlineFileRefs(html);
-    expect(out).toContain("/files/assets/missing.png");
-    expect(out).toContain("data:image/png;base64,");
+    // 失败的引用被剥离，不影响同一 HTML 里其它引用正常内联
+    expect(out).not.toContain("/files/assets/missing.png");
+    expect(out).toContain('src="data:image/png;base64,');
   });
 });

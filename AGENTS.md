@@ -148,7 +148,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Admin UI       | Ant Design (apps/admin only — antd stack, no Tailwind) |
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
 | Database       | PostgreSQL via Drizzle ORM                          |
-| Rendering      | `playwright-core` + headless Chromium               |
+| Rendering      | `satori` + `satori-html` + `@resvg/resvg-js`（无浏览器；子集字体内置） |
 | Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
 | i18n           | next-intl（无 URL 路由的 cookie 模式）— `messages/zh.json` + `en.json`，typed messages |
 | Package mgr    | pnpm 10                                             |
@@ -278,7 +278,7 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   UI — do not hand-roll message/attachment/tool UI.
 - **Async tasks:** image generation and HTML rendering must go through
   `src/server/domain/tasks/task-executor.ts`. Never call provider APIs or
-  Playwright directly from tools/route handlers with unbounded concurrency.
+  render directly from tools/route handlers with unbounded concurrency.
 - **Comments:** explain *why*, not *what*. No narration comments.
 - **Commits:** conventional commits (`feat:`, `fix:`, `chore:`, `docs:`...).
 
@@ -306,14 +306,16 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
     canvas items, draft and view restore (workspace saved locally per session)
     → deleting a session must remove its MinIO objects and asset rows (GC)
     → narrow-viewport check: chat/canvas toggle exclusively, session drawer.
-  - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model and
-    Chromium installed): pick poster-designer → attach a product image →
+  - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model):
+    pick poster-designer → attach a product image →
     request a poster → verify the rendered poster appears in chat and canvas
-    (vision input, HTML sandbox render) → select the poster as a reference
+    (vision input, browser-free render) → select the poster as a reference
     for an edit round → reload to confirm restore.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
-- Playwright screenshot rendering is covered by a service-level test using a
-  minimal HTML fixture; keep it hermetic (no network).
+- Rendering tests are hermetic service-level tests using minimal HTML fixtures;
+  they need no browser. Note the two hard constraints the tests lock in: resvg must
+  run with `loadSystemFonts: false` (16× slower otherwise, silently), and satori must
+  keep `embedFont: true` (text vanishes otherwise, also silently).
 
 ## Security considerations
 
@@ -339,11 +341,14 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   store with generated filenames (never user-supplied names); serve user
   files through the `files` route with correct `Content-Type` and
   `Content-Disposition` to prevent stored-XSS via SVG/HTML.
-- **HTML rendering sandbox (important):** agent-generated HTML is rendered in
-  headless Chromium. Render with `--disable-js` where feasible, block
-  outbound network requests except whitelisted asset hosts, and set
-  per-render timeouts. Never render user/agent HTML with access to internal
-  network URLs (SSRF) or local file paths.
+- **HTML rendering sandbox (important):** agent-generated HTML is rendered without
+  any browser. The renderer never executes JS, so scripts are structurally inert
+  (the old pre-check/CSP/script-intercept layers are gone). Outbound network is the
+  remaining risk: strip every image reference that is not a `data:` URI or a
+  whitelisted host **before** inlining `/files/` refs (reversing the order lets a
+  stripped URL become an inlined data URI and bypass the gate). Per-render timeout
+  is mandatory. Never let agent HTML reach internal network URLs (SSRF) or local
+  file paths.
 - **Prompt-injection containment:** user-supplied text and file contents are
   untrusted input to the LLM. Tools must validate inputs with zod
   regardless of what the model asks for; the tool registry blocks any tool

@@ -18,7 +18,7 @@
 Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
                                       │  agentLoop + 声明式 Agent（提示词 + 工具子集）
                                       ├── tool: generate_image ──► 火山 Seedream / 通义万相
-                                      ├── tool: render_html ──► Playwright 截图服务
+                                      ├── tool: render_html ──► 无浏览器渲染（satori + resvg）
                                       └── tool: save_asset ──► 图片存储
    │
    ▼
@@ -52,7 +52,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
-| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图（`src/server/infra/render/`），进程内限并发，与生图共用执行器闸门 |
+| 图片渲染 | `satori` + `satori-html` + `@resvg/resvg-js` | 无浏览器渲染：HTML → VDOM → SVG → PNG（`src/server/infra/render/`），子集字体内置，与生图共用执行器闸门 |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
 | 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（web 30 天 / 管理端 12 小时） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线）。管理端是另一套会话：`oops_admin_session` 不同名 + `ADMIN_AUTH_SECRET`（缺省回退 `AUTH_SECRET`），两侧互不相认 |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
@@ -110,7 +110,8 @@ generate_image({ prompt, size, aspectRatio })
               failed/canceled/重启清理 → release（全额返还，条目转 released）
 ```
 
-- Playwright 截图同样任务化（CPU/内存密集，并发限 1~2）。
+- 无浏览器渲染（satori + resvg）同样任务化。实测单张 750×1334 约 23ms，纯 CPU 计算、
+  无进程复用；resvg 的 native 调用为同步阻塞，并发过高会打满事件循环，与生图共用闸门。
 - 进程重启后 pending/running 任务标记失败，启动对账（`reconcileFrozen`）释放任务已
   终态/不存在的残余冻结条目（崩溃窗口兜底）。
 - 未来多实例：executor 替换为 BullMQ + Redis，Service 接口不变（冻结/结算语义不变）。
@@ -524,9 +525,21 @@ oops/
 领域仓储层为 `@oops/db`（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
 共享包依赖单向：`config → db → llm → auth` 禁逆；app 只经 `@oops/*` 公共 API（exports 子路径）消费，env 全部经 `@oops/config` 域 getter 读取。
 
-> `src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）已落地：
-> 沙箱渲染（禁 JS 三重约束 = HTML 预校验 + 脚本请求拦截 + CSP 纵深、出网白名单、单渲染超时）、
-> 浏览器实例进程内复用；渲染前把 `/files/` 引用内联为 data URI（沙箱默认断网，相对路径不可解析）。
+> `src/server/infra/render/`（无浏览器渲染，对应 `render_html` 工具）已落地：
+> HTML → satori-html 转 VDOM → satori 输出 SVG → resvg 转 PNG，不依赖浏览器二进制与进程，
+> 可跑在无图形栈的函数运行时。渲染链路固定顺序「版式静态校验 → 图片出网闸门 → `/files/`
+> 引用内联 → 渲染」；闸门必须在内联之前，顺序颠倒会让非法外链被内联成 data URI 绕过检查。
+> 安全模型分两层：渲染器不执行 JS，「不执行脚本」是结构性事实（原 Playwright 时代的
+> 禁脚本三重防护已删除）；图片外链仍由渲染前扫描剥离（非 data: 与非白名单 host），
+> 与渲染器内建的内网/元数据 SSRF 防护形成纵深。
+> 字体：satori 不回退系统字体且不合成加粗，必须注入 Regular + Bold 两个真实字重的
+> 子集字体（思源黑体 Noto Sans SC，SIL OFL 可再分发；由 `scripts/build-subset-font.mjs`
+> 从可变字体实例化后裁剪，源字体在 `.fontcache/` 不入库）。汉字集取 GB 2312 一二级
+> 6763 字（`scripts/gb2312-hanzi.txt`）——不能用连续码点范围：整个 CJK 基本区 20992 字
+> 会触发 subset-font 的字形数 bug（产出损坏 glyf 表），而收窄到 3072 字又会让
+> 「标题」「图片」等常用字静默缺字形。缺字形不报错，故有逐字覆盖回归测试锁定。
+> 版式：渲染器对 grid / float / `var()` / `position:sticky` 等**静默降级不报错**，
+> 故由 `assert-layout-support.ts` 在渲染前静态校验拒绝并回喂 Agent 改写。
 > 多模态上下文：声明 vision 能力的 Agent（海报设计师）将引用商品图以 `ImageContent` 注入本轮
 > LLM 输入（非 vision Agent 保持文本引用块），transcript 图片一律清洗为引用占位文本（无 base64 落库）；
 > 部署海报场景需 `LLM_MAIN_MODEL` 指向已登记的 vision 模型（qwen3.7-plus；

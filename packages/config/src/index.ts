@@ -96,9 +96,9 @@ const imageShape = {
     ),
 };
 
-/** 渲染沙箱域（html-rendering spec）。 */
+/** 海报渲染域（poster-rendering spec）。无浏览器渲染，无 Chromium 可执行路径。 */
 const renderShape = {
-  // 出网白名单 host（逗号分隔；空 = 仅内联资源与 data:）
+  // 图片外链白名单 host（逗号分隔；空 = 仅内联 data: 放行，其余外链在渲染前剥离）
   RENDER_ALLOWED_HOSTS: z
     .string()
     .default("")
@@ -108,10 +108,8 @@ const renderShape = {
         .map((s) => s.trim())
         .filter(Boolean),
     ),
-  // 单渲染超时 ms
-  RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
-  // 可选 Chromium 可执行路径（未设走 playwright 默认解析）
-  RENDER_EXECUTABLE_PATH: z.string().min(1).optional(),
+  // 单次渲染超时 ms。实测渲染约 23ms，上限主要留给图片内联的对象存储读取
+  RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 };
 
 const coreSchema = z.object(coreShape);
@@ -256,17 +254,16 @@ export function getImageConfig(env: Env = process.env): ImageConfig {
 }
 
 export interface RenderConfig {
+  /** 图片外链白名单 host（空 = 仅内联 data: 放行）。 */
   allowedHosts: string[];
   timeoutMs: number;
-  executablePath?: string;
 }
 
-/** 渲染沙箱域（RENDER_*）。 */
+/** 海报渲染域（RENDER_*）：图片外链白名单 + 单次渲染超时。 */
 export function getRenderConfig(env: Env = process.env): RenderConfig {
   const v = renderSchema.parse(env);
   return {
     allowedHosts: v.RENDER_ALLOWED_HOSTS,
     timeoutMs: v.RENDER_TIMEOUT_MS,
-    executablePath: v.RENDER_EXECUTABLE_PATH,
   };
 }

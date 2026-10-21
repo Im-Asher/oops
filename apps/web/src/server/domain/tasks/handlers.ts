@@ -6,7 +6,6 @@ import {
   generateImage,
 } from "@/server/infra/providers/dashscope-images";
 import { renderHtml, RenderError } from "@/server/infra/render/render-html";
-import { inlineFileRefs } from "@/server/infra/render/inline-files";
 import { createStorage, defaultS3Client, extFromMime, generateAssetKey } from "@/server/infra/storage/s3";
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -81,9 +80,12 @@ registerTaskHandler("generate_image", async (payload, ctx) => {
 });
 
 /**
- * render_html handler（html-rendering spec）：HTML 渲染 → 截图 → S3 → assets
- * 原子语义（任一步失败整体失败，不留半成品资产）；截图 base64 随 result 返回
- * 供工具回喂模型，落库时经 slimForDb 剔除。
+ * render_html handler（poster-rendering spec）：HTML 校验 → 出网闸门 → 内联 → 渲染
+ * → S3 → assets。原子语义（任一步失败整体失败，不留半成品资产）；
+ * 渲染结果 base64 随 result 返回供工具回喂模型，落库时经 slimForDb 剔除。
+ *
+ * 版式校验、图片出网闸门与文件内联的编排都在 renderHtml 内部完成，此处只透传
+ * 原始 HTML——顺序（闸门先于内联）由 render-html.ts 保证。
  */
 registerTaskHandler("render_html", async (payload, ctx) => {
   const { html, width, height, referenceAssetId } = payload as {
@@ -94,9 +96,7 @@ registerTaskHandler("render_html", async (payload, ctx) => {
   };
   let rendered: Awaited<ReturnType<typeof renderHtml>>;
   try {
-    // 版式引用的商品图/底图先内联为 data URI（沙箱默认断网，相对路径不可解析）
-    const html2 = await inlineFileRefs(html);
-    rendered = await renderHtml({ html: html2, width, height, signal: ctx.signal });
+    rendered = await renderHtml({ html, width, height, signal: ctx.signal });
   } catch (err) {
     // unknown 类（含非 RenderError 的管线异常）根因只在底层 cause：全量进服务端日志，
     // 摘要经 renderTaskError 拼入任务错误供落库与 Agent 解释
