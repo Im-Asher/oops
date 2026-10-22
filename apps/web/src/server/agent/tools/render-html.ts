@@ -69,6 +69,8 @@ interface RenderHtmlOutcome {
   width: number;
   height: number;
   taskId: string;
+  /** 渲染前被剥离的图片引用数（外链/读取失败/src 缺失）。 */
+  droppedImages?: number;
   referenceAssetId?: string;
 }
 
@@ -76,7 +78,7 @@ export const renderHtmlTool: ToolDefinition<RenderHtmlArgs> = {
   name: "render_html",
   label: "海报渲染",
   description:
-    "把你生成的完整海报 HTML 渲染为一张海报图片（服务端沙箱截图）。" +
+    "把你生成的完整海报 HTML 渲染为一张海报图片（服务端无浏览器渲染）。" +
     "HTML 必须自包含：内联全部 CSS、无脚本、按宽 750 与所选高度档位设计；" +
     "先想好版式与文案再产出完整 HTML，一次渲染成型。",
   schema: renderHtmlSchema,
@@ -111,9 +113,16 @@ export const renderHtmlTool: ToolDefinition<RenderHtmlArgs> = {
         data: result.data,
         mimeType: result.mimeType,
       };
+      // 有图被剥离时明确告知：商品图丢失会让海报缺主角，Agent 必须转告用户重新
+      // 上传/选中，而不是静默交付一张带空洞的海报。
+      const dropped = result.droppedImages ?? 0;
       const caption: TextContent = {
         type: "text",
-        text: `海报已渲染：${result.url}（${POSTER_WIDTH}×${result.height}）`,
+        text:
+          `海报已渲染：${result.url}（${POSTER_WIDTH}×${result.height}）` +
+          (dropped > 0
+            ? `。注意：有 ${dropped} 处图片引用未能加载（外链被禁或读取失败），成品中对应位置为空——若缺失的是商品图，请告知用户重新上传并选中该图后重试。`
+            : ""),
       };
       return {
         content: [image, caption],
@@ -123,6 +132,7 @@ export const renderHtmlTool: ToolDefinition<RenderHtmlArgs> = {
           width: result.width,
           height: result.height,
           taskId: result.taskId,
+          ...(result.droppedImages !== undefined ? { droppedImages: result.droppedImages } : {}),
           ...(result.referenceAssetId ? { referenceAssetId: result.referenceAssetId } : {}),
         },
       };

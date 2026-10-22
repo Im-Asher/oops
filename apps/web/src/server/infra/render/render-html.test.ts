@@ -70,6 +70,34 @@ describe("renderHtml（无浏览器确定性）", () => {
     expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
   });
 
+  it("回归：无 src 的 img 不得让整次渲染失败（旧浏览器方案下图裂仍出图）", async () => {
+    // 无浏览器迁移的回退：satori 遇到无 src 的 img 会抛
+    // "Image source is not provided" 让整次渲染失败，且被误报成「版式非法」。
+    // 必须降级为「该图缺席」，其余版式照常出图。
+    const cases = [
+      '<img style="width:200px;height:200px">', // Agent 写的占位符，无 src 属性
+      '<img src="">',                            // 内联读取失败后残留的空 src
+      '<img src="   ">',                         // 全空白 src
+    ];
+    for (const badImg of cases) {
+      const html = posterHtml(1000).replace("</head>", `${badImg}</head>`);
+      const out = await renderHtml({ html, width: 750, height: 1000 });
+      expect(Array.from(out.png.slice(0, 4)), badImg).toEqual([137, 80, 78, 71]);
+      // 剥离计数应反映「有图没进去」，供上层告知 Agent
+      expect(out.droppedImages, badImg).toBeGreaterThan(0);
+    }
+  });
+
+  it("坏图引用不影响同一次渲染里的合法图片", async () => {
+    const html = posterHtml(1000).replace(
+      "</head>",
+      '<img src=""><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="></head>',
+    );
+    const out = await renderHtml({ html, width: 750, height: 1000 });
+    expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
+    expect(out.droppedImages).toBe(1);
+  });
+
   it("白名单内图片引用被保留", async () => {
     const html = posterHtml(1000).replace(
       "</head>",

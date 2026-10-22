@@ -16,7 +16,7 @@
  * 第 2 步的渲染前扫描，见 assert-image-urls.ts。
  */
 import { getRenderConfig } from "@oops/config";
-import { assertImageUrls } from "./assert-image-urls";
+import { assertImageUrls, stripUnusableImages } from "./assert-image-urls";
 import { assertLayoutSupport, describeLayoutViolations } from "./assert-layout-support";
 import { inlineFileRefs } from "./inline-files";
 import { renderHtmlToPng } from "./satori-pipeline";
@@ -44,6 +44,12 @@ export interface RenderedPage {
   png: Uint8Array;
   width: number;
   height: number;
+  /**
+   * 本次渲染前被剥离的图片引用数（外链 + 读取失败 + src 缺失）。
+   * 供上层告知 Agent「有图没进去」——尤其是商品图丢失时，Agent 应转告用户
+   * 重新上传/选中，而非静默交付一张带空洞的海报。
+   */
+  droppedImages?: number;
 }
 
 /** 可注入的渲染实现（handler 测试用 fake 替换）。 */
@@ -110,8 +116,17 @@ export async function renderHtml(input: RenderHtmlInput): Promise<RenderedPage> 
   const scan = assertImageUrls(html, allowedHosts);
   logFields.strippedImages = scan.strippedCount;
 
-  // 3. 文件引用内联（/files/xxx → data URI）
+  // 3. 文件引用内联（/files/xxx → data URI）；读不到的引用被剥离并计数——
+  // 这是「商品图没进成品」的可靠信号，必须累进 strippedImages 才能回喂 Agent。
   const inlined = await inlineFileRefs(scan.html);
+  logFields.strippedImages += inlined.dropped;
+
+  // 3b. 兜底清扫：移除 src 缺失/为空的 <img>。必须在内联之后——内联失败会留下
+  // src=""。渲染器遇到无 src 的 img 会抛 "Image source is not provided" 让整次
+  // 渲染失败，而旧浏览器方案下图裂仍能渲染完整海报；这里兜住，让坏引用降级为
+  // 「该图缺席」而非「整次失败」。
+  const usable = stripUnusableImages(inlined.html);
+  logFields.strippedImages += usable.strippedCount;
 
   // 4. 无浏览器渲染。硬超时用 AbortController + Promise.race。
   // 时序说明：渲染函数内部有多个 await，因此「渲染已 settle」与「计时器触发」
@@ -139,10 +154,10 @@ export async function renderHtml(input: RenderHtmlInput): Promise<RenderedPage> 
   const renderer = input.renderer ?? ((opts) => renderHtmlToPng(opts));
   try {
     const out = await Promise.race([
-      renderer({ html: inlined, width, height, signal: controller.signal }),
+      renderer({ html: usable.html, width, height, signal: controller.signal }),
       timeoutPromise,
     ]);
-    return out;
+    return { ...out, droppedImages: logFields.strippedImages };
   } catch (err) {
     if (err instanceof RenderError) throw err;
     // 基础设施故障（字体缺失、native binding 不可用等）归 unknown：

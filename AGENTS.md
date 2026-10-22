@@ -307,10 +307,13 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
     → deleting a session must remove its MinIO objects and asset rows (GC)
     → narrow-viewport check: chat/canvas toggle exclusively, session drawer.
   - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model):
-    pick poster-designer → attach a product image →
-    request a poster → verify the rendered poster appears in chat and canvas
+    pick poster-designer → attach a product image → **select it on the canvas**
+    (selection is the only path an image reaches the agent; upload alone does not)
+    → request a poster → verify the rendered poster appears in chat and canvas
     (vision input, browser-free render) → select the poster as a reference
     for an edit round → reload to confirm restore.
+    Without a selected product image the poster agent refuses to run any tool and
+    asks for one — it will not fabricate a product via `generate_image`.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
 - Rendering tests are hermetic service-level tests using minimal HTML fixtures;
   they need no browser. Note the two hard constraints the tests lock in: resvg must

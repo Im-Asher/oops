@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertImageUrls } from "./assert-image-urls";
+import { assertImageUrls, stripUnusableImages } from "./assert-image-urls";
 
 /**
  * 出网闸门单测：重点是**剥离计数**（不含 URL 原文），以及
@@ -131,5 +131,34 @@ describe("assertImageUrls", () => {
     const r = assertImageUrls(html, []);
     expect(r.html).not.toContain("secret-token");
     expect(JSON.stringify(r)).not.toContain("secret-token");
+  });
+});
+
+describe("stripUnusableImages（渲染前兜底：无 src 的 img）", () => {
+  it("移除无 src 属性的 img（Agent 写了占位符）", () => {
+    const r = stripUnusableImages('<div><img style="width:100px"><img src="/files/a.png"></div>');
+    expect(r.strippedCount).toBe(1);
+    expect(r.html).not.toContain("<img style");
+    expect(r.html).toContain('src="/files/a.png"');
+  });
+
+  it("移除 src 为空的 img（内联失败留下的 src=\"\"）", () => {
+    const r = stripUnusableImages('<img src=""><img src="data:image/png;base64,AA=">');
+    expect(r.strippedCount).toBe(1);
+    expect(r.html).not.toContain('src=""');
+    expect(r.html).toContain("data:image/png");
+  });
+
+  it("移除 src 全空白的 img", () => {
+    const r = stripUnusableImages('<img src="   ">');
+    expect(r.strippedCount).toBe(1);
+    expect(r.html).toBe("");
+  });
+
+  it("正常 img 原样保留且计数为 0", () => {
+    const html = '<img src="/files/a.png"><img src="data:image/png;base64,AA=">';
+    const r = stripUnusableImages(html);
+    expect(r.strippedCount).toBe(0);
+    expect(r.html).toBe(html);
   });
 });

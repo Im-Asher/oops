@@ -52,6 +52,12 @@ interface ComposerProps {
   onRemovePendingFile?: (id: string) => void;
   /** 积分耗尽（/api/chat 402 后）：整输入区禁用直至刷新/恢复余额。 */
   creditsExhausted?: boolean;
+  /**
+   * 需要商品图才开工的 Agent（如海报设计师）：当前既无引用图时，占位文案
+   * 提示先上传商品图。仅改文案，不阻断发送——用户可能确实想要纯文字版海报。
+   * 由调用方按 Agent 能力声明，组件不内置 Agent 判断。
+   */
+  needsProductImage?: boolean;
 }
 
 /**
@@ -80,6 +86,7 @@ export function Composer({
   pendingFiles,
   onRemovePendingFile,
   creditsExhausted,
+  needsProductImage,
 }: ComposerProps) {
   const composingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,6 +95,10 @@ export function Composer({
   const sessionReady = variant === "landing" || hasSession;
   // 积分耗尽优先于会话门槛展示（余额恢复需刷新或后台发放，禁用语义更明确）。
   const gateReady = sessionReady && !creditsExhausted;
+  // 缺商品图提示：仅在已就绪、无积分问题、且当前没有引用图时出现。
+  // 排在 creditsExhausted 之后、placeholder 之前——环境性问题优先，商品图是内容层提醒。
+  const hintNeedProductImage =
+    gateReady && needsProductImage === true && !reference;
   // landing 语境下无「会话」概念，附件钮文案随之调整。
   const attachLabel = onAttach
     ? variant === "landing"
@@ -191,9 +202,11 @@ export function Composer({
         placeholder={
           creditsExhausted
             ? t("placeholderNoCredits")
-            : sessionReady
-              ? t("placeholder")
-              : t("placeholderNeedSession")
+            : !sessionReady
+              ? t("placeholderNeedSession")
+              : hintNeedProductImage
+                ? t("placeholderNeedProductImage")
+                : t("placeholder")
         }
         rows={1}
         value={value}
