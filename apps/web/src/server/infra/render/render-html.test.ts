@@ -1,59 +1,68 @@
-import { existsSync } from "node:fs";
-import { chromium } from "playwright-core";
-import { afterEach, describe, expect, it } from "vitest";
-import { getRenderConfig } from "@oops/config";
-import { assertNoScripts, RenderError, renderHtml } from "./render-html";
+import { describe, expect, it } from "vitest";
+import { RenderError, renderHtml } from "./render-html";
 
-// Chromium 可执行文件缺失（playwright-core 不自带浏览器）时跳过渲染用例——
-// 这些用例依赖真实浏览器，本地/冒烟环境先 `pnpm dlx playwright install chromium`。
-const chromiumPath = getRenderConfig().executablePath ?? chromium.executablePath();
-const hasChromium = Boolean(chromiumPath) && existsSync(chromiumPath);
+/**
+ * 无浏览器渲染测试：全部确定性断言，不依赖任何浏览器二进制。
+ * 字体来自 assets/fonts/（子集产物），若缺失会在字体加载处明确抛错而非静默降级。
+ */
 
-const FIXTURE_HTML = `<!doctype html><html><head><meta charset="utf-8">
-<style>body{margin:0;background:#f97316;display:flex;align-items:center;justify-content:center;height:1000px}
-h1{color:#fff;font-size:64px;margin:0}</style></head>
-<body><h1>双十一大促</h1></body></html>`;
+/** 合规海报 HTML：仅 flex 布局 + 受支持属性 + 内联 data URI 图片。 */
+function posterHtml(height: number): string {
+  return `<!doctype html><html><head><style>
+body{margin:0;width:750px;height:${height}px;overflow:hidden;background:linear-gradient(160deg,#FFF7ED,#FED7AA);display:flex;flex-direction:column;padding:60px;box-sizing:border-box}
+.t{font-size:80px;font-weight:700;color:#1F2937;letter-spacing:4px}
+.s{font-size:32px;color:#4B5563;margin-top:16px}
+.p{font-size:96px;color:#DC2626;margin-top:auto}
+img{width:200px;height:200px;object-fit:cover;border-radius:24px}
+</style></head><body>
+<div class="t">双十一大促</div>
+<div class="s">全场五折起</div>
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="/>
+<div class="p">¥299</div>
+</body></html>`;
+}
 
-describe("assertNoScripts（禁 JS 主闸门）", () => {
-  it("拒绝 script 标签", () => {
-    expect(() => assertNoScripts("<div><script>alert(1)</script></div>")).toThrowError(
-      RenderError,
-    );
-  });
-
-  it("拒绝内联事件属性", () => {
-    expect(() => assertNoScripts('<img src="x.png" onerror="alert(1)">')).toThrowError(
-      RenderError,
-    );
-  });
-
-  it("拒绝 javascript: URL", () => {
-    expect(() => assertNoScripts('<a href="javascript:alert(1)">x</a>')).toThrowError(
-      RenderError,
-    );
-  });
-
-  it("静态 HTML 通过", () => {
-    expect(() => assertNoScripts(FIXTURE_HTML)).not.toThrow();
-  });
-});
-
-describe("renderHtml（需 Chromium）", { skip: !hasChromium }, () => {
-  afterEach(() => {
-    // 实例复用：不主动销毁；进程退出即回收
-  });
-
-  it("自包含 HTML 渲染出正确尺寸的 PNG", async () => {
-    const out = await renderHtml({ html: FIXTURE_HTML, width: 750, height: 1000 });
+describe("renderHtml（无浏览器确定性）", () => {
+  it("合规 HTML 渲染出定宽定高的 PNG", async () => {
+    const out = await renderHtml({ html: posterHtml(1334), width: 750, height: 1334 });
     expect(out.width).toBe(750);
-    expect(out.height).toBe(1000);
+    expect(out.height).toBe(1334);
     // PNG 魔数
     expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
     expect(out.png.byteLength).toBeGreaterThan(1000);
   });
 
-  it("白名单外资源缺失不致命：渲染继续并成功", async () => {
-    const html = FIXTURE_HTML.replace(
+  it("三个高度档位均可渲染", async () => {
+    for (const height of [1000, 1334, 1654]) {
+      const out = await renderHtml({ html: posterHtml(height), width: 750, height });
+      expect(out.height).toBe(height);
+      expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
+    }
+  });
+
+  it("grid 布局被拒绝并归入 invalid_html（不回退到静默降级）", async () => {
+    const html = posterHtml(1000).replace("display:flex;flex-direction:column", "display:grid");
+    await expect(
+      renderHtml({ html, width: 750, height: 1000 }),
+    ).rejects.toMatchObject({ kind: "invalid_html", name: "RenderError" });
+  });
+
+  it("float 布局被拒绝并归入 invalid_html", async () => {
+    const html = posterHtml(1000).replace(".t{", ".t{float:left;");
+    await expect(
+      renderHtml({ html, width: 750, height: 1000 }),
+    ).rejects.toMatchObject({ kind: "invalid_html", name: "RenderError" });
+  });
+
+  it("伪元素选择器被拒绝并归入 invalid_html", async () => {
+    const html = posterHtml(1000).replace(".t{", ".t::before{content:'x'}.t{");
+    await expect(
+      renderHtml({ html, width: 750, height: 1000 }),
+    ).rejects.toMatchObject({ kind: "invalid_html", name: "RenderError" });
+  });
+
+  it("白名单外图片被剥离且渲染继续（不致命）", async () => {
+    const html = posterHtml(1000).replace(
       "</head>",
       '<img src="https://blocked.invalid/x.png"></head>',
     );
@@ -61,16 +70,73 @@ describe("renderHtml（需 Chromium）", { skip: !hasChromium }, () => {
     expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
   });
 
+  it("白名单内图片引用被保留", async () => {
+    const html = posterHtml(1000).replace(
+      "</head>",
+      '<img src="https://cdn.example.com/x.png"></head>',
+    );
+    // 走 allowedHosts 注入路径，验证闸门放行（图片本身加载失败不致命）
+    const out = await renderHtml({
+      html,
+      width: 750,
+      height: 1000,
+      allowedHosts: ["example.com"],
+    });
+    expect(Array.from(out.png.slice(0, 4))).toEqual([137, 80, 78, 71]);
+  });
+
   it("超时判定失败（RenderError timeout）", async () => {
+    // 已 settle 的 promise 在 race 中总是赢过 setTimeout，故不能靠 timeoutMs=1
+    // 与 20ms 的真实渲染竞速（那样由调度顺序决定，不确定）。注入慢渲染替身，
+    // 让渲染真的慢于超时上限，从而确定性地走超时分支。
     await expect(
-      renderHtml({ html: FIXTURE_HTML, width: 750, height: 1000, timeoutMs: 5 }),
+      renderHtml({
+        html: posterHtml(1000),
+        width: 750,
+        height: 1000,
+        timeoutMs: 20,
+        renderer: () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ png: new Uint8Array([137, 80, 78, 71]), width: 750, height: 1000 }),
+              500,
+            ),
+          ),
+      }),
     ).rejects.toMatchObject({ kind: "timeout", name: "RenderError" });
   });
 
-  it("浏览器实例复用：连续两次渲染均成功", async () => {
-    const first = await renderHtml({ html: FIXTURE_HTML, width: 400, height: 300 });
-    const second = await renderHtml({ html: FIXTURE_HTML, width: 400, height: 300 });
-    expect(first.png.byteLength).toBeGreaterThan(0);
-    expect(second.png.byteLength).toBeGreaterThan(0);
+  it("外部 signal abort 时归类 timeout", async () => {
+    const ac = new AbortController();
+    const p = renderHtml({
+      html: posterHtml(1000),
+      width: 750,
+      height: 1000,
+      signal: ac.signal,
+      // 渲染慢于 abort 到达的时刻，使外部信号成为 race 的胜者
+      renderer: () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ png: new Uint8Array([137, 80, 78, 71]), width: 750, height: 1000 }),
+            500,
+          ),
+        ),
+    });
+    ac.abort();
+    await expect(p).rejects.toMatchObject({ kind: "timeout", name: "RenderError" });
+  });
+
+  it("非法 HTML 结构要么渲染出图要么归入 invalid_html（不得归 unknown）", async () => {
+    let outcome: "resolved" | RenderError;
+    try {
+      await renderHtml({ html: "<div>未闭合", width: 750, height: 1000 });
+      outcome = "resolved";
+    } catch (e) {
+      expect(e).toBeInstanceOf(RenderError);
+      expect((e as RenderError).kind).toBe("invalid_html");
+      outcome = e as RenderError;
+    }
+    expect(["resolved"]).toContain(typeof outcome === "string" ? "resolved" : "");
+    if (outcome !== "resolved") expect(outcome.kind).toBe("invalid_html");
   });
 });

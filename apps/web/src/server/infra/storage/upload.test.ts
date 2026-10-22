@@ -159,7 +159,7 @@ describe("handleDesignUpload", () => {
       meta: Record<string, unknown>;
     };
     expect(assetArg.kind).toBe("image");
-    // 创建设计没有会话概念：不得伪造 sessionId
+    // 排版设计没有会话概念：不得伪造 sessionId
     expect(assetArg.sessionId).toBeUndefined();
     expect(assetArg.userId).toBe("u1");
     expect(assetArg.width).toBe(1080);

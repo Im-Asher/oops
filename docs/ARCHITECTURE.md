@@ -18,7 +18,7 @@
 Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
                                       │  agentLoop + 声明式 Agent（提示词 + 工具子集）
                                       ├── tool: generate_image ──► 火山 Seedream / 通义万相
-                                      ├── tool: render_html ──► Playwright 截图服务
+                                      ├── tool: render_html ──► 无浏览器渲染（satori + resvg）
                                       └── tool: save_asset ──► 图片存储
    │
    ▼
@@ -34,7 +34,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
 | 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
-| 前端骨架 | 三页结构：`/home` 轻量落地页（侧栏导航 + 创作输入/Agent 卡片入口 + 创建设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
+| 前端骨架 | 三页结构：`/home` 轻量落地页（两级侧栏 + 创作输入/Agent 卡片入口 + 排版设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
 | 主题 | 手写 ThemeProvider（零依赖）：html `dark` class 切换 + localStorage（`oops-theme`）持久化 + layout 首屏阻塞脚本防闪烁；明暗两套 CSS token |
 | i18n | next-intl cookie 模式（无 URL 路由）：zh/en 双语；层 A UI 文案进词典，层 B LLM 文本由 agent 语言跟随；防回流 = typed messages + lint 禁裸中文 + zh↔en 键对齐单测 |
 
@@ -52,7 +52,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
-| 图片渲染 | `playwright-core` + Chromium | HTML 沙箱渲染 → 截图（`src/server/infra/render/`），进程内限并发，与生图共用执行器闸门 |
+| 图片渲染 | `satori` + `satori-html` + `@resvg/resvg-js` | 无浏览器渲染：HTML → VDOM → SVG → PNG（`src/server/infra/render/`），子集字体内置，与生图共用执行器闸门 |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
 | 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（web 30 天 / 管理端 12 小时） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线）。管理端是另一套会话：`oops_admin_session` 不同名 + `ADMIN_AUTH_SECRET`（缺省回退 `AUTH_SECRET`），两侧互不相认 |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
@@ -110,7 +110,8 @@ generate_image({ prompt, size, aspectRatio })
               failed/canceled/重启清理 → release（全额返还，条目转 released）
 ```
 
-- Playwright 截图同样任务化（CPU/内存密集，并发限 1~2）。
+- 无浏览器渲染（satori + resvg）同样任务化。实测单张 750×1334 约 23ms，纯 CPU 计算、
+  无进程复用；resvg 的 native 调用为同步阻塞，并发过高会打满事件循环，与生图共用闸门。
 - 进程重启后 pending/running 任务标记失败，启动对账（`reconcileFrozen`）释放任务已
   终态/不存在的残余冻结条目（崩溃窗口兜底）。
 - 未来多实例：executor 替换为 BullMQ + Redis，Service 接口不变（冻结/结算语义不变）。
@@ -183,8 +184,9 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 ### 5.2 前端骨架：双页路由、首页跳转协议与主题
 
-**路由结构**：`/home` 落地页（侧栏导航：首页 / AI画布 / 创建设计可用，素材库与消息中心置灰禁用；主区创作横幅、
-创作输入与 Agent 卡片）+ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
+**路由结构**：`/home` 落地页（**两级侧栏**：一级项 首页 / 创作 / 图库，二级项 创作›AI 画布·排版设计、
+图库›作品集·素材库；一级项是纯展开控件，素材库置灰禁用；主区创作横幅、创作输入与 Agent 卡片）
++ `/canvas` AI 画布页（无应用侧栏，点阵画布全屏为唯一主舞台，聊天面板
 左上悬浮可收起、收起后画布左上重开，画布右上悬浮保存徽章与导出）+ `/design` 设计工作台页
 （顶栏撤销重做/下载 + 56px 左轨 + 模版/素材/文字面板 + 缩放适配画布；尺寸前置弹窗在 `/home`
 触发，携 `?w=&h=` 建页）+
@@ -195,12 +197,34 @@ assistant 剥 `thinking` 块、图片内容块替换为含 URL/assetId 的文本
 
 **作品集与加工出口**（`/home` 主区作品集视图）：作品集是跨会话聚合视图——**条目即原资产本身**，
 由 `assets.saved_at` 打标实现，非副本（见 §7）。三条入口：AI 画布卡片 hover 星标、
-创建设计导出面板「同时存入作品集」勾选、首页侧栏 `navPortfolio`。加工出口一律传
+排版设计导出面板「同时存入作品集」勾选、首页侧栏 图库›作品集。加工出口一律传
 `assetId` 而非图片 URL（`/canvas?assetId=`、`/design?assetId=`），服务端经
 `GET /api/assets/:id` 校验归属后才给出 `/files/*` 地址——传URL 会让用户手改参数注入
 任意外部图片源。设计侧以新增图层落地（复用 `designReducer` 的 `addElements`，自带
 `pushHistory` 故可撤销），不覆盖既有设计稿；资产已删只内联提示，设计稿保持原样。
 设计导出勾选入库失败时只警告：浏览器下载已完成，附加动作不得阻断首要意图。
+
+**消息中心**（`/home` 主区视图 + 侧栏底栏铃铛）：同样**不占独立路由**，
+`view: "home" | "portfolio" | "messages"`，切主区而非跳转。**铃铛是唯一入口**——导航树里没有
+消息中心项（它在两个 L1 分组里都无处安放），故铃铛在该视图下带 `aria-current="page"`，
+与作品集/首页的当前位置指示方式统一。取数收敛在一个
+hook（`src/lib/notifications/use-notifications.ts`），由 `/home` 持有并注入铃铛与视图，
+**只跑一个 60s 轮询**（多标签页不重复请求）：未读计数轮询，列表按来源筛选一次取完；
+`document.hidden` 时暂停，切回可见立即补拉一次，轮询失败静默保留上次计数（不为角标打扰用户）。
+系统消息按 `category` 与词典键**显式配对**渲染（`credits.low` / `credits.exhausted`
+各配 title + body 两键），未登记类别回退消息主体保存的中文原文——不拿 `i18n_key` 直接撞词典，
+因为 next-intl v4 没有 `t.has`，未知键只会打一条 onError 再返回键名。
+管理端下发（`source=admin`）无 i18n_key，标题正文一律原样展示。
+
+**侧栏形态**（spec home-landing「一级列与二级面板结构」「一级项展开面板并落到默认子项」「二级面板的开合约束」「当前位置的委托标记」、DESIGN.md B7.2）：侧栏从 `/home` 页面内联 JSX 抽为独立组件 `src/components/layout/home-sidebar.tsx`（除面板开合外纯展示，不碰 `view`、不碰路由、不取数）；窄屏抽屉状态与 `Cmd/Ctrl+B` 快捷键收敛在 `src/lib/layout/use-sidebar-layout.ts`（`drawerOpen` / `isNarrow` + `matchMedia`；**无 localStorage** —— rail 是常量，没有折叠态）。形态照抄一处实测参照（Canva 项目页，1440×900，2026-10-19 直接读 DOM）：**二级面板是 rail 的 flex 兄弟节点，占布局宽度把主区挤窄**（1121px → 857px），**不是浮层**；rail 64px、面板 264px、面板行高 40px。
+**两级语义**：一级项（首页 / 创作 / 图库）常驻 64px 一级列；二级项只在该组的**并排二级面板**里出现。一级行只有**一个**可激活目标：激活它 = 展开本组面板 + 落到该组 `primaryId` 声明的默认子项（不靠数组顺序推断）；行内**没有展开控件 / chevron / 第二个目标**，故一级行是纯按钮而非链接。**落派只在当前页内执行**：图库 → 切主区为作品集；创作 → 不动（其默认子项是整页路由 `/canvas`，自动跳转会连同刚展开的面板一起被卸载，用户就退不回排版设计）。面板内激活二级项**不**收起面板，重复激活同一一级项也**不**收起。
+面板的全局开合在**一级列顶部的线性开关**（参照实测：36×36 按钮，带 `aria-expanded`/`aria-controls`，重新打开时恢复上一次展开的组，与 `Cmd/Ctrl+B` 共用同一个 `togglePanel()`）。
+面板状态保留在侧栏内部（不进 `page.tsx`，否则切面板会重渲染主区）、**不落盘**、初值 `null`；收起态 = 宽度 0 + `inert` + `aria-hidden`，**内容不卸载**（否则关闭过渡擦的是一条空条）。
+色相只标记当前位置，非当前一级项与全部二级项中性。**两个标识分开**：填色 tile 标记当前所在**分区**（跟随用户激活的那个 L1，与主区视图解耦）；`aria-current="page"` 标记**最深的选中项**，且**恰好一个**（一级列 + 面板内二级项合计）：面板展开时标记面板内的二级项，面板收起（其项已移出可访问性树）时由其一级项代行。点「创作」会让它的 tile 亮起来而主区仍是落地页 —— 若从视图推导高亮，创作就会永远暗着（这正是过去的脏脏）。
+产品标识与**构建版本**只在**二级面板顶部**（一级列顶部只剩面板开关），不在用户菜单；主题、语言、设置在用户菜单内。一级列底部仅铃铛 + 头像，**纵向排列**（上铃铛下头像）。
+窄屏（<768px）侧栏移出文档流，经浮动菜单按钮以 Radix Dialog 抽屉唤出（`components/ui/sheet.tsx`，无新依赖；焦点陷阱 / `aria-modal` / 滚动锁定交给 Radix）；抽屉内以**分组标题 + 平铺二级项**呈现、无展开控件也无浮层——模态 Dialog 会给兄弟节点加 `aria-hidden`，portaled 浮层会落在焦点陷阱之外，且该分支没有常驻面板可开、一级项也已不再导航。
+视觉规范（tile 几何、面板列规则、色相、宽度 token `--spacing-sidebar*`）以 DESIGN.md B7.2 为准。
+
 
 **首页 → 画布直发协议**：创作输入提交（landing composer）携带 `?draft=<文本>&send=1&t=<提交时间戳>`，
 选了 Agent 再带 `?agent=<id>`；待传附件（≤5 张图片）经模块级 handoff store（`src/lib/chat/home-handoff.ts`，
@@ -310,6 +334,18 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
                         `model.<providerId>.<modelId>.enabled`(bool) /
                         `model.roleDefaults.<role>`({providerId,modelId})，
                         zod 校验写入；是配置三层链的 DB overlay 层）
+notifications 消息主体  id(uuid), source(text system|admin), category(text),
+                        level(text info|warning|critical), title(text), body(text),
+                        i18n_key(text?), i18n_params(jsonb?),
+                        audience(text all|users), created_by(text?, 管理员逻辑引用),
+                        revoked_at(timestamptz?), created_at
+                        （写时扇出：内容只存一份，逐人投递态在 user_notifications；
+                        撤回只置 revoked_at，用户侧立即不可见，管理端统计保留）
+user_notifications
+              用户投递  user_id(text), notification_id(uuid→notifications, 级联删),
+                        read_at(timestamptz?), PK(user_id, notification_id)
+                        （投递即「可见且未读」；已读 = read_at 非空。user_id 不设外键：
+                        users.id 是 uuid 而所有 *_user_id 列一律 text）
 ```
 
 枚举取值：
@@ -322,6 +358,16 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 - `task_status`：`pending` / `running` / `succeeded` / `failed` / `canceled`
 - `credit_ledger_type`：`grant` / `freeze` / `settle` / `release` / `adjust`
 - `credit_ledger_status`：`frozen` / `settled` / `released`（仅 freeze 条目持有）
+
+通知相关列一律 `text` + 应用层常量（`NOTIFICATION_SOURCES` / `_CATEGORIES` /
+`_LEVELS` / `_AUDIENCES`，见 `packages/db/src/notification.repo.ts`）：动作集与类别集
+随产品增长，`pgEnum` 改型需 DDL。取值：
+
+- `notifications.source`：`system` / `admin`
+- `notifications.level`：`info` / `warning` / `critical`
+- `notifications.audience`：`all` / `users`
+- `notifications.category`：`credits.low` / `credits.exhausted`（系统，积分两级阈值）
+  / `admin.broadcast`（管理员全体广播）/ `admin.direct`（管理员定向）
 
 > 注：`chat-image-gen` 已落地：① `chat_sessions` 新增 `agent_id` 列（迁移 `0001`）；
 > ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
@@ -336,7 +382,7 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 > （零存储开销），代价是 `DELETE /api/sessions/:id` 的 GC 需跳过已收藏项
 > （`listKeysBySessionUnsaved` / `removeUnsavedBySession` 与无条件版本并存）；存活资产的
 > `session_id` 因 `ON DELETE SET NULL` 被置空，作品集展示其来源时呈现为未知。`saved_at`
-> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。创建设计的导出成果经
+> 建部分索引（`WHERE saved_at IS NOT NULL`）供作品集列表使用。排版设计的导出成果经
 > `POST /upload purpose=design` 落库为**无会话归属**资产（设计编辑器没有会话概念）。
 > `canvas-first-workbench` 增 `meta.referenceAssetId`（generate_image 血缘：引用的源图 assetId，
 > 参考图上传 `purpose=reference` 落 `kind=image` + `meta.purpose="reference"`，不追加聊天消息）。
@@ -349,14 +395,23 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 > `add-admin-console` 新增 `admin_audit_log` / `app_config` 表与 `invite_codes.revoked_at`
 > 列（迁移 `0008`）；`users.role` 在更早的抽包阶段加入（迁移 `0006`）。
 > 审计动作用 text + 应用层常量（不用 pgEnum——动作集随管理面增长，改型需 DDL）。
+> `add-message-center` 新增 `notifications` / `user_notifications` 两表（迁移 `0011`）。
+> 投递模型是**写时扇出**：消息主体一份内容，`user_notifications` 一人一行存已读态
+> （500/批插入），因此「谁收到了、谁读了」是直接查询而非运行时 join 扩散；
+> 撤回只置 `notifications.revoked_at`，用户侧列表/计数立即过滤，管理端的
+> 目标人数与已读明细仍可回答「撤回前多少人读过」。积分两类系统消息的
+> 去重与复位不引入状态列：比较「最近一条同类通知时刻」与「账本最近正向流水时刻」，
+> 配合事务级 `pg_advisory_xact_lock(hashtext(userId))` 消除并发双写窗口。
+> 保留期清理（已读且超 90 天）挂在 `apps/web/src/instrumentation.ts` 启动钩子。
 
 ### 7.1 管理面（admin console）
 
 独立应用 `apps/admin`（antd 栈，dev 端口 3001），**自带登录页 `/login` 与独立的
 `oops_admin_session` 会话**（复用 `users` 表账号，`role=admin` 才发会话；web 端会话
 不被认，登录语义与部署形态无关）；页面由 proxy 存在性检查（无会话 → `/login`）+ layout
-`requireAdmin` 双层守卫。六张管理面：
-用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板。
+`requireAdmin` 双层守卫。七张管理面：
+用户 / 邀请码 / 积分运营（发放·扣减·流水·对账·定价）/ Agent 开关 / 模型配置 / 总览看板 /
+消息管理（下发广播·定向、已读明细、撤回）。
 
 - **登录契约**：`POST /api/login` 同源校验 → 限频（10/60s）→ `authenticateAdmin`（密码 +
   `role=admin` + `status=active`；失败一律"用户名或密码不正确"，不泄漏账号与角色）→
@@ -373,7 +428,9 @@ app_config    运行配置  key(text 主键), value(jsonb), updated_by(text),
 - **审计动作**（应用层常量 `ADMIN_AUDIT_ACTIONS`）：`auth.login`（管理员登录，覆盖面中
   唯一的非写操作项）/ `user.status_change` / `invite.create` /
   `invite.revoke` / `credits.adjust` / `pricing.update` / `agent.toggle` / `model.config`
-  （同时覆盖模型启停与角色默认模型）；审计可按动作 / 目标 / 操作者检索。
+  （同时覆盖模型启停与角色默认模型）/ `message.send` / `message.revoke`（目标类型
+  `message`，与消息投递同事务落审计——「消息已发但审计缺失」不可能发生）；
+  审计可按动作 / 目标 / 操作者检索。
 > 业务四表历史行的 `user_id='owner'` 为 foundation 阶段遗留值，仅作旧数据存在，新写入一律为真实用户 id。
 > `assets.resultAssetId` 等扩展属后续按需演进。
 
@@ -407,7 +464,11 @@ oops/
 │   │       ├── sessions/[id]/route.ts # GET 历史（UIMessage 重建）/ PATCH 重命名+Agent 重绑 / DELETE 删除即 GC（删对象存储字节→assets→会话，messages 级联；已收藏资产豁免）
 │   │       ├── assets/route.ts     # GET 作品集列表（游标分页 + 标签筛选）/ 批量收藏态（ids）
 │   │       ├── assets/[id]/route.ts# GET 单图详情（加工出口换址）/ PATCH 收藏·标题·标签 / DELETE 彻底删除
-│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式）
+│   │       ├── notifications/      # 站内信：route.ts GET 列表（来源筛选 + 分页）/
+│   │       │   │                   #   unread-count/route.ts 未读计数（铃铛 60s 轮询）/
+│   │       │   │                   #   [id]/route.ts PATCH 标记已读（撤回后 404）/ read-all/route.ts 全部已读
+│   │       └── chat/route.ts       # POST SSE 聊天（requireUser + 敏感词初筛 + 首条消息自动标题 + 落库 + 流式；
+│   │                              #   积分不足 402 前 best-effort 投递「已耗尽」通知）
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
 │   │   ├── db/                     # → @oops/db（packages/db：schema + 6 仓储 + drizzle/ 迁移与 drizzle.config.ts 共址）
@@ -438,8 +499,8 @@ oops/
 │   ├── src/
 │   │   ├── proxy.ts                # Edge 层引导（oops_session 存在性 → /gate；非安全边界）
 │   │   ├── app/
-│   │   │   ├── (console)/          # 门卫（requireAdminFromCookieHeader）+ AdminShell（Sider 六面菜单 +
-│   │   │   │                       #   头部身份/退出 form）+ 六面占位页（users/invite-codes/points/agents/models/audit）
+│   │   │   ├── (console)/          # 门卫（requireAdminFromCookieHeader）+ AdminShell（Sider 七面菜单 +
+│   │   │   │                       #   头部身份/退出 form）+ 七面页面（users/invite-codes/points/agents/models/audit/dashboard/messages）
 │   │   │   ├── gate/page.tsx       # 无 cookie 引导页（指路 web 端登录）
 │   │   │   ├── api/logout/route.ts # POST 清会话 cookie（Max-Age=0）+ 307 回 web 首页
 │   │   │   └── layout.tsx          # 文档壳（AntdRegistry + next-intl + ConfigProvider zhCN）
@@ -464,9 +525,21 @@ oops/
 领域仓储层为 `@oops/db`（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
 共享包依赖单向：`config → db → llm → auth` 禁逆；app 只经 `@oops/*` 公共 API（exports 子路径）消费，env 全部经 `@oops/config` 域 getter 读取。
 
-> `src/server/infra/render/`（HTML→Playwright 截图，对应 `render_html` 工具）已落地：
-> 沙箱渲染（禁 JS 三重约束 = HTML 预校验 + 脚本请求拦截 + CSP 纵深、出网白名单、单渲染超时）、
-> 浏览器实例进程内复用；渲染前把 `/files/` 引用内联为 data URI（沙箱默认断网，相对路径不可解析）。
+> `src/server/infra/render/`（无浏览器渲染，对应 `render_html` 工具）已落地：
+> HTML → satori-html 转 VDOM → satori 输出 SVG → resvg 转 PNG，不依赖浏览器二进制与进程，
+> 可跑在无图形栈的函数运行时。渲染链路固定顺序「版式静态校验 → 图片出网闸门 → `/files/`
+> 引用内联 → 渲染」；闸门必须在内联之前，顺序颠倒会让非法外链被内联成 data URI 绕过检查。
+> 安全模型分两层：渲染器不执行 JS，「不执行脚本」是结构性事实（原 Playwright 时代的
+> 禁脚本三重防护已删除）；图片外链仍由渲染前扫描剥离（非 data: 与非白名单 host），
+> 与渲染器内建的内网/元数据 SSRF 防护形成纵深。
+> 字体：satori 不回退系统字体且不合成加粗，必须注入 Regular + Bold 两个真实字重的
+> 子集字体（思源黑体 Noto Sans SC，SIL OFL 可再分发；由 `scripts/build-subset-font.mjs`
+> 从可变字体实例化后裁剪，源字体在 `.fontcache/` 不入库）。汉字集取 GB 2312 一二级
+> 6763 字（`scripts/gb2312-hanzi.txt`）——不能用连续码点范围：整个 CJK 基本区 20992 字
+> 会触发 subset-font 的字形数 bug（产出损坏 glyf 表），而收窄到 3072 字又会让
+> 「标题」「图片」等常用字静默缺字形。缺字形不报错，故有逐字覆盖回归测试锁定。
+> 版式：渲染器对 grid / float / `var()` / `position:sticky` 等**静默降级不报错**，
+> 故由 `assert-layout-support.ts` 在渲染前静态校验拒绝并回喂 Agent 改写。
 > 多模态上下文：声明 vision 能力的 Agent（海报设计师）将引用商品图以 `ImageContent` 注入本轮
 > LLM 输入（非 vision Agent 保持文本引用块），transcript 图片一律清洗为引用占位文本（无 base64 落库）；
 > 部署海报场景需 `LLM_MAIN_MODEL` 指向已登记的 vision 模型（qwen3.7-plus；
@@ -483,10 +556,10 @@ oops/
 
 ## 10. 构建版本徽标
 
-首页侧栏展示构建版本（`src/lib/version.ts`）：构建时注入的 `NEXT_PUBLIC_APP_VERSION`
-优先，缺失时回退 `package.json` 的 `version`，不注入也能正常构建与展示（无需数据库配置）。
-构建/运行环境需同时注入该变量以保持 SSR 与客户端一致（详见 `src/lib/version.ts` 注释）。
-可选在构建命令中覆盖，例如从 git tag 派生：
+构建版本展示在 `/home` 用户菜单内（`src/lib/version.ts`）：构建时注入的
+`NEXT_PUBLIC_APP_VERSION` 优先，缺失时回退 `package.json` 的 `version`，不注入也能正常构建与展示
+（无需数据库配置）。构建/运行环境需同时注入该变量以保持 SSR 与客户端一致
+（详见 `src/lib/version.ts` 注释）。可选在构建命令中覆盖，例如从 git tag 派生：
 
 ```bash
 NEXT_PUBLIC_APP_VERSION=$(git describe --tags --always) pnpm build

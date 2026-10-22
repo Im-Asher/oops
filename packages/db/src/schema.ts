@@ -326,3 +326,62 @@ export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type AppConfig = typeof appConfig.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type AssetTag = typeof assetTags.$inferSelect;
+
+// —— 站内信域 ——
+
+// 消息主体（内容只存一份，扇出的是 user_notifications 的指针）：
+// source 系统事件 / 管理员下发；category 与 level 为 text + 应用层常量（同 adminAuditLog：
+// 取值集随管理面增长，pgEnum 改型需 DDL）。i18nKey 仅系统消息有值，客户端按 key 渲染词典、
+// 缺键回退 title/body 中已存的中文原文；管理员消息 i18nKey 为 null，原样展示不做本地化。
+// revokedAt 置位即撤回：用户侧列表按 IS NULL 过滤，投递与已读记录保留以支撑已读统计。
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source").notNull(),
+    category: text("category").notNull(),
+    level: text("level").notNull().default("info"),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    i18nKey: text("i18n_key"),
+    i18nParams: jsonb("i18n_params"),
+    // all 全体用户 / users 指定用户；定向明细在 user_notifications 行里
+    audience: text("audience").notNull(),
+    // 管理员 users.id；系统消息为 null。管理员被删后消息仍须可读 → 不设外键（同审计表）
+    createdBy: text("created_by"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("notifications_created_idx").on(t.createdAt),
+    index("notifications_source_created_idx").on(t.source, t.createdAt),
+  ],
+);
+
+// 每人一份的投递与已读状态（写时扇出）：已读是每人不同的状态，必须一人一行。
+// 不承载去重/复位状态——积分通知的复位由 credit_ledger 时间线推导（见 design.md D6）。
+export const userNotifications = pgTable(
+  "user_notifications",
+  {
+    // userId 不设外键：users.id 是 uuid，而本仓库所有 *_user_id 列一律是 text
+    // （credit_ledger / tasks / messages / assets 同构，只靠逻辑引用），
+    // 类型不一致会导致外键无法实现。此处沿用既有约定；MVP 无删除用户的路径，
+    // 故暂无用户级联清理需求（若将来支持删用户，须显式清理投递行）。
+    userId: text("user_id").notNull(),
+    notificationId: uuid("notification_id")
+      .notNull()
+      .references(() => notifications.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    // 用户侧列表/未读计数走 PK 的 user_id 前缀；notification_id 单列索引服务管理端
+    // 已读统计聚合与消息删除时的级联定位
+    primaryKey({ columns: [t.userId, t.notificationId] }),
+    index("user_notifications_notification_idx").on(t.notificationId),
+  ],
+);
+
+export type Notification = typeof notifications.$inferSelect;
+export type UserNotification = typeof userNotifications.$inferSelect;

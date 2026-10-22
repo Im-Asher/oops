@@ -95,8 +95,14 @@ describe("globals.css 设计 token 契约", () => {
     expect(missing).toEqual([]);
   });
 
-  it("Step 2 依赖的四个 @utility 已注册（删掉任何一个，落地页以 unknown utility 报错）", () => {
-    for (const name of ["rounded-media", "rounded-pill", "bg-brand-gradient", "text-brand-gradient"]) {
+  it("落地页与侧栏依赖的 @utility 已注册（删掉任何一个会以 unknown utility 报错）", () => {
+    for (const name of [
+      "rounded-media",
+      "rounded-pill",
+      "bg-brand-gradient",
+      "text-brand-gradient",
+      "sidebar-scroll",
+    ]) {
       expect(css).toMatch(new RegExp(`@utility ${name}\\s*\\{`));
     }
   });
@@ -133,6 +139,22 @@ describe("globals.css 设计 token 契约", () => {
     expect(landing.size).toBeGreaterThan(0);
     const drift = [...landing].filter(([k, v]) => root.get(k) !== v).map(([k]) => k);
     expect(drift).toEqual([]);
+  });
+
+  it("侧栏宽度 token 走 @theme 间距命名空间产出 w-sidebar-rail / w-sidebar-drawer（DESIGN.md B7.2.1）", () => {
+    // 64 / 264 取自 Canva 项目页实测（design D3）：一级列 64px、二级面板 264px
+    expect(css).toMatch(/--spacing-sidebar-rail:\s*64px\s*;/);
+    expect(css).toMatch(/--spacing-sidebar-drawer:\s*264px\s*;/);
+    // 折叠态退役后 232px 的 --spacing-sidebar 不再产出工具类，残留即红
+    expect(css).not.toMatch(/--spacing-sidebar:/);
+    // 落进 :root 会让上一条的 .landing-root 镜像守卫变红，故在此显式钉死
+    const root = blockVars(":root");
+    expect(root.has("--spacing-sidebar-rail")).toBe(false);
+    expect(root.has("--spacing-sidebar-drawer")).toBe(false);
+    // 必须落在 @theme inline 内，否则不产出工具类
+    const theme = css.match(/@theme inline\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(theme).toContain("--spacing-sidebar-rail:");
+    expect(theme).toContain("--spacing-sidebar-drawer:");
   });
 
   it("B2.6/B2.1：canvas 与 design 组件不再使用 Tailwind 内置紫，点阵走 --stage-dot", () => {

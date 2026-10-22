@@ -31,7 +31,7 @@ const patchSchema = z
   });
 
 /**
- * GET：单图详情。画布/作品集把assetId 转交创建设计时用它换地址——
+ * GET：单图详情。画布/作品集把assetId 转交排版设计时用它换地址——
  * 传id 而非 url，服务端校验归属后才给地址，避免手改参数注入外链（design.md D7）。
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -57,8 +57,8 @@ Canva is the friendliest face in design tooling: Adobe looks professional and fo
 | Motion 180/280/420ms | PRODUCT_DESIGN Principle 5 mandates a single 200ms rhythm | Baseline becomes 200ms (B6) |
 | 1320px container | `/home` is 768px, `/canvas` is full-bleed | Specify per surface (B7) |
 | Pro / Magic moments | **oops has no Pro tier and no Magic Studio** | Delete outright — a design system must not describe products that do not exist |
-| 5 category accents | 2 built-in agents today | Reduce to 3, and render as dots rather than colored fills (B7.4) |
-| No admin app | `apps/admin` uses antd, no Tailwind | Add a token mapping (B7.5) |
+| 5 category accents | 2 built-in agents today | Reduce to 3, and render as dots rather than colored fills (B7.5) |
+| No admin app | `apps/admin` uses antd, no Tailwind | Add a token mapping (B7.6) |
 
 ---
 
@@ -436,24 +436,134 @@ Rules: at most 3 blobs per viewport; never under body text (contrast), only behi
 - Under `prefers-reduced-motion: reduce`, entrances become instant and the crossfade becomes a hard cut. Blobs stay — they do not move anyway.
 - No looping animation anywhere on the landing page, hero included.
 
-### B7.2 Chat + Canvas (immersive)
+### B7.2 Application Sidebar `/home` (resident rail + adjacent panel)
+
+Implementation: `apps/web/src/components/layout/home-sidebar.tsx` (presentation + open-panel state) + `apps/web/src/lib/layout/use-sidebar-layout.ts` (narrow-viewport sheet + the disclosure shortcut).
+
+Reference measurement (Canva projects page, 1440x900, live DOM, 2026-10-19): rail **64px**, item 64x52; panel **264px**, row 40px; the panel is a **push column** — with it open the main area goes 1121px to 857px, and closing restores it; clicking an L1 opens that section's panel and lands on its first L2; clicking the same L1 again does **not** collapse it; clicking a different L1 collapses it.
+
+Information architecture — **L1 is a destination that also opens its panel**:
+
+| L1 | Navigates to | L2 (panel only) |
+| --- | --- | --- |
+| 首页 | the landing view, collapsing the panel | — (leaf) |
+| 创作 | *(no in-page default)* | AI 画布 · 排版设计 (size dialog to `/design?w=&h=`) |
+| 图库 | 作品集 (main-area view) | 作品集 · 素材库 (placeholder, disabled) |
+
+Each group's **default child is declared in the data** (`primaryId`), never inferred from array order — a reorder must not silently change where 创作 leads.
+
+- **The panel is a sibling, not an overlay.** It occupies layout width and squeezes the main area; it never floats above the main content. Three consequences worth keeping:
+  - **L2 never shares the column.** Affiliation is structural (column vs adjacent column) rather than an indent. The earlier same-column variant proved the indent route cannot carry it: `pl-4` inside an `items-center` flex container yields an 8px shift, and brand-hued children read as one violet slab.
+  - **The panel opens on L1 activation, not on a per-row control.** There is **no chevron and no second target per row** — a row with two activatable targets reads as one control to a screen reader, and the reference implementation has no such control. Activating 首页 has no panel to open, so it collapses the current one.
+- **The panel's global open/close lives in a linear switch at the top of the rail**, beside the wordmark, measured on the reference as a 36×36 button labelled 「切换侧边导航栏」 (toggling the main area 1361px ↔ 1097px). It carries `aria-expanded` + `aria-controls`; reopening restores the group that was open last. It shares one `togglePanel()` with `Cmd/Ctrl+B`, so the two never diverge. Below 768px it disappears — there is no resident panel to toggle.
+  - **The bell is the only entry to 消息中心**, a main-area view like 作品集 with no nav row; the bell carries `aria-current` while that view is up.
+
+**Landing on the default child happens only in-page.** Activating 图库 switches the main area to 作品集; activating 创作 opens the panel and **stays put**. Reason: 创作's first L2 (AI 画布) is a full-page route that carries no app sidebar, so auto-navigating would remove the panel the user just opened — and they could never reach 排版设计. The rule is uniform, not a special case: *apply the default child's effect **within the current page**; a whole-page destination waits for an explicit click.* Hence L1 rows are plain buttons, not links.
+
+#### B7.2.1 Width
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--spacing-sidebar-rail` | 64px | the resident L1 column → `w-sidebar-rail` |
+| `--spacing-sidebar-drawer` | 264px | the L2 panel and the narrow-viewport sheet → `w-sidebar-drawer` |
+
+Declared in `@theme inline` under Tailwind's spacing namespace, **never in `:root`**: `:root`'s semantic layer is mirrored verbatim by `.landing-root`, and the token guard in `globals.tokens.test.ts` turns red on any divergence. A width token added to `:root` alone breaks that mirror.
+
+The rail is a **constant** — there is no collapsed state, so there is no second geometry to keep in sync. The panel shares one width token with the narrow sheet: both are "the second column", and a sheet narrower than 264px would truncate four-character labels.
+
+#### B7.2.2 Nav Item Geometry
+
+| Element | Spec |
+| --- | --- |
+| Rail target | `w-full` column in the rail's 56px content box: 32px squircle tile (`--radius-lg`) holding a 16px icon, `py-1`, label `text-[11px]/leading-tight` below, `whitespace-nowrap`. About 58px tall |
+| Panel item | horizontal row, `h-10` (40px), `px-3`, `gap-2`: 14px icon in a 24px box + `text-[13px]` label |
+| Narrow sheet | the same horizontal row component; children indent with `ml-4` (margin, not padding — padding inside an `items-center` row reads as half its value) |
+| Group separator | a centered 32px (`w-8`) `--brand-ink-200` hairline with 8px clearance above and below, **between the two groups only** |
+| Rail top | the panel switch only (`size-7` icon button, `PanelLeftOpen`/`PanelLeftClose`) — **no wordmark, no version**: a 64px column cannot hold them, and the reference puts its brand at the top of the panel |
+| Panel top | wordmark `oops` + the build-version badge (`text-[11px] tabular-nums`), `px-3 py-3` |
+| Footer | hairline above, then a **vertical** stack of two controls — bell above, avatar below (`gap-1`). Theme, locale and settings moved into the user menu |
+
+- **The chevron is gone entirely** — not moved, not restyled. It only made sense while a row had two targets; with one target per row there is nothing to expand *from*, and a decorative affordance on a non-interactive element is worse than none.
+- **The hairline is load-bearing, not decoration.** An 11px centered gray label is nearly the same shape as a nav label, so without a rule between them 创作 and 图库 read as one undifferentiated list. It sits *between* groups only.
+
+#### B7.2.2a Vertical Budget
+
+The rail has no page to scroll, so the nav either fits or the user loses the current-location anchor to a scroll. There is only **one** state to budget (the panel is a separate column with its own height), at a **565px** viewport (a short window — the case that actually broke):
+
+| Region | Rail |
+| --- | --- |
+| Container padding | 16 |
+| Rail top | 36 |
+| Nav content | 189 |
+| Footer | 77 |
+| **Total** | **318** |
+
+Derivation, so a reviewer can re-check it without a browser:
+
+- Rail target = `8 (py-1) + 32 (tile) + 4 (gap) + 14 (label) = 58`.
+- Nav = 首页 `58` + `2` gap + 创作 `58` + `2` gap + hairline `17 (1 + 8 + 8)` + 图库 `58` = **195**.
+- Footer = `8 (pt-2) + 1 (border) + 32 (bell) + 4 (gap-1) + 32 (avatar size-8)` = **77** — a column stacks, so the rail can afford it.
+- Rail top = `28 (size-7 button) + 8 (pb-2)` = **36**; the version badge used to sit here and now lives in the user menu.
+
+Moving L2 out of the rail is what bought the headroom. **Overflow is the fallback, never the default**: if a change pushes the total past the viewport, shrink a region rather than adding scroll. Never solve a height problem with `overflow-y-auto` alone — closing the panel returns focus to the nav row, and the browser's `block:'nearest'` scroll then pushes 首页 out of view, so the user cannot see where they are.
+
+#### B7.2.3 Color Hierarchy
+
+| State | Fill | Glyph |
+| --- | --- | --- |
+| Current rail item | `bg-primary` tile | `text-primary-foreground` (the 6.2:1 pair from B2.4) |
+| Current panel item | full-row `bg-primary/10` pill | `text-primary` + `font-medium` |
+| Any other item | transparent, `hover:bg-accent/60` | `text-muted-foreground` |
+| Disabled | 40% opacity, no hover feedback | `cursor-not-allowed` |
+
+**Hue marks the current location and nothing else.** The earlier group hue (violet 创作 / neutral 图库) existed to separate siblings inside one column; grouping is now expressed by structure (two adjacent columns), so tinting sibling L1 items is noise — and the panel sits flush against the rail, where a hue difference would assert a relationship that no longer exists. This also settles a code/doc conflict: the implementation gave 创作's children `brand` while this section specified the opposite.
+
+The two fills never overlap: the L1 that stands in for a hidden current child shows the filled tile, while an open panel marks the child itself.
+
+#### B7.2.4 One Component, One Width
+
+A single nav item component per orientation (rail column, panel row) serves every L1 and L2 row, so hierarchy is expressed by **placement** — which column the row lives in — never by a second item geometry or an indent. Consequences:
+
+- The rail has no width transition, so per-item re-layout during an animation is impossible.
+- The rail **keeps its text labels**. Two CJK glyphs at 11px occupy about 22px inside a 56px target, so the visible text equals the `aria-label`, leaving no tooltip-only accessibility gap.
+- **Two distinct indicators, never one.** The filled tile marks the current **section** (whichever L1 the user last activated — decoupled from the main view, see below); `aria-current="page"` marks the **deepest selected item**, and **exactly one nav row carries it at a time** (rail L1 and panel L2 counted together). Selecting 创作 therefore lights its tile while `aria-current` sits on 作布内的 AI 画布 — which is what the reference does when both its rail item and 所有项盈亮. When the panel is collapsed its items leave the accessibility tree (`inert` + `aria-hidden`), so the **L1 takes the mark over** — otherwise collapsing the panel would erase the current-location anchor this document keeps insisting on.
+- **The current section is state, not a derivation of the main view.** Clicking 创作 selects its default child (AI 画布) while the main area stays on the landing page, because that child is a whole-page route with no in-page form. Deriving the highlight from the view alone would leave 创作 dark — the exact bug that made the rail look broken. The panel renders a second `<nav>` landmark with its own label (`{group}的二级导航`) rather than an anonymous region.
+- The **footer** is the one region that differs from the old panel: the rail has room for a column, so it keeps only bell · avatar and preferences moved into the user menu.
+- The nav scrolls only when the budget in B7.2.2a is exceeded, and its scrollbar is the `sidebar-scroll` utility — a 6px transparent-track bar. The default scrollbar overlaps `border-r` and reads as a double rule.
+
+#### B7.2.5 The Panel Is a Column, Not an Overlay
+
+The panel is a flex sibling of the rail inside the page's flex container, sized by one width transition:
+
+- **Opening and closing animate `width`** (`w-0` to `w-sidebar-drawer`) on `--duration-slow` (320ms) with `--ease-standard`, `motion-reduce:transition-none`. The panel's *content* keeps a fixed 264px width inside an `overflow-hidden` wrapper, so the transition is a horizontal wipe rather than a text reflow.
+- **Content is not unmounted on close.** If it were, the 320ms in which the main area returns to full width would show an empty strip. The last opened group stays mounted and is hidden by width 0 plus `inert` + `aria-hidden` — which is also what keeps it out of the tab order and the accessibility tree while collapsed, a hard requirement because "collapsed" here means "present in the DOM".
+- **Activating a panel row does not collapse the panel.** With push semantics, collapsing on every selection would make the main area jump on each navigation.
+- **Re-activating the same L1 does not collapse it either** (measured). To close the panel: activate 首页, or press `Cmd/Ctrl+B`. There is no close button — the reference has none, and the panel is one keystroke or one click away.
+
+Narrow viewport (<768px) is a different rendering branch, not a second design: the sidebar leaves the document flow (`fixed inset-y-0`) and opens as a Radix `Dialog` sheet from a floating 40px menu button. Inside that modal sheet the levels are listed as **group headings plus flat L2 rows** — no disclosure control, no floating layer — because a modal dialog marks its siblings `aria-hidden`, so a portaled overlay would be invisible to screen readers and outside the focus trap, and because there is no resident panel here while L1 no longer navigates: an activatable L1 row would only promise a panel that cannot exist. The same data drives both branches. `Escape`, the close button and any navigation dismiss the sheet.
+
+#### B7.2.6 Motion
+
+The panel's `width` transition is the "panel expansion" step in B6: `--duration-slow` (320ms) with `--ease-standard`, `motion-reduce:transition-none`. A fourth duration step is a defect (B6). The rail itself never animates — there is no width to animate.
+
+### B7.3 Chat + Canvas (immersive)
 
 - Stage: `--brand-ink-950` plus a `radial-gradient` dot grid (currently hardcoded `rgba(255,255,255,0.07)` — should become a token).
 - No brand color inside the stage (see B2.6).
 - Floating chat panel: translucent `--brand-ink-900` with backdrop blur; focus ring in cyan.
 - Zoom and pan never re-encode images; animation is limited to container transforms.
 
-### B7.3 Design Editor (tooling)
+### B7.4 Design Editor (tooling)
 
 - Density over whitespace: tight panels, 28–32px control heights.
 - Colors *inside* the canvas are **user content**, outside this palette's scope (the swatch constants in `design-right-panel.tsx` are content, not chrome — they are compliant).
 - Documents may opt into the serif family (`--font-editorial`), kept separate from the UI family.
 
-### B7.4 Agent Labels
+### B7.5 Agent Labels
 
 The agent count will grow, but there are only **three** category colors: atmosphere → cyan family, poster → violet family, custom → coral (decorative). Render as a **neutral chip with a 6px leading color dot**, not a colored fill — highest contrast always belongs to the primary action (Principle 5).
 
-### B7.5 admin (antd mapping)
+### B7.6 admin (antd mapping)
 
 `apps/admin` uses antd and does not consume Tailwind tokens, so the mapping must be explicit or the two apps silently diverge:
 

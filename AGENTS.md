@@ -40,6 +40,71 @@ Key characteristics:
   spelling cannot fragment. Processing entry points pass `assetId` (never a URL)
   through `GET /api/assets/:id`, which checks ownership before handing out an
   address — a URL param would let a user inject an arbitrary external image.
+- **Message center** — in-app notifications rendered as a view inside `/home`
+  (sidebar switches views; the bell sits in the sidebar footer). Delivery is
+  **write-time fan-out**: one `notifications` row holds the content, one
+  `user_notifications` row per recipient holds the read state, so "who
+  received it / who read it" is a query rather than a runtime join spread.
+  Revoking only stamps `revokedAt` — invisible to the user immediately, while
+  the admin console keeps target/read counts for the record. Credits notices
+  are two-level (`credits.low` on settlement, `credits.exhausted` at the 402
+  gate); dedup/reset is derived from the append-only ledger timeline (no
+  extra state column) and serialized per user with a transaction-level
+  `pg_advisory_xact_lock(hashtext(userId))`. Notification writes are
+  best-effort everywhere: a failure must never change a 402 rejection or turn
+  a settled task into a failed one. Retention (read + >90d) is purged from
+  `apps/web/src/instrumentation.ts` at startup.
+- **Resident-rail app sidebar with an adjacent L2 panel** — `/home`'s left sidebar
+  is a single component (`components/layout/home-sidebar.tsx`) holding a **two-level**
+  nav: L1 = 首页 / 创作 / 图库, L2 = 创作›AI 画布·排版设计 and 图库›作品集·素材库.
+  The shape is copied from a measured reference (Canva projects page, 2026-10-19) and
+  the rules below are the ones that measurement settled:
+  - **The L2 panel is a flex sibling of the rail, not a floating overlay.** It occupies
+    layout width and squeezes the main area (measured 1121px → 857px). Nothing may
+    reintroduce an overlay here — the previous implementation did and it was wrong.
+  - **An L1 row has exactly one activatable target: activating it opens that group's
+    panel and lands on the group's `primaryId` child** (declared in the data, never
+    inferred from array order). There is **no chevron and no second control per row**, so
+    L1 rows are plain buttons, not links; a leaf L1 (首页) collapses the panel instead.
+    Activating a panel row does **not** collapse the panel, and neither does
+    re-activating the same L1.
+  - **Landing on the default child happens only in-page.** 作品集 is a main-area view, so
+    图库 switches to it; AI 画布 is a whole-page route, so 创作 opens its panel and stays.
+    Auto-navigating there would remove the panel the user just opened and leave no way to
+    reach 排版设计. Rule: *apply the default child's effect within the current page.*
+  - **The panel's global open/close is a linear switch at the top of the rail** (beside
+    the wordmark, `aria-expanded` + `aria-controls`), matching the reference's 36×36
+    「切换侧边导航栏」 button. Reopening restores the group that was open last; it shares
+    one `togglePanel()` with `Cmd/Ctrl+B`. It is absent below 768px, where there is no
+    resident panel.
+
+  - Panel state lives inside the sidebar (opening it must not re-render the main area),
+    is never persisted, and starts closed. Collapsed means width 0 + `inert` +
+    `aria-hidden`, **not** unmounted — otherwise the closing transition wipes an empty
+    strip.
+  - **Two indicators, deliberately separate.** The filled tile marks the current **section**
+    and follows the L1 the user activated, *not* the main view — clicking 创作 selects its
+    default child (AI 画布) while the main area stays on the landing page, so a
+    view-derived highlight would leave 创作 dark. `aria-current="page"` marks the deepest
+    selected item, and exactly one nav row carries it (rail L1 and panel L2 counted
+    together); when the panel is collapsed its items leave the accessibility tree and the
+    **L1 takes the mark over**, so the current-location anchor never disappears.
+    消息中心 has **no nav row**: the footer bell is its only entry and carries
+    `aria-current` while that view is up.
+  - Nav items keep their visible text labels (the visible text is the accessible name,
+    so no tooltip-only a11y gap opens). The rail footer keeps only bell and avatar;
+    theme, locale and settings live in the user menu. The **wordmark and build-version
+    badge appear only at the top of the L2 panel** — a 64px column cannot hold them, and the
+    reference puts its brand there. The footer is a **vertical** stack: bell above, avatar
+    below.
+  - Narrow-viewport sheet state and the `Cmd/Ctrl+B` shortcut live in
+    `lib/layout/use-sidebar-layout.ts`. Below 768px the sidebar leaves the document flow
+    and opens as a Radix Dialog sheet (`components/ui/sheet.tsx`, no new dependency) that
+    lists **group headings plus flat L2 rows** — L1 is a non-interactive heading there, no
+    disclosure control and no floating layer, since a modal dialog marks its siblings
+    `aria-hidden` and there is no resident panel to expand.
+  - Geometry, hue rules and the `--spacing-sidebar*` width tokens (rail 64px, panel
+    264px) are specified in `docs/DESIGN.md` B7.2 —
 - **MVP single-tenant** — simple passcode/invite-code auth with a cookie
   session. All tables carry a `userId` column so multi-tenancy can be added
   later without schema redesign.
@@ -83,7 +148,7 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 | Admin UI       | Ant Design (apps/admin only — antd stack, no Tailwind) |
 | Agent runtime  | `@earendil-works/pi-agent-core` + `pi-ai`           |
 | Database       | PostgreSQL via Drizzle ORM                          |
-| Rendering      | `playwright-core` + headless Chromium               |
+| Rendering      | `satori` + `satori-html` + `@resvg/resvg-js`（无浏览器；子集字体内置） |
 | Image gen      | DashScope 万相 `wan2.7-image` via pi-ai `createImagesProvider` (Token Plan China) |
 | i18n           | next-intl（无 URL 路由的 cookie 模式）— `messages/zh.json` + `en.json`，typed messages |
 | Package mgr    | pnpm 10                                             |
@@ -93,8 +158,8 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 pnpm workspace monorepo. The web app lives in `apps/web/` (package
 `@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
 antd-only UI stack, dev port 3001, guarded by the same `oops_session` cookie;
-six management surfaces live since M2: users / invite codes / credits ops /
-agent toggles / model config / dashboard+audit); `packages/` holds shared
+seven management surfaces live since M2: users / invite codes / credits ops /
+agent toggles / model config / dashboard+audit / message center); `packages/` holds shared
 packages. Unless
 written with a repo-root prefix, all app paths in the sections below are
 **relative to `apps/web/`** (admin paths use explicit `apps/admin/` prefixes).
@@ -114,7 +179,7 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   │   │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
 │   │   │   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
 │   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
-│   │   ├── components/     # React components (client)
+│   │   ├── components/     # React components (client)；layout/ 放跨页面壳层（home-sidebar 等）
 │   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
 │   │   ├── lib/            # Shared utilities (client-safe)
 │   │   └── types/          # Shared TypeScript types
@@ -213,7 +278,7 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   UI — do not hand-roll message/attachment/tool UI.
 - **Async tasks:** image generation and HTML rendering must go through
   `src/server/domain/tasks/task-executor.ts`. Never call provider APIs or
-  Playwright directly from tools/route handlers with unbounded concurrency.
+  render directly from tools/route handlers with unbounded concurrency.
 - **Comments:** explain *why*, not *what*. No narration comments.
 - **Commits:** conventional commits (`feat:`, `fix:`, `chore:`, `docs:`...).
 
@@ -241,14 +306,16 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
     canvas items, draft and view restore (workspace saved locally per session)
     → deleting a session must remove its MinIO objects and asset rows (GC)
     → narrow-viewport check: chat/canvas toggle exclusively, session drawer.
-  - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model and
-    Chromium installed): pick poster-designer → attach a product image →
+  - **Poster flow** (needs `LLM_MAIN_MODEL` pointed at a vision model):
+    pick poster-designer → attach a product image →
     request a poster → verify the rendered poster appears in chat and canvas
-    (vision input, HTML sandbox render) → select the poster as a reference
+    (vision input, browser-free render) → select the poster as a reference
     for an edit round → reload to confirm restore.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
-- Playwright screenshot rendering is covered by a service-level test using a
-  minimal HTML fixture; keep it hermetic (no network).
+- Rendering tests are hermetic service-level tests using minimal HTML fixtures;
+  they need no browser. Note the two hard constraints the tests lock in: resvg must
+  run with `loadSystemFonts: false` (16× slower otherwise, silently), and satori must
+  keep `embedFont: true` (text vanishes otherwise, also silently).
 
 ## Security considerations
 
@@ -274,11 +341,14 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   store with generated filenames (never user-supplied names); serve user
   files through the `files` route with correct `Content-Type` and
   `Content-Disposition` to prevent stored-XSS via SVG/HTML.
-- **HTML rendering sandbox (important):** agent-generated HTML is rendered in
-  headless Chromium. Render with `--disable-js` where feasible, block
-  outbound network requests except whitelisted asset hosts, and set
-  per-render timeouts. Never render user/agent HTML with access to internal
-  network URLs (SSRF) or local file paths.
+- **HTML rendering sandbox (important):** agent-generated HTML is rendered without
+  any browser. The renderer never executes JS, so scripts are structurally inert
+  (the old pre-check/CSP/script-intercept layers are gone). Outbound network is the
+  remaining risk: strip every image reference that is not a `data:` URI or a
+  whitelisted host **before** inlining `/files/` refs (reversing the order lets a
+  stripped URL become an inlined data URI and bypass the gate). Per-render timeout
+  is mandatory. Never let agent HTML reach internal network URLs (SSRF) or local
+  file paths.
 - **Prompt-injection containment:** user-supplied text and file contents are
   untrusted input to the LLM. Tools must validate inputs with zod
   regardless of what the model asks for; the tool registry blocks any tool

@@ -1,6 +1,6 @@
 "use client";
 
-// 管理端布局骨架（task 3.1/3.2）：antd Layout + 侧边六面导航 + 头部身份/退出。
+// 管理端布局骨架（task 3.1/3.2）：antd Layout + 侧边导航 + 头部身份/退出。
 // 必须为 client 组件：Menu 选中态/路由跳转需浏览器交互；antd 复合组件
 // 静态属性在 RSC client-reference proxy 上不可访问（1.2 spike 纪律）。
 import type { ReactNode } from "react";
@@ -31,6 +31,7 @@ export default function AdminShell({
     { key: "/agents", label: t("agents") },
     { key: "/models", label: t("models") },
     { key: "/audit", label: t("audit") },
+    { key: "/messages", label: t("messages") },
   ];
 
   return (

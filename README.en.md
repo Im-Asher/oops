@@ -34,7 +34,7 @@ Describe your needs, upload product assets, pick a design agent, and get product
 
 - 💬 **Conversation as creation** — streaming SSE chat; the agent asks clarifying questions first, then calls tools to generate
 - 🖼️ **Hybrid generation pipeline** —
-  - Posters / product-detail long images: agent-generated HTML → server-side Playwright screenshot (pixel-precise text & layout)
+  - Posters / product-detail long images: agent-generated HTML → server-side browser-free rendering (pixel-precise text & layout)
   - Atmosphere / scene images: pure text-to-image API (Wanxiang `wan2.7-image`)
 - 🤖 **Declarative agents** — each agent is a single config file (system prompt + tool subset); adding one requires **zero code changes**. Ships with "Atmosphere Designer" & "Product Photographer"
 - 🧠 **Session memory** — dual-view message persistence + automatic context compaction (compact); long sessions never lose the thread
@@ -74,7 +74,7 @@ Tasks run asynchronously (concurrency 2, 90s timeout per task) — close the pag
   - `/` — public marketing landing page (visible when signed out; signed-in visits redirect to `/home`)
   - `/home` — studio home (creation composer + agent card entries)
   - `/canvas` — full-screen AI canvas workbench (floating chat panel + dotted canvas)
-- ☁️ **Deployment**: any host running Node.js 22+ (Chromium needed for screenshot rendering); requires Postgres + MinIO (S3-compatible), both provisioned by `docker-compose.yaml`
+- ☁️ **Deployment**: any host running Node.js 22+ (no browser needed for rendering); requires Postgres + MinIO (S3-compatible), both provisioned by `docker-compose.yaml`
 
 ## 🛠️ How · How to run it?
 

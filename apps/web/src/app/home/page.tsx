@@ -2,25 +2,14 @@
 
 import { Composer } from "@/components/chat/composer";
 import { PresetDialog } from "@/components/design/preset-dialog";
-import { LocaleToggle } from "@/components/locale-toggle";
+import { HomeSidebar, type HomeView } from "@/components/layout/home-sidebar";
+import { NotificationsPanel } from "@/components/notifications/notifications-panel";
 import { PortfolioPanel } from "@/components/portfolio/portfolio-panel";
-import { ThemeToggle } from "@/components/theme-provider";
-import { UserMenu } from "@/components/chat/user-menu";
-import {
-  ImageIcon,
-  ImagesIcon,
-  LayoutDashboardIcon,
-  MessageSquareIcon,
-  PaletteIcon,
-  SettingsIcon,
-  SparklesIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ComponentType } from "react";
 import { setPendingHandoffFiles } from "@/lib/chat/home-handoff";
-import { APP_VERSION } from "@/lib/version";
+import { useNotifications } from "@/lib/notifications/use-notifications";
 import type { AgentInfo } from "@/types/chat";
 
 /** 单个待传附件（id 供 chip 移除定位，自增序号即唯一）。 */
@@ -29,63 +18,14 @@ interface HomePendingFile {
   file: File;
 }
 
-/** 侧栏导航项：链接项与 onAction 触发项可用，禁用项仅展示（本版未实现的能力）。 */
-function NavItem({
-  icon: Icon,
-  label,
-  href,
-  active,
-  onAction,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  href?: string;
-  active?: boolean;
-  onAction?: () => void;
-}) {
-  const t = useTranslations("home");
-  const disabled = !href && !onAction;
-  const className = `flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${
-    active
-      ? "bg-muted text-foreground"
-      : disabled
-        ? "cursor-not-allowed text-muted-foreground/50"
-        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-  }`;
-  if (disabled) {
-    return (
-      <button aria-disabled className={className} disabled title={t("comingSoon")} type="button">
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </button>
-    );
-  }
-  if (onAction) {
-    return (
-      <button className={className} onClick={onAction} type="button">
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </button>
-    );
-  }
-  if (href) {
-    return (
-      <Link className={className} href={href}>
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </Link>
-    );
-  }
-  return null;
-}
-
 /**
- * 首页落地页（spec/home-landing）：左侧栏（首页/创建分组/用户入口）+ 垂直居中的
+ * 首页落地页（spec/home-landing）：左侧两级栏（首页 / 创作 / 图库 + 二级项）+ 垂直居中的
  * 创作横幅与完整创作 composer（Agent 选择/附件）。提交即直发：跳 /canvas 后
  * 由画布侧新建会话并自动发送（含附件为参考图）。
  */
 export default function HomePage() {
   const t = useTranslations("home");
+  const tn = useTranslations("notifications");
   const router = useRouter();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [draft, setDraft] = useState("");
@@ -95,10 +35,13 @@ export default function HomePage() {
   const [fileError, setFileError] = useState<string | null>(null);
   // 直发乐观态：按钮转圈 + 输入卡弱化 + 路由锁（跳转期间不可再触发）。
   const [submitting, setSubmitting] = useState(false);
-  // 创建设计：尺寸前置设置弹窗（人工海报编辑器入口）。
+  // 排版设计：尺寸前置设置弹窗（人工海报编辑器入口）。
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
-  /** 主区视图：创作落地页 / 作品集。作品集不占独立路由，侧栏切换即可。 */
-  const [view, setView] = useState<"home" | "portfolio">("home");
+  /** 主区视图：创作落地页 / 作品集 / 消息中心。后两者不占独立路由，侧栏切换即可（D10）。
+   *  消息中心在导航树里没有条目 —— 唯一入口是侧栏底栏铃铛，由它切到这里。 */
+  const [view, setView] = useState<HomeView>("home");
+  // 铃铛与消息中心共用同一份取数状态：挂一次 hook、只跑一个 60s 轮询（D11）
+  const notifications = useNotifications((k) => tn(k));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextFileIdRef = useRef(0);
 
@@ -155,57 +98,21 @@ export default function HomePage() {
 
   return (
     <main className="fixed inset-0 flex overflow-hidden bg-background text-foreground">
-      {/* 左侧栏：首页 / 创建分组（AI画布、创建设计弹窗可用）/ 其他导航项置灰 / 底部用户入口 */}
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-4">
-        <div className="flex items-center gap-2 px-3 pb-4">
-          <span className="text-base font-semibold tracking-wide text-foreground">oops</span>
-          <span
-            className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary"
-            data-testid="app-version-badge"
-            title={t("buildVersion", { version: APP_VERSION })}
-          >
-            v{APP_VERSION}
-          </span>
-        </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1" aria-label={t("mainNav")}>
-          <NavItem
-            active={view === "home"}
-            href="/home"
-            icon={LayoutDashboardIcon}
-            label={t("navHome")}
-            onAction={() => setView("home")}
-          />
-          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupCreate")}</p>
-          <NavItem href="/canvas" icon={SparklesIcon} label={t("navCanvas")} />
-          <NavItem
-            icon={PaletteIcon}
-            label={t("navCreateDesign")}
-            onAction={() => setDesignDialogOpen(true)}
-          />
-          <p className="px-3 pb-1 pt-4 text-xs text-muted-foreground/80">{t("groupLibrary")}</p>
-          <NavItem
-            active={view === "portfolio"}
-            icon={ImageIcon}
-            label={t("navPortfolio")}
-            onAction={() => setView("portfolio")}
-          />
-          <NavItem icon={ImagesIcon} label={t("navAssets")} />
-          <NavItem icon={MessageSquareIcon} label={t("navMessages")} />
-        </nav>
-        <div className="flex items-center gap-1 border-t border-border pt-3">
-          <NavItem icon={SettingsIcon} label={t("navSettings")} />
-          <div className="ml-auto flex items-center gap-0.5 pr-1">
-            <ThemeToggle />
-            <LocaleToggle />
-            <UserMenu />
-          </div>
-        </div>
-      </aside>
+      {/* 左侧常驻一级列 + 覆盖式二级抽屉：一级项 首页 / 创作 / 图库，二级项只在该组
+          的抽屉里出现。抽屉开合由侧栏内部持有，故此处切换侧栏不会重渲染主区。 */}
+      <HomeSidebar
+        notifications={notifications}
+        onOpenDesign={() => setDesignDialogOpen(true)}
+        onViewChange={setView}
+        view={view}
+      />
 
-      {/* 主区：作品集视图 或 创作落地页（横幅 + 输入框，垂直居中） */}
+      {/* 主区：作品集 / 消息中心视图，或创作落地页（横幅 + 输入框，垂直居中） */}
       <div className="min-w-0 flex-1 overflow-y-auto">
         {view === "portfolio" ? (
           <PortfolioPanel />
+        ) : view === "messages" ? (
+          <NotificationsPanel feed={notifications} />
         ) : (
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 py-16">
             <section className="flex flex-col items-center gap-3 text-center">

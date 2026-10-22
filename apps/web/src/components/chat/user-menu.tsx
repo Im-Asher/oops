@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocaleSwitch } from "@/components/locale-toggle";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { resolveDisplayName } from "@/lib/nickname";
-import { LogOutIcon, UserRoundIcon } from "lucide-react";
+import { cn } from "cn";
+import { LanguagesIcon, LogOutIcon, MoonIcon, SettingsIcon, SunIcon, UserRoundIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -96,9 +99,46 @@ export function UserMenuContent() {
 }
 
 /**
- * 用户入口（原工具条底部）：头像触发 + 用户菜单内容。
+ * 偏好区：主题 / 语言 / 设置（spec home-landing「构建版本徽标的位置」）。
+ *
+ * 一级列只有 72px，底部再竖排三个偏好控件会吃掉 ~120px 的常驻高度预算
+ * （DESIGN.md B7.2.2a），因此它们与账号一起收进用户菜单。写成 `DropdownMenuItem`
+ * 而不是嵌套 ThemeToggle/LocaleToggle 按钮：菜单项才进 Radix 的方向键导航，
+ * `asChild` 还会让子按钮自己的 onClick 覆盖掉 Radix 的选中处理。
  */
-export function UserMenu() {
+function UserPreferences() {
+  const t = useTranslations("home");
+  const tc = useTranslations("common");
+  const { theme, toggleTheme } = useTheme();
+  const { switchLocale } = useLocaleSwitch();
+  const dark = theme === "dark";
+
+  return (
+    <>
+      <DropdownMenuSeparator className="bg-muted" />
+      <DropdownMenuItem onSelect={toggleTheme}>
+        {dark ? <SunIcon /> : <MoonIcon />}
+        {dark ? tc("theme.toLight") : tc("theme.toDark")}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={switchLocale}>
+        <LanguagesIcon />
+        {tc("localeToggle.label")}
+      </DropdownMenuItem>
+      {/* 可访问名取可见文字（设置），title 只解释为何不可用 */}
+      <DropdownMenuItem disabled title={t("comingSoon")}>
+        <SettingsIcon />
+        {t("navSettings")}
+      </DropdownMenuItem>
+    </>
+  );
+}
+
+/**
+ * 用户入口：头像触发 + 用户菜单内容。
+ * className 供窄形态（/home 一级列）缩小命中区，画布 AppHeader 沿用默认 40px。
+ * showPreferences 把主题/语言/设置一并收进菜单——一级列底部只留铃铛与头像。
+ */
+export function UserMenu({ className, showPreferences = false }: { className?: string; showPreferences?: boolean }) {
   const t = useTranslations("chat.userMenu");
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
 
@@ -123,7 +163,10 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button
           aria-label={t("label")}
-          className="size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground"
+          className={cn(
+            "size-10 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground",
+            className,
+          )}
           size="icon"
           variant="ghost"
         >
@@ -141,6 +184,7 @@ export function UserMenu() {
         className="w-52 border-border bg-popover text-foreground"
       >
         <UserMenuContent />
+        {showPreferences ? <UserPreferences /> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
