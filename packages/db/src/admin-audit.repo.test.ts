@@ -69,6 +69,8 @@ describe("admin audit repo", () => {
       "pricing.update",
       "agent.toggle",
       "model.config",
+      "message.send",
+      "message.revoke",
     ]);
     expect([...ADMIN_AUDIT_TARGET_TYPES]).toEqual([
       "user",
@@ -76,6 +78,7 @@ describe("admin audit repo", () => {
       "credit_price",
       "agent",
       "model_config",
+      "message",
     ]);
   });
 

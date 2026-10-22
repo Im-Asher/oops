@@ -13,25 +13,35 @@ function setLocaleCookie(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`;
 }
 
-/** 语言切换按钮：与 ThemeToggle 并列（首页左侧栏底部、画布聊天面板头部）。 */
-export function LocaleToggle({ className }: { className?: string }) {
+/**
+ * 语言切换逻辑（cookie 写入 + router.refresh）：工具条按钮与用户菜单项共用，
+ * 避免「两个入口两套写法」在切换语义上分叉。
+ */
+export function useLocaleSwitch() {
   const locale = useLocale();
-  const t = useTranslations("common.localeToggle");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const toggle = useCallback(() => {
+  const switchLocale = useCallback(() => {
     const next: Locale = locale === "en" ? "zh" : "en";
     setLocaleCookie(next);
     startTransition(() => router.refresh());
   }, [locale, router]);
+
+  return { pending, switchLocale };
+}
+
+/** 语言切换按钮：与 ThemeToggle 并列（画布聊天面板头部等）。 */
+export function LocaleToggle({ className }: { className?: string }) {
+  const t = useTranslations("common.localeToggle");
+  const { pending, switchLocale } = useLocaleSwitch();
 
   return (
     <Button
       aria-label={t("label")}
       className={className}
       disabled={pending}
-      onClick={toggle}
+      onClick={switchLocale}
       size="icon-sm"
       title={t("label")}
       variant="ghost"

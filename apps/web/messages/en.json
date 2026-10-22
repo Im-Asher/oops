@@ -172,12 +172,17 @@
     "navHome": "Home",
     "groupCreate": "Create",
     "navCanvas": "AI canvas",
-    "navCreateDesign": "Create design",
+    "navLayoutDesign": "Layout design",
     "groupLibrary": "Library",
     "navPortfolio": "Portfolio",
     "navAssets": "Assets",
     "navMessages": "Messages",
     "navSettings": "Settings",
+    "subNav": "{group} sub-navigation",
+    "expandPanel": "Expand sub-navigation",
+    "collapsePanel": "Collapse sub-navigation",
+    "openSidebar": "Open sidebar",
+    "closeSidebar": "Close sidebar",
     "headline": "E-commerce visuals from a single sentence",
     "subheadline": "Describe your product and scene — the AI canvas handles hero shots, detail pages and atmosphere images.",
     "fileErrorNonImage": "Images only — {count} file(s) not added",
@@ -501,6 +506,27 @@
       "emptyTag": "Tag cannot be empty",
       "tagTooLong": "Tag is too long",
       "tooManyTags": "Too many tags"
+    }
+  },
+  "notifications": {
+    "credits": {
+      "lowTitle": "Credits running low",
+      "low": "Your balance is {balance}, below the warning line. Generating stops once it runs out.",
+      "exhaustedTitle": "Out of credits",
+      "exhausted": "Your balance is {balance}. Generating is no longer possible — ask an admin for more credits."
+    },
+    "bellLabel": "Messages ({count} unread)",
+    "unreadCount": "{count} unread",
+    "markAllRead": "Mark all as read",
+    "retry": "Retry",
+    "empty": "No messages yet",
+    "emptyFiltered": "No messages from this source",
+    "loadFailed": "Failed to load messages, please retry",
+    "filter": {
+      "label": "Filter by source",
+      "all": "All",
+      "system": "System",
+      "admin": "From admins"
     }
   },
   "design": {

@@ -58,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
   // 参考图上传：purpose=reference → 绑定会话的图片资产（画布选中引用用），不写聊天消息。
   // 会话须存在且属于当前用户；purpose 缺省回落普通上传/画布导出链路。
   const purpose = form.get("purpose");
-  // 创建设计导出：purpose=design → 无会话归属的资产（设计没有会话概念），
+  // 排版设计导出：purpose=design → 无会话归属的资产（设计没有会话概念），
   // 携带宽高供作品集网格算宽高比；同样不追加聊天消息。
   if (purpose === "design") {
     return handleDesignUpload(

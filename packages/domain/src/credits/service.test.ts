@@ -25,7 +25,7 @@ vi.mock("@oops/db/admin-audit.repo", () => ({
 function makeLedger(overrides: Partial<CreditLedgerRepo> = {}): CreditLedgerRepo {
   return {
     freeze: vi.fn().mockResolvedValue({ id: "e1" }),
-    settle: vi.fn().mockResolvedValue(undefined),
+    settle: vi.fn().mockResolvedValue({ id: "e1", userId: "u1" }),
     releaseByTask: vi.fn().mockResolvedValue(undefined),
     releaseEntry: vi.fn().mockResolvedValue(undefined),
     adjust: vi.fn().mockResolvedValue(undefined),
@@ -142,11 +142,30 @@ describe("credits service", () => {
 
   it("settle / release 透传到 ledger 仓储", async () => {
     const ledger = makeLedger();
-    const svc = createCreditsService({ ledger });
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const svc = createCreditsService({ ledger, notifyCreditsState: notify });
     await svc.settle("t1", 8);
     await svc.release("t2");
     expect(ledger.settle).toHaveBeenCalledWith({ taskId: "t1", actualCost: 8 });
     expect(ledger.releaseByTask).toHaveBeenCalledWith({ taskId: "t2" });
+    // 预警级触发点：结算后按结算后余额复查一次（makeLedger 默认余额 5 ≤ 预警线）
+    expect(notify).toHaveBeenCalledWith("u1", 5);
+  });
+
+  it("settle 后复查余额失败不影响已完成的结算", async () => {
+    const ledger = makeLedger({
+      getBalance: vi.fn().mockRejectedValue(new Error("db down")),
+    });
+    const svc = createCreditsService({ ledger, notifyCreditsState: vi.fn() });
+    await expect(svc.settle("t1")).resolves.toBeUndefined();
+  });
+
+  it("settle 无冻结条目时不触发通知复查", async () => {
+    const ledger = makeLedger({ settle: vi.fn().mockResolvedValue(null) });
+    const notify = vi.fn();
+    await createCreditsService({ ledger, notifyCreditsState: notify }).settle("t1");
+    expect(ledger.getBalance).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   describe("adjustCredits（M2 task 5.1）", () => {

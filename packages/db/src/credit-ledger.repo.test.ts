@@ -76,4 +76,20 @@ describe("credit-ledger repo（M2 task 5.2 扩展）", () => {
     expect(mock.state.calls[0]?.op).toBe("select.from");
     expect(mock.state.calls[1]?.op).toBe("select.from.groupBy");
   });
+
+  it("getLatestBalanceRecoveryAt coerces the pg string aggregate into a Date", async () => {
+    // max(timestamptz) 走聚合时 pg 返回字符串：若照声明当 Date 用，
+    // 下游与 Date 的比较会被数值强转成 NaN 而恒为 false（积分通知去重失效）
+    const mock = makeMockDb({
+      selectResult: [{ at: "2026-10-18T08:30:57.640Z" }],
+    });
+    const at = await createCreditLedgerRepo(mock.db).getLatestBalanceRecoveryAt("u1");
+    expect(at).toBeInstanceOf(Date);
+    expect(at?.toISOString()).toBe("2026-10-18T08:30:57.640Z");
+
+    const empty = makeMockDb({ selectResult: [{ at: null }] });
+    await expect(
+      createCreditLedgerRepo(empty.db).getLatestBalanceRecoveryAt("u1"),
+    ).resolves.toBeNull();
+  });
 });

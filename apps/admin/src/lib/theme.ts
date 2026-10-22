@@ -1,7 +1,7 @@
 import type { ThemeConfig } from "antd";
 
 /**
- * antd 主题 token 映射（docs/DESIGN.md B7.5）。
+ * antd 主题 token 映射（docs/DESIGN.md B7.6）。
  *
  * admin 不消费 Tailwind，与 web 的视觉一致性只能靠这份显式映射维持；
  * 改品牌色必须双落：apps/web/src/app/globals.css + 此文件，

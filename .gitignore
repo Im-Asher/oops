@@ -153,3 +153,7 @@ next-env.d.ts
 .playwright-cli/
 
 .trees/
+
+# 字体源缓存：完整 TTF 体积大且受字体授权约束，不入库；
+# 子集化产物在 apps/web/assets/fonts/ 入库。
+apps/web/.fontcache/

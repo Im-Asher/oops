@@ -25,7 +25,7 @@ const FULL_ENV = {
   QWEN_TOKEN_PLAN_CN_API_KEY: "sk-test",
   LLM_MAIN_MODEL: "qwen3-max",
   IMAGE_ENDPOINT: "https://example.com/img",
-  RENDER_EXECUTABLE_PATH: "/usr/bin/chromium",
+  RENDER_ALLOWED_HOSTS: "a.com,b.cn",
 };
 
 describe("parseEnv 全量解析", () => {
@@ -35,8 +35,8 @@ describe("parseEnv 全量解析", () => {
     expect(c.S3_FORCE_PATH_STYLE).toBe(true);
     expect(c.LLM_PROVIDER).toBe("qwen-token-plan-cn");
     expect(c.IMAGE_MODELS).toEqual(["wan2.7-image"]);
-    expect(c.RENDER_ALLOWED_HOSTS).toEqual([]);
-    expect(c.RENDER_TIMEOUT_MS).toBe(30000);
+    expect(c.RENDER_ALLOWED_HOSTS).toEqual(["a.com", "b.cn"]);
+    expect(c.RENDER_TIMEOUT_MS).toBe(10000);
   });
 
   it("非法 env 抛出 ZodError（含 key 名定位）", () => {
@@ -166,7 +166,7 @@ describe("getRenderConfig", () => {
     expect(c.timeoutMs).toBe(5000);
   });
 
-  it("executablePath 可选缺省", () => {
-    expect(getRenderConfig({}).executablePath).toBeUndefined();
+  it("超时默认 10s（无浏览器渲染，实测约 23ms）", () => {
+    expect(getRenderConfig({}).timeoutMs).toBe(10000);
   });
 });

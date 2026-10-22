@@ -18,6 +18,9 @@ const h = vi.hoisted(() => ({
   visionAgent: false,
   storageBytes: [137, 80, 78, 71] as number[],
   gateOpen: true,
+  gateBalance: 100,
+  noticeCalls: [] as Array<{ userId: string; balance: number }>,
+  noticeThrows: false,
 }));
 
 vi.mock("@/server/agent", () => ({ default: {} }));
@@ -42,7 +45,15 @@ vi.mock("@oops/auth/require-user", () => ({
 }));
 vi.mock("@oops/domain/credits/service", () => ({
   creditsService: {
-    checkGate: async () => ({ ok: h.gateOpen, balance: h.gateOpen ? 100 : 0 }),
+    checkGate: async () => ({ ok: h.gateOpen, balance: h.gateBalance }),
+  },
+}));
+vi.mock("@oops/domain/notifications/service", () => ({
+  notificationsService: {
+    notifyCreditsStateSafe: async (userId: string, balance: number) => {
+      h.noticeCalls.push({ userId, balance });
+      if (h.noticeThrows) throw new Error("通知写入失败");
+    },
   },
 }));
 vi.mock("@oops/db/asset.repo", () => ({
@@ -115,6 +126,9 @@ describe("POST /api/chat", () => {
     h.messageCreates = [];
     h.assetRows = [];
     h.gateOpen = true;
+    h.gateBalance = 100;
+    h.noticeCalls = [];
+    h.noticeThrows = false;
   });
 
   it("未认证返回 401，不触发任何下游", async () => {
@@ -127,11 +141,37 @@ describe("POST /api/chat", () => {
 
   it("余额不足返回 402，不落消息不触发 agent", async () => {
     h.gateOpen = false;
+    h.gateBalance = 0;
     const res = await post("画一颗苹果");
     expect(res.status).toBe(402);
     expect((await res.json()).error.code).toBe("INSUFFICIENT_CREDITS");
     expect(h.runAgentCalls).toBe(0);
     expect(h.messageCreates).toHaveLength(0);
+  });
+
+  it("余额不足时顺带投递积分通知（带当前余额）", async () => {
+    h.gateOpen = false;
+    h.gateBalance = 0;
+    await post("画一颗苹果");
+    expect(h.noticeCalls).toEqual([{ userId: "u1", balance: 0 }]);
+  });
+
+  it("闸门放行时不投递通知", async () => {
+    await post("画一颗苹果");
+    expect(h.noticeCalls).toHaveLength(0);
+  });
+
+  it("通知写入失败仍返回 402（best-effort 不影响拒绝结果）", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    h.gateOpen = false;
+    h.gateBalance = 0;
+    h.noticeThrows = true;
+    const res = await post("画一颗苹果");
+    expect(res.status).toBe(402);
+    expect((await res.json()).error.code).toBe("INSUFFICIENT_CREDITS");
+    expect(h.runAgentCalls).toBe(0);
+    expect(h.messageCreates).toHaveLength(0);
+    spy.mockRestore();
   });
 
   it("入口敏感词初筛：命中黑名单直接 400，不进入 LLM", async () => {

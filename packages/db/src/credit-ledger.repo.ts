@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNull,
@@ -47,8 +48,11 @@ export interface CreditLedgerRepo {
    * + frozen 流水插入。调用方须在同一事务内完成任务创建，余额不足抛错整体回滚。
    */
   freeze(input: FreezeInput): Promise<CreditLedgerEntry>;
-  /** 结算：按任务定位冻结条目，退差 delta = 冻结额 − 实际成本（actualCost 缺省 = 冻结额），条目转 settled。 */
-  settle(input: { taskId: string; actualCost?: number }): Promise<void>;
+  /**
+   * 结算：按任务定位冻结条目，退差 delta = 冻结额 − 实际成本（actualCost 缺省 = 冻结额），条目转 settled。
+   * 返回被结算的冻结条目（携带 userId，供调用方复查结算后余额）；无冻结条目时返回 null。
+   */
+  settle(input: { taskId: string; actualCost?: number }): Promise<CreditLedgerEntry | null>;
   /** 按任务释放：返还全部冻结额 + 条目转 released + release 流水。 */
   releaseByTask(input: { taskId: string }): Promise<void>;
   /** 按条目释放（对账兜底用：任务可能已被删，taskId 被 FK 置空无法按任务定位）。 */
@@ -60,6 +64,12 @@ export interface CreditLedgerRepo {
    */
   adjust(input: { userId: string; amount: number; type: "grant" | "adjust"; note?: string }): Promise<number>;
   getBalance(userId: string): Promise<number>;
+  /**
+   * 最近一次余额回升的时刻（发放 / 后台调增 / 冻结释放），无则 null。
+   * 积分通知的「已复位」判据：与最近一条同类通知比较，账本晚于通知即视为已回升
+   * （append-only 账本已完整记录事实，无需额外状态列，见 design.md D6）。
+   */
+  getLatestBalanceRecoveryAt(userId: string): Promise<Date | null>;
   getPrice(key: string): Promise<number | null>;
   listLeakedFrozen(): Promise<LeakedFrozen[]>;
   /** 积分流水查询（createdAt 倒序分页）：用户/类型/时间范围过滤，管理台流水页用。 */
@@ -125,7 +135,7 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .from(creditLedger)
         .where(and(eq(creditLedger.taskId, taskId), eq(creditLedger.status, "frozen")))
         .limit(1);
-      if (!entry) return; // 无冻结条目（理论不可达）：幂等跳过，不产生流水
+      if (!entry) return null; // 无冻结条目（理论不可达）：幂等跳过，不产生流水
       const frozen = -entry.amount; // amount 为负存冻结额
       const delta = frozen - (actualCost ?? frozen);
       if (delta !== 0) {
@@ -141,6 +151,7 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .update(creditLedger)
         .set({ status: "settled" })
         .where(eq(creditLedger.id, entry.id));
+      return entry;
     },
 
     async releaseByTask({ taskId }) {
@@ -183,6 +194,25 @@ export function createCreditLedgerRepo(db: DbClient = defaultDb): CreditLedgerRe
         .where(eq(users.id, userId))
         .limit(1);
       return row?.balance ?? 0;
+    },
+
+    async getLatestBalanceRecoveryAt(userId) {
+      // 正向流水三类：grant 发放 / release 冻结释放 / adjust 且为正（后台调增）
+      // 聚合 max(timestamptz) 由 pg 以字符串返回（不会走列类型的反序列化），
+      // 故按 string 取再显式转 Date：直接断言 Date 会让下游与 Date 比较恒为 false。
+      const [row] = await db
+        .select({ at: sql<string | null>`max(${creditLedger.createdAt})` })
+        .from(creditLedger)
+        .where(
+          and(
+            eq(creditLedger.userId, userId),
+            or(
+              inArray(creditLedger.type, ["grant", "release"]),
+              and(eq(creditLedger.type, "adjust"), gt(creditLedger.amount, 0)),
+            ),
+          ),
+        );
+      return row?.at ? new Date(row.at) : null;
     },
 
     async getPrice(key) {

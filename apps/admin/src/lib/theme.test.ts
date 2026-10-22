@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ANTD_THEME_TOKEN } from "./theme";
 
 /**
- * admin ↔ web 设计 token 一致性守卫（docs/DESIGN.md B7.5）。
+ * admin ↔ web 设计 token 一致性守卫（docs/DESIGN.md B7.6）。
  *
  * 两应用消费 token 的机制不同（antd ConfigProvider vs Tailwind @theme），
  * 靠人工记忆同步必然分叉；此测试把「同值」变成硬约束。
