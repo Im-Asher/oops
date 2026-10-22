@@ -214,6 +214,25 @@ pnpm db:migrate         # Apply migrations (requires running Postgres) — forwa
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 `pnpm-lock.yaml` (single workspace lockfile) and must be committed.
+
+**Deployment (Vercel, Root Directory = `apps/web`)**: migration is part of the build,
+not a manual step. `apps/web/vercel.json` sets `buildCommand` to
+`pnpm --filter @oops/db db:migrate && pnpm build`, so every deploy applies pending
+migrations before `next build`; the first deploy applies `0000`~`0011` in full. Rules:
+
+- **A schema change ships its SQL.** `pnpm db:generate` and committing
+  `packages/db/drizzle/*.sql` are two separate acts — a forgotten migration file makes
+  the build succeed while the tables stay missing, which is harder to diagnose than a
+  failed build.
+- **A failed migration must fail the build** (never `|| true`), otherwise the deploy
+  ships a version that cannot talk to its database.
+- `drizzle-kit` is a devDependency of `@oops/db`. If `NODE_ENV=production` is set in the
+  project env, the install step skips devDependencies and the migrate command cannot
+  resolve it — use Install Command `pnpm install --prod=false` in that case.
+- Preview deployments migrate too (they inherit the same `DATABASE_URL` unless a
+  separate preview database is configured). Every migration so far is additive +
+  `ON CONFLICT DO NOTHING` seed, but **give Preview its own database before writing a
+  destructive migration**.
 Env 是**两层结构**：仓库根 `.env.local`（共享域键：DATABASE_URL / S3_* /
 AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键，
 同名覆盖根层）。构建/脚本入口统一经 `@oops/config` 的
