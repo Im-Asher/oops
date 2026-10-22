@@ -91,3 +91,29 @@ export function assertImageUrls(
 
   return { html: out, strippedCount };
 }
+
+/**
+ * 移除 src 缺失 / 为空 / 全空白的 `<img>` 标签。
+ *
+ * 为什么需要：渲染器遇到无 src 的 `<img>` 会抛 `Image source is not provided`，
+ * 让**整次渲染失败**——而旧的浏览器方案下图裂了照样渲染完整海报。这是无浏览器
+ * 迁移引入的回退，必须在这里兜住。
+ *
+ * 来源：
+ * 1. Agent 直接写了 `<img>` 占位却没给 src（没有商品图时想留个位置）；
+ * 2. 内联之外的历史遗留路径（`inlineFileRefs` 现在按整标签移除了读不到的引用，
+ *    已不再产出 `src=""`，这里作为纵深防线保留）。
+ *
+ * ⚠️ 调用顺序：必须在 `inlineFileRefs` **之后**——内联若留下空 src 要在这里兜住。
+ */
+export function stripUnusableImages(html: string): ImageUrlScan {
+  let strippedCount = 0;
+  const out = html.replace(IMG_TAG, (tag) => {
+    const url = imgSrcOf(tag);
+    // 有 src 且去空白后非空 → 保留
+    if (url !== undefined && url.trim() !== "") return tag;
+    strippedCount += 1;
+    return "";
+  });
+  return { html: out, strippedCount };
+}

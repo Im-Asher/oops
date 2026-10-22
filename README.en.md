@@ -75,6 +75,7 @@ Tasks run asynchronously (concurrency 2, 90s timeout per task) — close the pag
   - `/home` — studio home (creation composer + agent card entries)
   - `/canvas` — full-screen AI canvas workbench (floating chat panel + dotted canvas)
 - ☁️ **Deployment**: any host running Node.js 22+ (no browser needed for rendering); requires Postgres + MinIO (S3-compatible), both provisioned by `docker-compose.yaml`
+  - **Vercel**: set Root Directory to `apps/web`; the build command in `apps/web/vercel.json` runs the database migration first (`pnpm --filter @oops/db db:migrate && pnpm build`), so the first deploy applies every migration — no manual script run needed
 
 ## 🛠️ How · How to run it?
 

@@ -131,6 +131,8 @@ registerTaskHandler("render_html", async (payload, ctx) => {
     width,
     height,
     taskId: ctx.taskId,
+    // 渲染前被剥离的图片引用数（>0 说明有图没进成品，Agent 应转告用户）
+    droppedImages: rendered.droppedImages ?? 0,
     ...(referenceAssetId ? { referenceAssetId } : {}),
   };
 });

@@ -77,6 +77,7 @@
   - `/home` —— 工作台首页（创作输入 + Agent 卡片入口）
   - `/canvas` —— 全屏 AI 画布工作台（悬浮聊天面板 + 点阵画布）
 - ☁️ **部署**：任意可运行 Node.js 22+ 的主机（无浏览器渲染，无需 Chromium）；依赖 Postgres + MinIO（S3 兼容），`docker-compose.yaml` 一键拉起
+  - **Vercel**：Root Directory 设为 `apps/web`，构建命令由 `apps/web/vercel.json` 前置执行数据库迁移（`pnpm --filter @oops/db db:migrate && pnpm build`），首次部署会把全部迁移一次性应用，无需手动跑脚本
 
 ## 🛠️ How · 怎么用
 
