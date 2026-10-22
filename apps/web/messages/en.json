@@ -315,6 +315,7 @@
       "placeholder": "Describe what you want to create…",
       "placeholderNeedSession": "Create a session first",
       "placeholderNoCredits": "Out of credits — generation paused",
+      "placeholderNeedProductImage": "Upload a product image first (then select it)",
       "selectAgent": "Select agent",
       "stop": "Stop generating",
       "send": "Send"

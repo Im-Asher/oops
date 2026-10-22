@@ -1275,6 +1275,9 @@ function ChatPageInner() {
           // 画布页积分由悬浮顶栏统一呈现，面板头部不再重复（spec「AI 画布页布局」）。
           showCredits={false}
           creditsExhausted={creditsExhausted}
+          // 有 render_html 能力的 Agent（海报设计师）必须有真实商品图：无引用图时
+          // composer 占位文案提示上传。仅文案提示，不阻断发送。
+          needsProductImage={agents.some((a) => a.id === agentId && a.tools.includes("render_html"))}
           statusLine={directSendStatus ?? (creditGateError ? { text: creditGateError, tone: "error" as const } : null)}
           sessionTitle={sessions.find((s) => s.id === currentId)?.title ?? ""}
         />

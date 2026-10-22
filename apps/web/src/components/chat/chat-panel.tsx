@@ -52,6 +52,11 @@ interface ChatPanelProps {
   creditsExhausted?: boolean;
   /** 头部是否展示积分徽标（宿主另有积分入口时关闭，避免同屏重复）。默认展示。 */
   showCredits?: boolean;
+  /**
+   * 需要商品图才开工的 Agent（透传 composer）：无引用图时占位文案提示上传。
+   * 由宿主按 Agent 能力声明，见 composer 的 needsProductImage。
+   */
+  needsProductImage?: boolean;
 }
 
 /**
@@ -87,6 +92,7 @@ export function ChatPanel({
   statusLine,
   creditsExhausted,
   showCredits = true,
+  needsProductImage,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
   return (
@@ -141,6 +147,7 @@ export function ChatPanel({
           focusSignal={focusSignal}
           onAttach={onAttach}
           creditsExhausted={creditsExhausted}
+          needsProductImage={needsProductImage}
           onChange={onInputChange}
           onAgentChange={onAgentChange}
           onSend={onSend}
