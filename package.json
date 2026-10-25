@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @oops/web dev",
+    "dev": "pnpm -r --parallel --filter @oops/web --filter @oops/admin --filter @oops/creation dev",
     "build": "pnpm --filter @oops/web build",
-    "start": "pnpm --filter @oops/web start",
+    "start": "pnpm -r --parallel --filter @oops/web --filter @oops/creation start",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
@@ -13,7 +13,9 @@
     "eval:seed": "pnpm --filter @oops/eval seed",
     "eval:doctor": "pnpm --filter @oops/eval run-script doctor",
     "db:generate": "pnpm --filter @oops/db db:generate",
-    "db:migrate": "pnpm --filter @oops/db db:migrate"
+    "db:migrate": "pnpm --filter @oops/db db:migrate",
+    "dev:web": "pnpm --filter @oops/web dev",
+    "dev:creation": "pnpm --filter @oops/creation dev"
   },
   "packageManager": "pnpm@10.32.1",
   "devDependencies": {
