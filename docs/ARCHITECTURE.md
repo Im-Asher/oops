@@ -126,6 +126,51 @@ generate_image({ prompt, size, aspectRatio })
 
 SSE 上同步等待表现为 tool call 的 loading 状态（AI Elements Tool 组件），10~30s 可接受。
 
+### 4.1 生成质量：评测闭环
+
+单测锁定的是代码契约，锁不住「模型产出的排版漂了」「字体缺字了」「文案没画上去」。这一层由
+`packages/eval`（`@oops/eval`）的评测器兜住：它只走公开 HTTP，对真实链路跑样本用例，把失败归类
+后与基线比较，新增失败即阻断。命令见 `AGENTS.md`。
+
+**驱动方式：黑盒 HTTP，不 import 服务端代码。** 一轮评测就是一次真实用户会话——
+`POST /api/auth/login` 登录 → `POST /api/sessions` 建会话 → `POST /upload`（`purpose=reference`）
+传参考图 → `POST /api/chat` 读 SSE → `GET /files/<key>`（带 cookie）下载产物。评测器不认识
+`apps/web/src/server` 的任何模块，因此它是**跨进程边界**的：后续把创作域拆成独立服务，评测器无需改动，
+只改 `EVAL_BASE_URL`。这条约束同样意味着评测器无法「顺手修一下」被测实现的问题——被测契约变了，
+评测红，而不是评测侧悄悄适配。
+
+**判定四层**（`src/taxonomy.ts` 定义失败分类）：
+
+| 层 | 做什么 | 手段 |
+| --- | --- | --- |
+| L1 结构 | 是否有产物、PNG 真实像素尺寸、HTML 是否命中禁用 CSS（如 `display:grid`） | 纯计算，不启进程 |
+| L2 几何 | `scrollHeight - innerHeight` 量溢出、`<img>` 是否真的加载出尺寸 | eval 侧 Chromium 打开模型产出的 HTML |
+| L3 文字 | DOM 有文案但图里读不出 → `missing_glyph`（对应产品 GB2312 子集字体缺字）；DOM 里也没有 → `text_missing` | DOM 文本 vs VLM 读图 |
+| L4 审美 | 按固定 rubric 给 1–5 分 | VLM 打分 |
+
+失败分类全集：`render_error | css_unsupported | overflow | missing_glyph | text_missing |
+image_missing | no_tool_call | timeout | content_rejected | size_mismatch | judge_low`。报告按分类
+聚合，跨版本可比，不必逐条读 diff。
+
+**为什么 L2 要自带浏览器。** 产品渲染器是 satori + resvg，无浏览器（§8 注），但「版式溢出」这种几何
+事实只有真实排版引擎量得出来——静态分析算不出 flex/grid 折行后的高度。所以评测器在 eval 侧自带一个
+Chromium（缺 Playwright Chromium 时回退系统 Chrome），用它打开模型产出的 HTML 量几何。这样一来
+评测与被测渲染器解耦：**换渲染器不影响评测**，评测量的是「作者在这份 HTML 里想要的版式」是否成立，
+与被测渲染器如何近似实现它无关。测量浏览器的页面脚本强制关闭（`javaScriptEnabled: false`，测量走
+CDP evaluate，不依赖页面脚本），出网请求全部拦截，`/files/*` 用本地取回的字节回填——同一份 HTML
+在测量浏览器里跑出的结论因此是可复现的，不受当时网络与外链内容影响。
+
+**为什么 L4 不进闸门。** 回归门的规则是：与 `packages/eval/baseline.json` 比较，**L1–L3 新增任何失败即
+退出码 1**；`judge_low` 永不阻断。L1–L3 是确定性判定（有没有产物、尺寸对不对、有没有溢出、字形在不在），
+重复跑结论一致；L4 是 VLM 打分，同一张图重复打分会跳，阈值边缘的抖动会把闸门变成摇号。用抖动信号当闸门
+的结果是假报警，而假报警会训练人忽略红灯——闸门一旦被当成噪声，就同时失去了真报警。故 L4 只做趋势观察
+（分数随版本怎么走），是否参与趋势判断需先用真实产物分布校准阈值（见 `IMPROVEMENT.md`）。
+
+**样本与基线**：`cases/*.yaml` 为样本用例（入库），`fixtures/` 为程序生成的占位商品图（入库），
+`runs/<ts>/report.{json,md}` 为每次运行的报告（**不入库**，gitignored），`baseline.json` 为回归基线（入库）。
+`baseline.json` **尚未生成**：首次基线必须在有运行中 web、API key 与 Postgres 的机器上跑通真实链路后，
+由 `pnpm eval --smoke --update-baseline` 产生；在此之前评测只出报告、不阻断。
+
 ## 5. 端到端流程（用户发送一条消息）
 
 ```
@@ -513,7 +558,12 @@ oops/
 │   ├── db/                         # @oops/db：Drizzle schema/仓储 + drizzle/ 迁移目录 + drizzle.config.ts 共址
 │   ├── domain/                     # @oops/domain：积分账本服务（credits/）+ 任务执行器 core（tasks/，并发/注册/终态结算钩子）
 │   ├── llm/                        # @oops/llm：模型目录 catalog + 角色 resolver（llm-assembly）
-│   └── auth/                       # @oops/auth：password / session / require-user / require-admin / register / authenticate / rate-limit
+│   ├── auth/                       # @oops/auth：password / session / require-user / require-admin / register / authenticate / rate-limit
+│   └── eval/                       # @oops/eval：黑盒 HTTP 生成质量评测器（不 import 服务端代码，见 §4.1）
+│       ├── src/                    # cli / run / execute / http / sse / judges(L1-L4) / report / taxonomy / baseline / seed / doctor
+│       ├── cases/                  # 样本用例（YAML，入库）
+│       ├── fixtures/               # 程序生成的占位商品图（入库）
+│       └── baseline.json           # 回归基线（入库；尚未生成，见 §4.1）
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
 ├── pnpm-workspace.yaml             # workspace 声明（apps/* + packages/*）
 ├── package.json                    # 根编排壳：dev/build/start → --filter @oops/web、db:* → --filter @oops/db、lint/typecheck/test → -r

@@ -64,3 +64,5 @@
 - [ ] **修复基线语义冲突**：`AGENTS.md` 称任务「persisted and retryable」，而 `ARCHITECTURE.md` §4 称「重启后 running 标记 failed」。统一表述：任务记录持久化（可手动重试/排查），但进程重启不自动恢复，running 任务标记 failed 后由用户重发。
 - [ ] **刷新后图片不显示（2026-09-30 冒烟发现）**：`runtime.ts` 落库 `tool_calls` 写入的是工具 result `details`（url/size/model/prompt，**无 `type` 字段**），而 `transcript.ts` 的 `toUIMessage` 要求 `type === "generate_image"` 才重建图片 part → 刷新后聊天面板与画布均无图（实时 SSE 流不受影响，图片仅当前回合可见）。修复方向：落库时补 `type: "generate_image"`，并让 `toUIMessage` 对存量行按「有 url 无 type」宽松兼容。
 - [ ] **assets.session_id 未关联（2026-09-30 冒烟发现）**：`generate_image` 落 assets 时 session_id 恒为空（历史数据亦然），按会话查询资产不可用。当前无消费方（画布走 SSE 直显），但多租户/作品库演进前需补齐关联。
+- [ ] **评测首次基线待生成**：`packages/eval/baseline.json` 尚未入库。需有人在具备运行中 web、API key 与 Postgres 的环境跑通真实链路后，执行 `pnpm eval --smoke --update-baseline` 产生首份基线；在此之前 `pnpm eval` 只出报告、不阻断（无基线时退出码恒 0），回归门等于未生效。
+- [ ] **L4 阈值待校准**：`EVAL_L4_THRESHOLD` 默认为 3，是拍脑袋定的。需用真实产物的分数分布校准后再决定取值，并据此判断 `judge_low` 是否可参与趋势判断；无论如何都不进回归闸门（VLM 打分抖动会造成假报警，见 ARCHITECTURE.md §4.1）。

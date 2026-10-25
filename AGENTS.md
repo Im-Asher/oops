@@ -186,8 +186,9 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   ├── messages/      # next-intl 词典（zh.json + en.json）
 │   ├── public/        # 静态资源
 │   └── .env.local     # web 专属层（同名键覆盖根共享层；NEXT_PUBLIC_* 等）
-├── packages/          # shared packages：@oops/{config,db,domain,llm,auth}（TS 源码直出 + transpilePackages；
-│                      #   包间分层 config → db → {domain,llm} → auth 单向禁逆，app 只经 @oops/* exports 消费）
+├── packages/          # shared packages：@oops/{config,db,domain,llm,auth,eval}（TS 源码直出 + transpilePackages；
+│                      #   包间分层 config → db → {domain,llm} → auth 单向禁逆，app 只经 @oops/* exports 消费；
+│                      #   eval 为黑盒 HTTP 评测器，只依赖公开 HTTP 契约，见 ARCHITECTURE.md §4.1）
 ├── .env.local / .env.example  # 根共享 env 层：DATABASE_URL / S3_* / AUTH_SECRET / LLM_* / RENDER_* / QWEN_*
 ├── docker-compose.yaml  docs/  openspec/（本地）  AGENTS.md
 ```
@@ -208,6 +209,9 @@ pnpm start              # Start production server — forwards to @oops/web
 pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
 pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
 pnpm test               # Run unit tests (Vitest) — pnpm -r test
+pnpm eval            # 生成质量评测（需先 pnpm dev + pnpm eval:seed；详见 docs/ARCHITECTURE.md）
+pnpm eval:doctor     # 评测前置体检：API key / web 可达 / 浏览器 / DATABASE_URL
+pnpm eval:seed       # 幂等创建评测专用账号并灌初始积分
 pnpm db:generate        # Generate Drizzle migrations — forwards to @oops/db
 pnpm db:migrate         # Apply migrations (requires running Postgres) — forwards to @oops/db
 ```
@@ -334,6 +338,11 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
     Without a selected product image the poster agent refuses to run any tool and
     asks for one — it will not fabricate a product via `generate_image`.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring work done.
+  These lock code contracts only; generation **quality** (layout overflow, missing
+  glyphs, missing text, aesthetics) is covered by the separate eval harness
+  (`pnpm eval`, see `docs/ARCHITECTURE.md` §4.1) — run it after changes to prompts,
+  renderer, fonts or layout CSS. Its baseline `packages/eval/baseline.json` does not
+  exist yet, so until one is recorded the run reports but never blocks.
 - Rendering tests are hermetic service-level tests using minimal HTML fixtures;
   they need no browser. Note the two hard constraints the tests lock in: resvg must
   run with `loadSystemFonts: false` (16× slower otherwise, silently), and satori must
