@@ -13,6 +13,8 @@ export function mergeRuns(runs: CaseResult[]): CaseResult {
   if (runs.length === 1) return runs[0];
 
   const first = runs[0];
+  const failures = mergeFailures(runs);
+  const kept = new Set(failures.map((f) => f.code));
 
   return {
     id: first.id,
@@ -20,13 +22,19 @@ export function mergeRuns(runs: CaseResult[]): CaseResult {
     // 真实耗时：N 次是串行跑的，加起来才是这轮实际花掉的时间
     durationMs: runs.reduce((sum, r) => sum + r.durationMs, 0),
     imageUrl: firstSuccess(runs, (r) => r.imageUrl),
-    failures: mergeFailures(runs),
+    failures,
     l4: mergeL4(runs),
     toolCalls: union(runs.flatMap((r) => r.toolCalls)),
     // rawText 取第一次成功那轮的文字：合并多轮文本只会让报告更难读
     rawText: pickRawText(runs),
     ...(() => {
-      const notes = union(runs.flatMap((r) => r.notes ?? []));
+      // 备注解释的是「为什么某项没判」。只在对应失败仍是多数结论时保留，
+      // 否则会出现「本 case PASS，但备注说跳过了 L3」这种自相矛盾的报告。
+      const notes = union(
+        runs
+          .filter((r) => r.failures.some((f) => kept.has(f.code)))
+          .flatMap((r) => r.notes ?? []),
+      );
       return notes.length > 0 ? { notes } : {};
     })(),
   };

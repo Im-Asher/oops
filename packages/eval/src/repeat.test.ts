@@ -141,12 +141,31 @@ describe("mergeRuns", () => {
     expect(merged.rawText).toBe("干净轮");
   });
 
-  it("toolCalls / notes 取并集去重，保持首次出现顺序", () => {
+  it("toolCalls 取并集去重，保持首次出现顺序", () => {
     const merged = mergeRuns([
-      run({ toolCalls: ["render_html", "render_image"], notes: ["跳过 L3"] }),
-      run({ toolCalls: ["render_html", "read_file"], notes: ["跳过 L3", "超时重试"] }),
+      run({ toolCalls: ["render_html", "render_image"] }),
+      run({ toolCalls: ["render_html", "read_file"] }),
     ]);
     expect(merged.toolCalls).toEqual(["render_html", "render_image", "read_file"]);
+  });
+
+  it("备注只在对应失败仍是多数结论时保留（避免 PASS 却写着跳过了 L3）", () => {
+    const merged = mergeRuns([
+      run({ failures: [overflow()], notes: ["版式溢出会裁掉文字，跳过 L3"] }),
+      run({ notes: ["版式溢出会裁掉文字，跳过 L3"] }),
+      run({}),
+    ]);
+    expect(merged.failures).toEqual([]);
+    expect(merged.notes).toBeUndefined();
+  });
+
+  it("备注与多数失败同轮时保留并去重", () => {
+    const merged = mergeRuns([
+      run({ failures: [overflow()], notes: ["跳过 L3"] }),
+      run({ failures: [overflow()], notes: ["跳过 L3", "超时重试"] }),
+      run({}),
+    ]);
+    expect(merged.failures.map((f) => f.code)).toEqual(["overflow"]);
     expect(merged.notes).toEqual(["跳过 L3", "超时重试"]);
   });
 
