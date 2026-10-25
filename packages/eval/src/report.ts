@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { NON_BLOCKING } from "./baseline";
 import { FAILURE_LABELS, type Failure, type FailureCode } from "./taxonomy";
 
 export interface CaseResult {
@@ -21,6 +22,23 @@ export interface Report {
   results: CaseResult[];
 }
 
+/** 本 case 是否只有非阻断性失败（目前仅 judge_low，即 L4 分数偏低）。 */
+export function onlyNonBlocking(result: Pick<CaseResult, "failures">): boolean {
+  return result.failures.length > 0 && result.failures.every((f) => NON_BLOCKING.has(f.code));
+}
+
+/**
+ * 是否存在阻断性失败。只有 judge_low 的 case 不算失败：
+ * L4 是审美评分，抖动不适合决定通过与否。
+ */
+export function isBlocking(result: Pick<CaseResult, "failures">): boolean {
+  return result.failures.some((f) => !NON_BLOCKING.has(f.code));
+}
+
+export function countPassed(results: Pick<CaseResult, "failures">[]): number {
+  return results.filter((r) => !isBlocking(r)).length;
+}
+
 export function summarize(report: Report): Record<string, number> {
   const byCode: Record<string, number> = {};
   for (const r of report.results) {
@@ -37,7 +55,7 @@ export function writeReport(dir: string, report: Report): string {
   const lines = [
     `# 评测报告 ${report.runAt}`,
     "",
-    `通过 ${report.passed}/${report.total}`,
+    `通过 ${report.passed}/${report.total}（仅 L4 评分偏低（\`judge_low\`）不算失败，明细中标注为非阻断）`,
     "",
     "## 失败分布",
     "",
@@ -52,7 +70,13 @@ export function writeReport(dir: string, report: Report): string {
     "| case | 结果 | L4 | 耗时 | 产物 |",
     "| --- | --- | --- | --- | --- |",
     ...report.results.map((r) => {
-      const status = r.failures.length === 0 ? "PASS" : r.failures.map((f) => f.code).join(", ");
+      const codes = r.failures.map((f) => f.code).join(", ");
+      const status =
+        r.failures.length === 0
+          ? "PASS"
+          : onlyNonBlocking(r)
+            ? `PASS（非阻断：${codes}）`
+            : codes;
       return `| ${r.id} | ${status} | ${r.l4?.score ?? "-"} | ${r.durationMs}ms | ${r.imageUrl ?? "-"} |`;
     }),
   ];

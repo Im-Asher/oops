@@ -38,6 +38,16 @@ describe("createClient", () => {
     await expect(c.login("u", "p")).rejects.toThrow(/登录失败/);
   });
 
+  it("服务不可达时给出可操作的报错", async () => {
+    const c = createClient({
+      baseUrl: "http://127.0.0.1:3999",
+      fetchImpl: (async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch,
+    });
+    await expect(c.login("u", "p")).rejects.toThrow(/连不上评测服务 http:\/\/127\.0\.0\.1:3999/);
+  });
+
   it("上传参考图返回 assetId 与 /files/ url", async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const c = createClient({ baseUrl: "http://x", fetchImpl: fakeFetch(calls) });

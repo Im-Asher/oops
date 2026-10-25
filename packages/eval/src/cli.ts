@@ -5,8 +5,8 @@ import { loadCases } from "./case";
 import { createClient } from "./http";
 import { createVlm } from "./vlm";
 import { executeCase } from "./execute";
-import { writeReport, type CaseResult, type Report } from "./report";
-import { compareToBaseline } from "./baseline";
+import { countPassed, isBlocking, writeReport, type CaseResult, type Report } from "./report";
+import { compareToBaseline, parseBaseline } from "./baseline";
 import { closeBrowser } from "./judges/l2";
 
 const PKG = new URL("..", import.meta.url).pathname;
@@ -45,11 +45,11 @@ async function main(): Promise<number> {
         client,
         vlm,
         fixturesDir: join(PKG, "fixtures"),
-        l4Threshold: Number(process.env.EVAL_L4_THRESHOLD ?? 3),
+        l4Threshold: l4Threshold(),
       });
       results.push(r);
       process.stdout.write(
-        r.failures.length === 0 ? "PASS\n" : `FAIL ${r.failures.map((f) => f.code).join(",")}\n`,
+        isBlocking(r) ? `FAIL ${r.failures.map((f) => f.code).join(",")}\n` : "PASS\n",
       );
     } catch (err) {
       const message = (err as Error).message;
@@ -70,7 +70,7 @@ async function main(): Promise<number> {
   const report: Report = {
     runAt: new Date().toISOString(),
     total: results.length,
-    passed: results.filter((r) => r.failures.length === 0).length,
+    passed: countPassed(results),
     results,
   };
   const md = writeReport(join(PKG, "runs", report.runAt.replace(/[:.]/g, "-")), report);
@@ -84,16 +84,32 @@ async function main(): Promise<number> {
   }
   if (!existsSync(baselinePath)) {
     console.log("无基线文件，本次不阻断。跑通后用 --update-baseline 记录基线。");
-    return 0;
+    // 无基线时唯一能判的就是本轮自身的阻断性失败
+    return results.some(isBlocking) ? 1 : 0;
   }
 
-  const cmp = compareToBaseline({
-    baseline: JSON.parse(readFileSync(baselinePath, "utf8")),
-    current: report,
-  });
+  let cmp: ReturnType<typeof compareToBaseline>;
+  try {
+    cmp = compareToBaseline({
+      baseline: parseBaseline(readFileSync(baselinePath, "utf8")),
+      current: report,
+    });
+  } catch (err) {
+    console.error(
+      `oops-eval: 基线不可用，未做回归判定（${(err as Error).message}）。修好 ${baselinePath} 或用 --update-baseline 重建。`,
+    );
+    return 2;
+  }
   for (const r of cmp.regressions) console.log(`回归：${r.id} → ${r.code}`);
   for (const r of cmp.fixed) console.log(`修复：${r.id} → ${r.code}`);
   return cmp.blocking ? 1 : 0;
+}
+
+/** 空串/非数字不能让阈值变成 0，否则 L4 会静默失效。 */
+function l4Threshold(): number {
+  const raw = process.env.EVAL_L4_THRESHOLD;
+  const n = Number(raw);
+  return raw !== undefined && raw.trim() !== "" && Number.isFinite(n) ? n : 3;
 }
 
 main()
@@ -102,6 +118,7 @@ main()
     process.exit(code);
   })
   .catch(async (err) => {
+    // closeBrowser 自身不会抛（内部已吞掉关闭错误），这里不会被覆盖退出码
     await closeBrowser();
     console.error(err instanceof Error ? `oops-eval: ${err.message}` : err);
     process.exit(2);

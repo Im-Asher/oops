@@ -5,6 +5,7 @@ references: [product.png]
 tags: [poster, smoke]
 assert:
   size: [750, 1654]
+  allowedHeights: [1000, 1334, 1654]
   mustContainText: ["一整天的温度", "陪你到最后一度"]
   maxOverflowPx: 0
   denyCss: ["display:grid", "float:"]

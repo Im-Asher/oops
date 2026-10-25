@@ -28,6 +28,18 @@ describe("真实 cases/ 目录", () => {
     }
   });
 
+  it("海报 case 用 allowedHeights 覆盖高度档位；文生图 case 保持精确尺寸", () => {
+    for (const c of cases) {
+      if (c.tags.includes("poster")) {
+        expect(c.assert.allowedHeights, `${c.id}: 海报高度档位由模型自选`).toEqual([
+          1000, 1334, 1654,
+        ]);
+      } else {
+        expect(c.assert.allowedHeights, `${c.id}: 非海报 case 不应放宽尺寸`).toBeUndefined();
+      }
+    }
+  });
+
   it("每个 references 都能在 fixtures/ 下找到且是合法 PNG", () => {
     for (const c of cases) {
       for (const rel of c.references) {

@@ -10,6 +10,8 @@ export function createVlm(opts: { baseUrl: string; apiKey: string; model: string
     const res = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${opts.apiKey}` },
+      // 视觉模型偶发挂死会拖住整轮评测：给单次调用一个硬超时
+      signal: AbortSignal.timeout(Number(process.env.EVAL_VLM_TIMEOUT_MS ?? 60_000)),
       body: JSON.stringify({
         model: opts.model,
         temperature: 0,

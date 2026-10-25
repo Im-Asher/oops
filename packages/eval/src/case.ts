@@ -12,6 +12,11 @@ export const caseSchema = z.object({
   tags: z.array(z.string()).default([]),
   assert: z.object({
     size: z.tuple([z.number().int().positive(), z.number().int().positive()]),
+    /**
+     * 尺寸不是单一确定值时（海报高度档位由模型自选）：宽度仍按 size[0] 卡，
+     * 高度只要落在该集合内即通过。
+     */
+    allowedHeights: z.array(z.number().int().positive()).optional(),
     mustContainText: z.array(z.string()).default([]),
     maxOverflowPx: z.number().int().min(0).default(0),
     denyCss: z.array(z.string()).default([]),

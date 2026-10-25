@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { EvalCase } from "./case";
 import type { EvalClient } from "./http";
-import { collectFromEvents } from "./run";
+import { collectFromEvents, type RunArtifacts } from "./run";
 import { parseSseStream, type SseEvent } from "./sse";
 import { judgeL1 } from "./judges/l1";
 import { judgeL2, measureHtml } from "./judges/l2";
@@ -67,10 +67,7 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
   }
   const artifacts = collectFromEvents(events);
 
-  const failures: Failure[] = artifacts.toolErrors.map((e) => ({
-    code: toFailureCode(e.code),
-    detail: e.message,
-  }));
+  const failures: Failure[] = collectFailures(artifacts, c);
   if (!artifacts.html && failures.length === 0 && c.assert.mustContainText.length > 0) {
     failures.push({ code: "no_tool_call", detail: "本轮没有调用 render_html" });
   }
@@ -87,7 +84,11 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
 
   failures.push(
     ...judgeL1({
-      expect: { size: c.assert.size, denyCss: c.assert.denyCss },
+      expect: {
+        size: c.assert.size,
+        denyCss: c.assert.denyCss,
+        allowedHeights: c.assert.allowedHeights,
+      },
       artifacts,
       bytes: imageBytes,
     }).failures,
@@ -139,6 +140,19 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
     toolCalls: artifacts.toolCalls.map((t) => t.name),
     rawText: artifacts.text,
   };
+}
+
+/**
+ * 工具错误只有在「本轮什么都没产出」时才算失败。
+ * 模型先失败一次、再重试成功是常见路径，把中途的 tool_end 错误一律记成失败会污染基线（假阳性）。
+ */
+export function collectFailures(
+  artifacts: Pick<RunArtifacts, "assetUrl" | "html" | "toolErrors">,
+  _c: EvalCase,
+): Failure[] {
+  const produced = Boolean(artifacts.assetUrl || artifacts.html);
+  if (produced) return [];
+  return artifacts.toolErrors.map((e) => ({ code: toFailureCode(e.code), detail: e.message }));
 }
 
 /** 从 HTML 里抠出站内文件路径（/files/...）。 */

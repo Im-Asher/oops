@@ -11,28 +11,56 @@ export interface Geometry {
 
 let browserPromise: Promise<Browser> | null = null;
 
-/** 浏览器实例复用：一批评测共用一个，进程退出前 close。 */
+/** 不可解析的基址：只为把相对 URL 变成绝对 URL，本身永不真正出网（路由全部 abort/fulfill）。 */
+export const BASE_URL = "http://eval.invalid/";
+
+/**
+ * 浏览器实例复用：一批评测共用一个，进程退出前 close。
+ * - 启动失败不能缓存 rejected promise：否则后续每个用例都立刻失败、永不重试。
+ * - 已断开的实例也要重建：浏览器崩溃/被外部杀掉后不该连带整轮评测失败。
+ */
 export async function getBrowser(): Promise<Browser> {
-  browserPromise ??= (async () => {
-    try {
-      return await chromium.launch({ headless: true });
-    } catch (err) {
-      const message = (err as Error)?.message ?? "";
-      if (!message.includes("Executable doesn't exist")) throw err;
-      console.warn(
-        "[eval] 未安装 playwright chromium，回退到系统 Chrome。如需自带浏览器：pnpm --filter @oops/eval exec playwright install chromium",
-      );
-      return chromium.launch({ headless: true, channel: "chrome" });
-    }
-  })();
-  return browserPromise;
+  // 复用仍然活着的实例
+  const cached = browserPromise;
+  if (cached) {
+    const b = await cached.catch(() => null);
+    if (b && b.isConnected()) return b;
+    if (browserPromise === cached) browserPromise = null;
+  }
+
+  const p = launchBrowser();
+  browserPromise = p;
+  // 启动失败不能留下 rejected promise：否则后续每个用例都立刻失败、永不重试
+  p.catch(() => {
+    if (browserPromise === p) browserPromise = null;
+  });
+  return p;
 }
 
+async function launchBrowser(): Promise<Browser> {
+  try {
+    return await chromium.launch({ headless: true });
+  } catch (err) {
+    const message = (err as Error)?.message ?? "";
+    if (!message.includes("Executable doesn't exist")) throw err;
+    console.warn(
+      "[eval] 未安装 playwright chromium，回退到系统 Chrome。如需自带浏览器：pnpm --filter @oops/eval exec playwright install chromium",
+    );
+    return chromium.launch({ headless: true, channel: "chrome" });
+  }
+}
+
+/** 关闭失败不影响退出码：CLI 的 catch 分支还会调用它，不能被这里再抛一次覆盖 exit 2。 */
 export async function closeBrowser(): Promise<void> {
-  if (!browserPromise) return;
-  const b = await browserPromise;
+  const p = browserPromise;
   browserPromise = null;
-  await b.close();
+  if (!p) return;
+  try {
+    const b = await p;
+    await b.close();
+  } catch {
+    // 浏览器没起来或已退出：无需处理
+  }
 }
 
 /**
@@ -61,7 +89,9 @@ export async function measureHtml(
       if (url.protocol === "data:") return route.continue();
       return route.abort();
     });
-    await page.setContent(html, { waitUntil: "load" });
+    // 注入 base：setContent 的文档落在 about:blank，浏览器不会为 /files/x.png 这类相对 URL 发起请求，
+    // page.route 也就匹配不到，<img>.naturalWidth 恒为 0。有了 base 相对路径被解析成可拦截的绝对请求。
+    await page.setContent(`<base href="${BASE_URL}">${html}`, { waitUntil: "load" });
     return await page.evaluate(() => {
       const doc = document.documentElement;
       const body = document.body;

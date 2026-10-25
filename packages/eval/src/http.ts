@@ -34,11 +34,19 @@ export function createClient(opts: ClientOptions): EvalClient {
 
   return {
     async login(username, password) {
-      const res = await doFetch(`${base}/api/auth/login`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/auth/login`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+      } catch (err) {
+        // 服务没起时 fetch 只会抛 "fetch failed"，对使用者没有指向性
+        throw new Error(
+          `连不上评测服务 ${base}（${(err as Error).message}）：请先启动 apps/web，或用 EVAL_BASE_URL 指定地址`,
+        );
+      }
       if (!res.ok) throw new Error(`登录失败（${res.status}）：请先运行 pnpm eval:seed`);
       const setCookie = res.headers.get("set-cookie") ?? "";
       cookie = setCookie.split(";")[0] ?? "";

@@ -5,6 +5,7 @@ references: [product.png]
 tags: [poster, smoke]
 assert:
   size: [750, 1334]
+  allowedHeights: [1000, 1334, 1654]
   mustContainText: ["129"]
   maxOverflowPx: 0
   denyCss: ["display:grid", "float:"]
