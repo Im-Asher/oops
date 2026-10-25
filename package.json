@@ -10,6 +10,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "eval": "pnpm --filter @oops/eval eval",
+    "eval:seed": "pnpm --filter @oops/eval seed",
+    "eval:doctor": "pnpm --filter @oops/eval run-script doctor",
     "db:generate": "pnpm --filter @oops/db db:generate",
     "db:migrate": "pnpm --filter @oops/db db:migrate"
   },

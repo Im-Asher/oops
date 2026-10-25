@@ -332,6 +332,18 @@ importers:
 
   packages/eval:
     dependencies:
+      '@oops/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@oops/config':
+        specifier: workspace:*
+        version: link:../config
+      '@oops/db':
+        specifier: workspace:*
+        version: link:../db
+      '@oops/domain':
+        specifier: workspace:*
+        version: link:../domain
       yaml:
         specifier: ^2.6.1
         version: 2.9.0
