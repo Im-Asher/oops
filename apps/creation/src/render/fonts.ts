@@ -7,6 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** 海报排版契约声明的两个字重（satori 不合成加粗，必须两个真实文件）。 */
 export type PosterFontWeight = "regular" | "bold";
@@ -24,8 +25,12 @@ const WEIGHT_NUMBER: Record<PosterFontWeight, PosterFontWeightNumber> = {
   bold: 700,
 };
 
-/** assets/fonts 位于 apps/web 下；运行时可被 outputFileTracingIncludes 带进函数包。 */
-const FONT_DIR = resolve(process.cwd(), "assets", "fonts");
+/**
+ * 字体目录按**模块位置**推导（apps/creation/assets/fonts），不依赖启动时 cwd：
+ * creation 不做打包（tsx 直跑源码），module URL 稳定；写成 cwd 相对会在从仓库根
+ * 启动时静默找不到文件。
+ */
+const FONT_DIR = fileURLToPath(new URL("../../assets/fonts", import.meta.url));
 
 const cache = new Map<PosterFontWeight, Buffer>();
 

@@ -59,6 +59,29 @@ describe("definitions drop-in 守卫", () => {
   });
 });
 
+/**
+ * 跨端一致性守卫：Agent 的 preset key 只存在于创作域的 definitions 里，文案却在
+ * web 的 next-intl 词典里。key 改名/新增而词典没跟上时，resolvePresets 会**静默**
+ * 把 key 原样透传给用户（看起来像乱码需求），所以必须在这里红。
+ * 直接读兄弟 app 的词典文件：本用例是构建期守卫，不产生运行时依赖。
+ */
+describe("preset key ↔ web 词典一致性", () => {
+  const dictionaryDir = join(here, "../../..", "web/messages");
+
+  it("所有 definitions 的 preset key 在 zh / en 词典均有登记", () => {
+    for (const locale of ["zh", "en"] as const) {
+      const dict = JSON.parse(readFileSync(join(dictionaryDir, `${locale}.json`), "utf8")) as {
+        chat?: { presets?: Record<string, Record<string, string>> };
+      };
+      for (const agent of agentRegistry.list()) {
+        for (const key of agent.presets) {
+          expect(dict.chat?.presets?.[agent.id]?.[key], `${locale}: ${agent.id}#${key}`).toBeTruthy();
+        }
+      }
+    }
+  });
+});
+
 describe("present_options 声明守卫（HITL 选项卡）", () => {
   it("每个注册 Agent 的 tools 均声明 present_options，且按名授权装配后可拿到（漏声明即守卫报红）", () => {
     const agents = agentRegistry.list();

@@ -4,9 +4,14 @@ import {
   DASHSCOPE_IMAGE_MODEL,
   DASHSCOPE_IMAGE_PROVIDER,
   generateImage,
-} from "@/server/infra/providers/dashscope-images";
-import { renderHtml, RenderError } from "@/server/infra/render/render-html";
-import { createStorage, defaultS3Client, extFromMime, generateAssetKey } from "@/server/infra/storage/s3";
+} from "../providers/dashscope-images";
+import { renderHtml, RenderError } from "../render/render-html";
+import {
+  createStorage,
+  defaultS3Client,
+  extFromMime,
+  generateAssetKey,
+} from "@oops/storage/s3";
 
 function base64ToBytes(b64: string): Uint8Array {
   const binary = atob(b64);

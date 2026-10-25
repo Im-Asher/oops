@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Message } from "@earendil-works/pi-ai";
-import { buildReplayHistory, isSerializedTranscript, type TranscriptRowLike } from "./transcript";
+import { buildReplayHistory, isSerializedTranscript, type TranscriptRowLike } from "@oops/llm/transcript";
 
 const here = dirname(fileURLToPath(import.meta.url));
 

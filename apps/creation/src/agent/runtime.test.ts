@@ -71,7 +71,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
   },
 }));
 
-vi.mock("@/server/infra/providers/llm", () => ({
+vi.mock("../providers/llm", () => ({
   // 模拟装配层：Agent 声明 vision 而装配结果不满足时抛配置错误（ModelConfigError 语义）；
   // h.visionSupported 模拟部署方已配置 vision 模型的场景
   getChatModelForRole: (

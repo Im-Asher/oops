@@ -2,12 +2,12 @@ import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import type { ImageContent } from "@earendil-works/pi-ai";
 import { createMessageRepo, type MessageRepo } from "@oops/db/message.repo";
 import { createSessionRepo, type SessionRepo } from "@oops/db/session.repo";
-import { getChatModelForRole, getChatModels } from "@/server/infra/providers/llm";
+import { getChatModelForRole, getChatModels } from "../providers/llm";
 import { agentRegistry } from "./registry";
 import { compactSessionHistory, summaryPrefixMessage } from "./compact";
 import { toolRegistry } from "./tools/registry";
-import { buildReplayHistory, sanitizeTranscript } from "./transcript";
-import type { SseEvent } from "./types";
+import { buildReplayHistory, sanitizeTranscript } from "@oops/llm/transcript";
+import type { SseEvent } from "@oops/contracts/events";
 
 /** 回放消息数硬上限（tasks.md 3.2：任何情况下不爆炸的最后防线） */
 const REPLAY_MAX_MESSAGES = 40;

@@ -4,7 +4,7 @@ const h = vi.hoisted(() => ({
   objects: {} as Record<string, { body: number[]; contentType?: string }>,
 }));
 
-vi.mock("@/server/infra/storage/s3", () => ({
+vi.mock("@oops/storage/s3", () => ({
   defaultS3Client: {},
   createStorage: () => ({
     getObject: async (key: string) => {

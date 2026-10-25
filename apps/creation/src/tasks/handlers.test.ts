@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RenderError } from "@/server/infra/render/render-html";
+import { RenderError } from "../render/render-html";
 import { renderTaskError } from "./handlers";
 import { TaskError } from "@oops/domain/tasks/executor";
 

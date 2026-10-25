@@ -29,6 +29,8 @@ export interface AgentMetadata {
   icon: string;
   presets: string[];
   tools: string[];
+  /** 主模型是否声明 vision（web 写 user 行 transcript 时需要同一判定）。 */
+  vision: boolean;
 }
 
 /** 声明式 Agent 工厂：结构校验（含模型能力声明）后透传，无副作用。 */
@@ -62,13 +64,14 @@ class AgentRegistry {
   }
 
   metadata(): AgentMetadata[] {
-    return this.list().map(({ id, name, description, icon, presets, tools }) => ({
+    return this.list().map(({ id, name, description, icon, presets, tools, models }) => ({
       id,
       name,
       description,
       icon,
       presets,
       tools,
+      vision: models?.main?.capabilities?.includes("vision") ?? false,
     }));
   }
 

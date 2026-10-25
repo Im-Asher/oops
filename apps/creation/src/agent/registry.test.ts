@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { agentRegistry, defineAgent } from "./registry";
-import { toolRegistry, type ToolDefinition } from "@/server/agent/tools/registry";
+import { toolRegistry, type ToolDefinition } from "./tools/registry";
 
 function fakeTool(name: string): ToolDefinition {
   return {

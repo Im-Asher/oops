@@ -1,4 +1,4 @@
-import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
+import { createStorage, defaultS3Client } from "@oops/storage/s3";
 
 /** 内联结果：产物 HTML + 被剥离的引用数（供上层告知 Agent「有图没进去」）。 */
 export interface InlineFileRefsResult {
