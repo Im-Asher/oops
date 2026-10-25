@@ -9,7 +9,8 @@ export type FailureCode =
   | "timeout"
   | "content_rejected"
   | "size_mismatch"
-  | "judge_low";
+  | "judge_low"
+  | "insufficient_credits";
 
 export const FAILURE_LABELS: Record<FailureCode, string> = {
   render_error: "渲染失败",
@@ -23,6 +24,7 @@ export const FAILURE_LABELS: Record<FailureCode, string> = {
   content_rejected: "内容被拒",
   size_mismatch: "尺寸不符",
   judge_low: "审美评分过低",
+  insufficient_credits: "评测账号积分不足",
 };
 
 export interface Failure {

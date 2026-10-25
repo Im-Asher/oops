@@ -3,7 +3,16 @@ agent: atmosphere-designer
 message: 生成一张清晨阳光下的木质桌面场景图，画面里放一只陶瓷保温杯
 tags: [image, smoke]
 assert:
-  size: [768, 1344]
+  # 文生图的像素档位由模型从 generate_image 的枚举里挑，断言只卡「枚举外的尺寸」。
+  # size 仅作名义值（本 case 无 HTML，不会作为测量视口）。
+  size: [1024, 1024]
+  allowedSizes:
+    - [1024, 1024]
+    - [768, 1344]
+    - [864, 1152]
+    - [1024, 768]
+    - [1152, 864]
+    - [1344, 768]
   mustContainText: []
   maxOverflowPx: 0
   denyCss: []

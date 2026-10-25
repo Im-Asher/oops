@@ -1,6 +1,11 @@
 id: 006-poster-long-copy
 agent: poster-designer
-message: 做一张长版详情海报，标题「一整天的温度」，正文讲清楚 6 层锁温结构，底部放一句品牌 slogan「陪你到最后一度」
+# 文案内容必须给全：否则 agent 会合理地调用 present_options 追问细节，本轮就没有 render_html，
+# 评到的不是版式能力而是"会不会追问"。断言要测的东西，必须在输入里闭合。
+message: >-
+  做一张长版详情海报，标题「一整天的温度」。
+  正文列出 6 层锁温结构：1 真空隔热层、2 铜箔反射层、3 医用级 316 内胆、4 中空保温层、5 食品级密封圈、6 耐磨外层喷涂。
+  底部放一句品牌 slogan「陪你到最后一度」。
 references: [product.png]
 tags: [poster, smoke]
 assert:

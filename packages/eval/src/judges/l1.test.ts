@@ -170,4 +170,40 @@ describe("judgeL1", () => {
       expect(r.failures.map((f) => f.code)).toContain("size_mismatch");
     });
   });
+
+  describe("allowedSizes（尺寸由模型从枚举里挑）", () => {
+    const allowed = {
+      ...base,
+      expect: {
+        ...base.expect,
+        allowedSizes: [
+          [1024, 1024],
+          [768, 1344],
+        ] as [number, number][],
+      },
+    };
+
+    it("命中集合内任一尺寸 → 通过", () => {
+      for (const [w, h] of [
+        [1024, 1024],
+        [768, 1344],
+      ]) {
+        const r = judgeL1({
+          ...allowed,
+          artifacts: { assetUrl: "/f", size: [w, h], html: null },
+          bytes: pngHeader(w, h),
+        });
+        expect(r.failures, `${w}×${h}`).toEqual([]);
+      }
+    });
+
+    it("枚举外的尺寸 → size_mismatch", () => {
+      const r = judgeL1({
+        ...allowed,
+        artifacts: { assetUrl: "/f", size: [900, 900], html: null },
+        bytes: pngHeader(900, 900),
+      });
+      expect(r.failures.map((f) => f.code)).toContain("size_mismatch");
+    });
+  });
 });

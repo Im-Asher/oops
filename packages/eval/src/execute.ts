@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { EvalCase } from "./case";
 import type { EvalClient } from "./http";
@@ -24,6 +24,7 @@ const KNOWN_CODES: ReadonlySet<string> = new Set<FailureCode>([
   "content_rejected",
   "size_mismatch",
   "judge_low",
+  "insufficient_credits",
 ]);
 
 /** 服务端错误码是开放字符串，这里收敛到封闭分类，未知一律归 render_error。 */
@@ -36,6 +37,8 @@ export interface ExecCtx {
   vlm: VisionAsk;
   fixturesDir: string;
   l4Threshold: number;
+  /** 存在时把模型产出的 HTML 落盘，供事后诊断（report.json 不存大字段）。 */
+  artifactDir?: string;
 }
 
 /** 跑单个 case 的完整流水线：上传参考图 → chat 读 SSE → L1/L2/L3/L4。 */
@@ -61,12 +64,34 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
     ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
   });
 
+  // 建连前就失败的请求（402 余额不足 / 500 / 400）不会产生任何事件流。
+  // 不在这里拦下，就会退化成「没有调用工具 + 没有产物」这种误导性结论。
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200) || `HTTP ${res.status}`;
+    return {
+      id: c.id,
+      agent: c.agent,
+      durationMs: Date.now() - started,
+      imageUrl: null,
+      failures: [
+        {
+          code: res.status === 402 ? "insufficient_credits" : "render_error",
+          detail: `chat 返回 ${res.status}：${detail}`,
+        },
+      ],
+      l4: null,
+      toolCalls: [],
+      rawText: "",
+    };
+  }
+
   const events: SseEvent[] = [];
   if (res.body) {
     for await (const e of parseSseStream(res.body)) events.push(e);
   }
   const artifacts = collectFromEvents(events);
 
+  const notes: string[] = [];
   const failures: Failure[] = collectFailures(artifacts, c);
   if (!artifacts.html && failures.length === 0 && c.assert.mustContainText.length > 0) {
     failures.push({ code: "no_tool_call", detail: "本轮没有调用 render_html" });
@@ -88,6 +113,7 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
         size: c.assert.size,
         denyCss: c.assert.denyCss,
         allowedHeights: c.assert.allowedHeights,
+        allowedSizes: c.assert.allowedSizes,
       },
       artifacts,
       bytes: imageBytes,
@@ -105,9 +131,24 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
       }
     }
     const metrics = await measureHtml(artifacts.html, c.assert.size, { fileBytes });
-    failures.push(...judgeL2({ metrics, maxOverflowPx: c.assert.maxOverflowPx }).failures);
+    if (ctx.artifactDir) {
+      // 落盘供事后诊断：溢出到底卡在哪个块、模型到底写了什么，只有原文能回答
+      mkdirSync(ctx.artifactDir, { recursive: true });
+      writeFileSync(join(ctx.artifactDir, `${c.id}.html`), artifacts.html);
+      writeFileSync(
+        join(ctx.artifactDir, `${c.id}.geometry.json`),
+        JSON.stringify(metrics, null, 2),
+      );
+    }
+    const l2Failures = judgeL2({ metrics, maxOverflowPx: c.assert.maxOverflowPx }).failures;
+    failures.push(...l2Failures);
 
-    if (imageBytes) {
+    // 溢出会裁掉文字：此时「图里读不到某段文案」是版式问题的后果，不是字形问题。
+    // 先修版式再谈缺字，否则同一处缺陷会被记成两类失败，读报告的人会去查字体。
+    const overflowed = l2Failures.some((f) => f.code === "overflow");
+    if (overflowed) {
+      notes.push("版式溢出会裁掉文字，本轮跳过 L3 字形判定");
+    } else if (imageBytes) {
       failures.push(
         ...(
           await judgeL3({
@@ -139,6 +180,7 @@ export async function executeCase(c: EvalCase, ctx: ExecCtx): Promise<CaseResult
     l4: l4 ? { score: l4.score, reason: l4.reason } : null,
     toolCalls: artifacts.toolCalls.map((t) => t.name),
     rawText: artifacts.text,
+    ...(notes.length > 0 ? { notes } : {}),
   };
 }
 

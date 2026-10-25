@@ -37,6 +37,9 @@ async function main(): Promise<number> {
     model: process.env.EVAL_VLM_MODEL ?? "qwen3.7-plus",
   });
 
+  // 本轮产物目录：报告 + 每个 case 的 HTML 与几何快照（诊断溢出到底卡在哪）
+  const runDir = join(PKG, "runs", new Date().toISOString().replace(/[:.]/g, "-"));
+
   const results: CaseResult[] = [];
   for (const c of cases) {
     process.stdout.write(`▶ ${c.id} ... `);
@@ -46,6 +49,7 @@ async function main(): Promise<number> {
         vlm,
         fixturesDir: join(PKG, "fixtures"),
         l4Threshold: l4Threshold(),
+        artifactDir: runDir,
       });
       results.push(r);
       process.stdout.write(
@@ -73,7 +77,7 @@ async function main(): Promise<number> {
     passed: countPassed(results),
     results,
   };
-  const md = writeReport(join(PKG, "runs", report.runAt.replace(/[:.]/g, "-")), report);
+  const md = writeReport(runDir, report);
   console.log(`\n报告：${md}`);
 
   const baselinePath = join(PKG, "baseline.json");

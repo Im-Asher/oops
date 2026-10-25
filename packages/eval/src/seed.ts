@@ -30,6 +30,9 @@ async function loadEnv(): Promise<void> {
   loadAppEnv(new URL("../../..", import.meta.url).pathname);
 }
 
+/** 评测积分下限：一次全量 smoke 会跑掉数十到上百积分，余额见底后每个 case 都 402。 */
+const MIN_EVAL_CREDITS = Number(process.env.EVAL_MIN_CREDITS ?? 2000);
+
 /**
  * 业务模块一律动态 import：@oops/db 在模块求值时就 getDbConfig() 建池，
  * 静态 import 会跑到 loadEnv() 之前，导致 DATABASE_URL 尚未注入即抛 ZodError。
@@ -47,6 +50,28 @@ async function loadDeps() {
     import("@oops/domain/credits/service"),
   ]);
   return { createUserRepo, generateUniqueOopsId, hashPassword, createCreditsService, INITIAL_GRANT_CREDITS };
+}
+
+/** 余额低于下限时补足；高于下限不动（重复执行不会无限刷余额）。 */
+async function topUpIfLow(
+  createCreditsService: typeof import("@oops/domain/credits/service").createCreditsService,
+  userId: string,
+): Promise<void> {
+  const balance = (await createCreditsService().checkGate(userId)).balance;
+  if (balance >= MIN_EVAL_CREDITS) {
+    console.log(`  积分余额 ${balance}，不低于下限 ${MIN_EVAL_CREDITS}，不补。`);
+    return;
+  }
+  const delta = MIN_EVAL_CREDITS - balance;
+  // 走 ledger.adjust（grant 流水 + 余额物化列同源写入），不裸 UPDATE users.credit_balance
+  const { createCreditLedgerRepo } = await import("@oops/db/credit-ledger.repo");
+  await createCreditLedgerRepo().adjust({
+    userId,
+    amount: delta,
+    type: "grant",
+    note: "eval top-up",
+  });
+  console.log(`  积分余额 ${balance} → 补 ${delta} 至 ${MIN_EVAL_CREDITS}（grant 流水）。`);
 }
 
 /** 把「连不上库」翻译成人话，避免甩一整段 pg 堆栈。 */
@@ -108,12 +133,14 @@ async function main(): Promise<number> {
   const existing = await userRepo.findByUsername(username);
   if (existing) {
     console.log(`✔ 评测账号已存在：${existing.username}（oops_${existing.oopsId}，status=${existing.status}）`);
-    console.log("  跳过建号与初始积分发放（幂等，不重复发）。");
     if (existing.status !== "active") {
       console.log(
         `  ⚠ 该账号当前为 ${existing.status}，登录会被 requireUser 拒绝；如确认要复用，请在管理端启用或删除后重跑本脚本。`,
       );
     }
+    // 余额兜底：一次全量评测要跑掉几十到上百积分，余额见底后每个 case 都会 402。
+    // 只在低于阈值时补足，重复执行不会无限刷余额。
+    await topUpIfLow(createCreditsService, existing.id);
     return 0;
   }
 
@@ -134,6 +161,7 @@ async function main(): Promise<number> {
 
   console.log(`✔ 已创建评测账号：${user.username}（oops_${user.oopsId}，id=${user.id}）`);
   console.log(`  初始积分 +${INITIAL_GRANT_CREDITS}（grant 流水），status=${user.status}，tokenVersion=${user.tokenVersion}`);
+  await topUpIfLow(createCreditsService, user.id);
   console.log(`  登录密码：${password === DEFAULT_PASSWORD ? DEFAULT_PASSWORD : "（由 EVAL_PASSWORD 指定）"}`);
   return 0;
 }

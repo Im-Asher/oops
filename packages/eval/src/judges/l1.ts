@@ -68,6 +68,8 @@ export interface L1Input {
     denyCss: string[];
     /** 存在时：校验宽度 == size[0] 且实际高度属于该集合（高度档位由模型自选）。 */
     allowedHeights?: number[] | undefined;
+    /** 存在时：实际尺寸命中任一即通过（尺寸由模型从枚举里挑）。 */
+    allowedSizes?: [number, number][] | undefined;
   };
   artifacts: { assetUrl: string | null; size: [number, number] | null; html: string | null };
   bytes: Uint8Array | null;
@@ -91,6 +93,16 @@ export function judgeL1(input: L1Input): JudgeResult {
   const actual = imageSize(input.bytes);
   if (!actual) {
     failures.push({ code: "render_error", detail: "产物格式无法识别（仅支持 PNG/JPEG）" });
+  } else if (expect.allowedSizes && expect.allowedSizes.length > 0) {
+    const hit = expect.allowedSizes.some(
+      ([w, h]) => actual.width === w && actual.height === h,
+    );
+    if (!hit) {
+      failures.push({
+        code: "size_mismatch",
+        detail: `期望尺寸∈[${expect.allowedSizes.map(([w, h]) => `${w}×${h}`).join("/")}]，实际 ${actual.width}×${actual.height}`,
+      });
+    }
   } else if (expect.allowedHeights && expect.allowedHeights.length > 0) {
     const [wantWidth] = expect.size;
     if (actual.width !== wantWidth || !expect.allowedHeights.includes(actual.height)) {

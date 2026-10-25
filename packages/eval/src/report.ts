@@ -13,6 +13,8 @@ export interface CaseResult {
   l4: { score: number | null; reason: string } | null;
   toolCalls: string[];
   rawText: string;
+  /** 本轮被判定的前置条件不成立（如溢出导致跳过 L3），不是失败，但要让人知道为什么没判。 */
+  notes?: string[];
 }
 
 export interface Report {
@@ -79,6 +81,16 @@ export function writeReport(dir: string, report: Report): string {
             : codes;
       return `| ${r.id} | ${status} | ${r.l4?.score ?? "-"} | ${r.durationMs}ms | ${r.imageUrl ?? "-"} |`;
     }),
+    ...(() => {
+      const noted = report.results.filter((r) => (r.notes?.length ?? 0) > 0);
+      if (noted.length === 0) return [];
+      return [
+        "",
+        "## 备注（未判定的前置条件）",
+        "",
+        ...noted.map((r) => `- ${r.id}：${(r.notes ?? []).join("；")}`),
+      ];
+    })(),
   ];
   const md = join(dir, "report.md");
   writeFileSync(md, `${lines.join("\n")}\n`);

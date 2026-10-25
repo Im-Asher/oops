@@ -1,0 +1,114 @@
+{
+  "results": [
+    {
+      "id": "001-poster-minimal",
+      "agent": "poster-designer",
+      "durationMs": 24538,
+      "imageUrl": "/files/assets/e1877d67-4cd4-45a9-829f-0f9a34a92540.png",
+      "failures": [],
+      "l4": {
+        "score": 4,
+        "reason": "总分：4/5"
+      },
+      "toolCalls": [
+        "render_html"
+      ],
+      "rawText": "海报已生成。\n\n目前渲染结果中，商品图显示为原始渐变色块（因为上传的源文件本身是渐变背景而非实物照片）。如果您有该保温杯的**真实产品实拍图**，请重新上传并选中后发送需求，我会将实物替换到海报主视觉区，让“恒温 12 小时”的卖点与真实质感结合得更紧密。\n\n若当前渐变图即为设计意图，可直接保存使用；如需调整文案或版式细节，请随时告知。"
+    },
+    {
+      "id": "002-poster-promo",
+      "agent": "poster-designer",
+      "durationMs": 40143,
+      "imageUrl": "/files/assets/52cb8efc-45dd-4bff-90cd-fdd06a9d34ce.png",
+      "failures": [],
+      "l4": {
+        "score": 4,
+        "reason": "总分：4/5"
+      },
+      "toolCalls": [
+        "render_html"
+      ],
+      "rawText": "已收到商品图（柔和渐变背景）与需求：主题「秋季新款直降」、突出价格 129 元、要有明显价格块。\n\n我将以该渐变图为海报底色，叠加商品主视觉区（用引用图作为占位/示意形象），并设计醒目的红色价格块。现在直接产出完整 HTML 并渲染为成品海报。\n\n海报已渲染完成！成品尺寸 750×1334，可直接用于投放。\n\n**版式说明：**\n- **顶部**：80px 重磅主标题「秋季新款直降」+ 副标题「新品上市 · 限时特惠」\n- **中部商品区**：引用图作为主视觉展示区，左上角叠加 NEW ARRIVAL 标签\n- **价格块**：深红底色 + ¥129元 超大数字，带投影突出促销感\n- **卖点胶囊**：三枚标签「秋季上新 / 直降优惠 / 限量发售」\n- **底部 CTA**：深色行动号召条「立即抢购」\n\n⚠️ **重要提醒**：当前商品区使用的是您上传的渐变背景图（非真实商品）。该图实际为纯色渐变底图，并非商品本身。**投放前请务必替换为真实商品照片**，否则消费者看到的将是与实物不符的画面。如需我基于真实商品图重新排版，请上传选中商品图后告知即可。"
+    },
+    {
+      "id": "003-poster-tall",
+      "agent": "poster-designer",
+      "durationMs": 37773,
+      "imageUrl": "/files/assets/bd61c756-1781-4f36-ae50-c1b8866e53a5.png",
+      "failures": [
+        {
+          "code": "overflow",
+          "detail": "文本/图片越界 86px（上限 0px）：<div>「立即选购 >」+86px"
+        }
+      ],
+      "l4": {
+        "score": 3,
+        "reason": "总分：3/5"
+      },
+      "toolCalls": [
+        "render_html"
+      ],
+      "rawText": "长版海报已渲染完成。\n\n**设计说明：**\n- **尺寸**：750×1654px，适合详情页或竖版信息流投放。\n- **视觉重心**：将您提供的商品图置于画面中央，配合柔和光晕突出产品质感。\n- **卖点排版**：采用“图标+标题+短句”的卡片式布局，清晰展示 316 内胆、24H 保温、一键开盖三大核心优势，阅读节奏舒适。\n- **配色**：提取了背景图的淡雅渐变作为基调，搭配深灰文字与白色半透明卡片，保证信息高对比度且不失高级感。\n\n您可以直接保存使用。如果需要调整文案细节或更换底部行动按钮的颜色，请随时告诉我。",
+      "notes": [
+        "版式溢出会裁掉文字，本轮跳过 L3 字形判定"
+      ]
+    },
+    {
+      "id": "004-poster-square",
+      "agent": "poster-designer",
+      "durationMs": 20637,
+      "imageUrl": "/files/assets/da8fde48-97ea-4ffd-a765-49ce47074351.png",
+      "failures": [
+        {
+          "code": "overflow",
+          "detail": "文本/图片越界 15px（上限 0px）：<div>「立即抢购」+15px"
+        }
+      ],
+      "l4": {
+        "score": 4,
+        "reason": "总分：4/5"
+      },
+      "toolCalls": [
+        "render_html"
+      ],
+      "rawText": "海报已生成，请查收：\n\n- **尺寸**：750×1000（方形主图比例）\n- **结构**：顶部红色\"NEW ARRIVAL\"通栏 + 左上角\"新品上市\"胶囊标签 + 中部商品展示区 + 底部\"全新登场 / 品质升级·限时首发 / 立即抢购\"行动引导\n- **配色**：以商品图的粉绿渐变为主色提取灵感，搭配 #f43f5e 玫红作为促销强调色，整体清新且醒目\n\n如需调整文案、价格信息或更换风格方向，告诉我即可。",
+      "notes": [
+        "版式溢出会裁掉文字，本轮跳过 L3 字形判定"
+      ]
+    },
+    {
+      "id": "005-atmosphere",
+      "agent": "atmosphere-designer",
+      "durationMs": 25547,
+      "imageUrl": "/files/assets/c33189c9-6b39-45fb-a1d6-2e1664419d5a.png",
+      "failures": [],
+      "l4": {
+        "score": 5,
+        "reason": "总分：5/5"
+      },
+      "toolCalls": [
+        "generate_image"
+      ],
+      "rawText": "这张清晨阳光下的木质桌面场景图已生成。画面中陶瓷保温杯在自然光下质感温润，木纹与光影搭配营造出宁静温馨的早晨氛围，适合作为商品详情页或主图的背景素材。\n\n如果需要调整构图、光线强度或更换杯型风格，随时告诉我。"
+    },
+    {
+      "id": "006-poster-long-copy",
+      "agent": "poster-designer",
+      "durationMs": 19316,
+      "imageUrl": null,
+      "failures": [
+        {
+          "code": "no_tool_call",
+          "detail": "本轮没有调用 render_html"
+        },
+        {
+          "code": "image_missing",
+          "detail": "本轮没有产出图片"
+        }
+      ],
+      "l4": null,
+      "toolCalls": [],
+      "rawText": "```html\n<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>一整天的温度 - 6层锁温结构详情海报</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  \n  body {\n    width: 750px;\n    min-height: 1334px;\n    background: linear-gradient(180deg, #e8f4ec 0%, #f0f7f2 30%, #faf9f5 70%, #fdfcf8 100%);\n    font-family: \"PingFang SC\", \"Microsoft YaHei\", sans-serif;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    padding: 60px 40px 80px;\n    color: #2c3e50;\n  }\n\n  .title {\n    font-size: 48px;\n    font-weight: 700;\n    letter-spacing: 4px;\n    text-align: center;\n    margin-bottom: 20px;\n    color: #1a2a3a;\n  }\n\n  .subtitle {\n    font-size: 20px;\n    font-weight: 400;\n    letter-spacing: 2px;\n    text-align: center;\n    margin-bottom: 60px;\n    color: #5a6a7a;\n  }\n\n  .structure-list {\n    width: 100%;\n    max-width: 650px;\n    display: flex;\n    flex-direction: column;\n    gap: 24px;\n    margin-bottom: 80px;\n  }\n\n  .structure-item {\n    display: flex;\n    align-items: center;\n    gap: 20px;\n    padding: 24px 28px;\n    background: rgba(255, 255, 255, 0.8);\n    border-radius: 16px;\n    border-left: 4px solid #7cb393;\n    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);\n  }\n\n  .item-number {\n    width: 48px;\n    height: 48px;\n    background: #7cb393;\n    color: white;\n    font-size: 24px;\n    font-weight: 700;\n    border-radius: 50%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    flex-shrink: 0;\n  }\n\n  .item-text {\n    font-size: 20px;\n    font-weight: 500;\n    letter-spacing: 1px;\n    color: #2c3e50;\n  }\n\n  .slogan {\n    font-size: 28px;\n    font-weight: 600;\n    letter-spacing: 3px;\n    text-align: center;\n    color: #1a2a3a;\n    margin-top: auto;\n    padding-top: 40px;\n    border-top: 2px solid #d0e0d5;\n    width: 100%;\n    max-width: 650px;\n  }\n</style>\n</head>\n<body>\n  <div class=\"title\">一整天的温度</div>\n  <div class=\"subtitle\">6层锁温结构 · 持久保温</div>\n  \n  <div class=\"structure-list\">\n    <div class=\"structure-item\">\n      <div class=\"item-number\">1</div>\n      <div class=\"item-text\">真空隔热层</div>\n    </div>\n    <div class=\"structure-item\">\n      <div class=\"item-number\">2</div>\n      <div class=\"item-text\">铜箔反射层</div>\n    </div>\n    <div class=\"structure-item\">\n      <div class=\"item-number\">3</div>\n      <div class=\"item-text\">医用级 316 内胆</div>\n    </div>\n    <div class=\"structure-item\">\n      <div class=\"item-number\">4</div>\n      <div class=\"item-text\">中空保温层</div>\n    </div>\n    <div class=\"structure-item\">\n      <div class=\"item-number\">5</div>\n      <div class=\"item-text\">食品级密封圈</div>\n    </div>\n    <div class=\"structure-item\">\n      <div class=\"item-number\">6</div>\n      <div class=\"item-text\">耐磨外层喷涂</div>\n    </div>\n  </div>\n  \n  <div class=\"slogan\">陪你到最后一度</div>\n</body>\n</html>\n```"
+    }
+  ]
+}

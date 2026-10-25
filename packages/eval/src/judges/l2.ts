@@ -1,12 +1,28 @@
 import { chromium, type Browser } from "playwright";
 import type { Failure } from "../taxonomy";
 
+export interface OverflowOffender {
+  tag: string;
+  /** 元素自身文本前 24 字，便于定位「是哪个块被裁了」。 */
+  snippet: string;
+  /** 越界像素（纵向取 rect.bottom - 视口高，横向取 rect.right - 视口宽）。 */
+  over: number;
+}
+
 export interface Geometry {
+  /**
+   * 真实溢出：只有**承载文本或图片**的元素越界才算。
+   * 纯装饰块（出血色块、背景圆）故意伸出画布是常见设计手法，不该判失败——
+   * 拿整篇文档的 scrollHeight 当指标会让每张带装饰的海报都假报警。
+   */
   overflowPx: number;
+  /** 文档整体可滚动高度超出量：含装饰出血，仅作诊断参考，不参与判定。 */
+  documentOverflowPx: number;
   clientHeight: number;
   scrollHeight: number;
   text: string;
   images: { src: string; width: number; height: number }[];
+  offenders: OverflowOffender[];
 }
 
 let browserPromise: Promise<Browser> | null = null;
@@ -95,13 +111,38 @@ export async function measureHtml(
     return await page.evaluate(() => {
       const doc = document.documentElement;
       const body = document.body;
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+
+      const offenders: { tag: string; snippet: string; over: number }[] = [];
+      for (const el of Array.from(body.querySelectorAll("*"))) {
+        const carriesText = Array.from(el.childNodes).some(
+          (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 0,
+        );
+        const isImage = el.tagName === "IMG";
+        if (!carriesText && !isImage) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        const overY = Math.round(r.bottom - vh);
+        const overX = Math.round(r.right - vw);
+        const over = Math.max(overY, overX, 0);
+        if (over > 0) {
+          offenders.push({
+            tag: el.tagName.toLowerCase(),
+            snippet: (el.textContent ?? "").trim().slice(0, 24),
+            over,
+          });
+        }
+      }
+
       return {
-        overflowPx: Math.max(
+        overflowPx: offenders.reduce((m, o) => Math.max(m, o.over), 0),
+        documentOverflowPx: Math.max(
           0,
-          doc.scrollHeight - window.innerHeight,
-          body.scrollWidth - window.innerWidth,
+          doc.scrollHeight - vh,
+          body.scrollWidth - vw,
         ),
-        clientHeight: window.innerHeight,
+        clientHeight: vh,
         scrollHeight: doc.scrollHeight,
         text: body.innerText,
         images: Array.from(document.images).map((i) => ({
@@ -109,6 +150,7 @@ export async function measureHtml(
           width: i.naturalWidth,
           height: i.naturalHeight,
         })),
+        offenders: offenders.sort((a, b) => b.over - a.over).slice(0, 5),
       };
     });
   } finally {
@@ -123,9 +165,17 @@ export function judgeL2(input: { metrics: Geometry; maxOverflowPx: number }): {
   const failures: Failure[] = [];
   const { metrics, maxOverflowPx } = input;
   if (metrics.overflowPx > maxOverflowPx) {
+    const who = metrics.offenders
+      .slice(0, 3)
+      .map((o) => `<${o.tag}>${o.snippet ? `「${o.snippet}」` : ""}+${o.over}px`)
+      .join("、");
     failures.push({
       code: "overflow",
-      detail: `内容超出画布 ${metrics.overflowPx}px（上限 ${maxOverflowPx}px）`,
+      detail:
+        `文本/图片越界 ${metrics.overflowPx}px（上限 ${maxOverflowPx}px）：${who}` +
+        (metrics.documentOverflowPx > metrics.overflowPx
+          ? `（另有 ${metrics.documentOverflowPx - metrics.overflowPx}px 为装饰出血，未计入）`
+          : ""),
     });
   }
   const broken = metrics.images.filter((i) => i.width === 0 || i.height === 0);

@@ -36,6 +36,15 @@ describe("parseCase", () => {
     expect(() => parseCase(`${valid}\n  allowedHeights: [1000.5]\n`)).toThrow();
   });
 
+  it("可选 allowedSizes 能解析", () => {
+    const c = parseCase(`${valid}\n  allowedSizes:\n    - [1024, 1024]\n`);
+    expect(c.assert.allowedSizes).toEqual([[1024, 1024]]);
+  });
+
+  it("allowedSizes 含非正整数时抛错", () => {
+    expect(() => parseCase(`${valid}\n  allowedSizes:\n    - [0, 1024]\n`)).toThrow();
+  });
+
   it("缺 id 时抛错", () => {
     expect(() => parseCase("message: hi\nassert:\n  size: [750, 1334]\n")).toThrow();
   });

@@ -110,9 +110,41 @@ describe("judgeL2", () => {
 
   it("图片未加载记 image_missing", () => {
     const r = judgeL2({
-      metrics: { overflowPx: 0, clientHeight: 1334, scrollHeight: 1334, text: "", images: [{ src: "/files/x.png", width: 0, height: 0 }] },
+      metrics: {
+        overflowPx: 0,
+        documentOverflowPx: 0,
+        clientHeight: 1334,
+        scrollHeight: 1334,
+        text: "",
+        images: [{ src: "/files/x.png", width: 0, height: 0 }],
+        offenders: [],
+      },
       maxOverflowPx: 0,
     });
     expect(r.failures.map((f) => f.code)).toContain("image_missing");
   });
+
+  it("纯装饰出血不计为 overflow", async () => {
+    // 背景圆故意伸出画布一截：常见设计手法，不该判失败
+    const m = await measureHtml(
+      `<html><body style="margin:0;width:750px;height:1000px;overflow:hidden">
+        <div style="position:absolute;left:-120px;bottom:-200px;width:400px;height:400px;border-radius:50%;background:#eee"></div>
+        <div style="height:1000px">正文</div></body></html>`,
+      [750, 1000],
+    );
+    expect(m.documentOverflowPx).toBe(0);
+    expect(m.overflowPx).toBe(0);
+    expect(judgeL2({ metrics: m, maxOverflowPx: 0 }).failures).toEqual([]);
+  }, 60_000);
+
+  it("文本越界时 detail 指出是哪个块", async () => {
+    const m = await measureHtml(
+      `<html><body style="margin:0;width:750px;height:1000px">
+        <div style="height:990px">占位</div>
+        <div>立即选购</div></body></html>`,
+      [750, 1000],
+    );
+    const f = judgeL2({ metrics: m, maxOverflowPx: 0 }).failures.find((x) => x.code === "overflow");
+    expect(f?.detail).toContain("立即选购");
+  }, 60_000);
 });
