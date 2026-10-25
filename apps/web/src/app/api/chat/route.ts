@@ -1,19 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { UserMessage } from "@earendil-works/pi-ai";
-import { runAgent, type AgentImageInput } from "@/server/agent/runtime";
-import { agentRegistry } from "@/server/agent/registry";
-import { screenInput } from "@/server/agent/moderation";
-import { sanitizeTranscript } from "@/server/agent/transcript";
-import "@/server/agent"; // 副作用：注册 Agent / 工具 / 任务处理器
 import { requireUser } from "@oops/auth/require-user";
-import { creditsService } from "@oops/domain/credits/service";
-import { notificationsService } from "@oops/domain/notifications/service";
+import { getCreationConfig } from "@oops/config";
 import { createAssetRepo } from "@oops/db/asset.repo";
-import { createMessageRepo } from "@oops/db/message.repo";
+import { createMessageRepo, type MessageRepo } from "@oops/db/message.repo";
 import { createSessionRepo } from "@oops/db/session.repo";
-import { createStorage } from "@/server/infra/storage/s3";
 import type { Asset } from "@oops/db/schema";
-import type { SseEvent } from "@/server/agent/types";
+import { creditsService } from "@oops/domain/credits/service";
+import { buildReferenceBlock } from "@oops/domain/messages/reference";
+import { notificationsService } from "@oops/domain/notifications/service";
+import { sanitizeTranscript } from "@oops/llm/transcript";
+import { isVisionAgent } from "@/server/creation/client";
+import { screenInput } from "@/server/moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -25,41 +24,13 @@ const chatSchema = z.object({
   referenceAssetIds: z.array(z.string().min(1)).max(5).optional(),
 });
 
-/** 引用块：把画布图片引用注入为模型可读文本（UI 文本与 content 列保持原文不变）。 */
-function buildReferenceBlock(assets: Asset[]): string {
-  if (assets.length === 0) return "";
-  const lines = assets.map(
-    (a) => `- assetId: ${a.id}, url: /files/${a.storageKey}, 原prompt: ${a.prompt || "(无)"}`,
-  );
-  return `[引用画布图片]\n${lines.join("\n")}`;
-}
-
-/** vision Agent 判定：声明 main 需要 vision 时，引用图片以 ImageContent 注入本轮。 */
-function requiresVision(agentId: string): boolean {
-  const def = agentRegistry.get(agentId);
-  return def?.models?.main?.capabilities?.includes("vision") ?? false;
-}
-
-/** 引用图片字节读取：归属校验通过后从存储取字节转 base64（vision 注入用）。 */
-async function loadVisionImages(assets: Asset[]): Promise<AgentImageInput[]> {
-  const storage = createStorage();
-  const out: AgentImageInput[] = [];
-  for (const a of assets) {
-    if (!a.mimeType.startsWith("image/")) continue;
-    const obj = await storage.getObject(a.storageKey);
-    const bytes = await obj.Body?.transformToByteArray();
-    if (!bytes) continue;
-    out.push({
-      assetId: a.id,
-      url: `/files/${a.storageKey}`,
-      data: Buffer.from(bytes).toString("base64"),
-      mimeType: a.mimeType,
-    });
-  }
-  return out;
-}
-
-/** 聊天入口：认证 → 校验 → 落库用户消息 → 经 agentLoop 流式生成（SSE）。 */
+/**
+ * 聊天入口（BFF）：认证 → 余额预检 → 校验 → 落库 user 行 → 转 creation。
+ *
+ * 这里**不解析、不重组、不缓存** creation 的 SSE 流：拿到 body 直接 pipe 给浏览器，
+ * 前端消费的事件格式与拆分前逐字节一致。创作域的执行、任务、积分冻结/结算、
+ * assistant 行落库全部在 creation 进程内完成。
+ */
 export async function POST(req: Request): Promise<Response> {
   const userId = await requireUser(req);
   if (!userId) {
@@ -67,12 +38,10 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // 生成闸门（credits spec）：余额 ≤ 0 在入口整面板拒绝（402），避免落库消息后才失败。
-  // 正确性边界仍由冻结时条件 UPDATE 硬校验兜底，此处仅是体验层预检。
+  // 正确性边界仍由 creation 侧冻结时的条件 UPDATE 硬校验兜底，此处仅是体验层预检。
   const gate = await creditsService.checkGate(userId);
   if (!gate.ok) {
-    // 顺带投递积分通知（warning / exhausted 两级，去重见 domain 服务）。
-    // 预检边界：通知失败 MUST NOT 改变拒绝结果（credits spec「生成闸门」），
-    // 故此处兜住异常——即便 Safe 包装本身失效，402 依旧照发。
+    // 通知失败 MUST NOT 改变拒绝结果（credits spec「生成闸门」），故此处兜住异常。
     try {
       await notificationsService.notifyCreditsStateSafe(userId, gate.balance);
     } catch (err) {
@@ -96,6 +65,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { sessionId, message } = parsed.data;
+  // 入口初筛留在 web：命中必须在 user 行落库之前拒绝，creation 拿不到这个机会。
   const blocked = screenInput(message);
   if (blocked) {
     return Response.json({ error: { code: "BLOCKED", message: blocked } }, { status: 400 });
@@ -126,13 +96,9 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
   }
-  // 本轮模型可见文本 = 原文 + 引用块；UI 与 content 列仍只存原文。
+  // 本轮模型可见文本 = 原文 + 引用块（creation 用同一份实现拼装自己的输入）。
   const userText =
     message + (referenceAssets.length > 0 ? `\n\n${buildReferenceBlock(referenceAssets)}` : "");
-
-  // vision 注入（poster-generation spec）：引用归属校验通过后，vision Agent 将图片
-  // 字节并入本轮 LLM 输入；非 vision Agent 忽略图片，仅文本引用块，行为不变。
-  const visionImages = requiresVision(agentId) ? await loadVisionImages(referenceAssets) : [];
 
   // 首条用户消息自动命名：仅当标题为空时截取前 20 字（手动命名与后续消息不覆盖；失败不阻断聊天）
   if (session.title == null) {
@@ -145,25 +111,20 @@ export async function POST(req: Request): Promise<Response> {
 
   const messageRepo = createMessageRepo();
   // user 消息双视图落库：content 列存原文（UI 渲染），transcript 存 LLM 视图。
-  // vision 回合的 transcript 与 LLM 视图同构（text + 图片引用），清洗器把图片块
-  // 文本化为带引用线索的占位（无 base64 落库）。
-  const userMessage: UserMessage =
-    visionImages.length > 0
-      ? {
-          role: "user",
-          timestamp: Date.now(),
-          content: [
+  // vision 回合额外带图片引用块（清洗后只留 assetId/url 占位，无 base64）；
+  // 能力查询失败时退化为纯文本口径，不阻断本轮。
+  const vision = (await isVisionAgent(agentId)) ?? false;
+  const userMessage: UserMessage = {
+    role: "user",
+    timestamp: Date.now(),
+    content:
+      vision && referenceAssets.length > 0
+        ? [
             { type: "text", text: userText },
-            ...visionImages.map((img) => ({
-              type: "image" as const,
-              data: img.data,
-              mimeType: img.mimeType,
-              assetId: img.assetId,
-              url: img.url,
-            })),
-          ],
-        }
-      : { role: "user", content: userText, timestamp: Date.now() };
+            ...visionImageParts(referenceAssets),
+          ]
+        : userText,
+  };
   const userRow = await messageRepo.create({
     sessionId,
     userId,
@@ -172,39 +133,97 @@ export async function POST(req: Request): Promise<Response> {
     transcript: sanitizeTranscript([userMessage]),
   });
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const ac = new AbortController();
-      req.signal.addEventListener("abort", () => ac.abort());
-      const send = (event: SseEvent) => {
-        controller.enqueue(encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`));
-      };
-      try {
-        await runAgent({
-          sessionId,
-          userId,
-          agentId,
-          userText,
-          userMessageId: userRow.id,
-          images: visionImages,
-          signal: ac.signal,
-          onEvent: send,
-          repos: { message: messageRepo },
-        });
-      } catch (err) {
-        send({ type: "error", message: (err as Error)?.message ?? "生成失败" });
-      } finally {
-        controller.close();
-      }
-    },
-  });
+  const runId = randomUUID();
+  const { baseUrl, internalToken } = getCreationConfig();
+  const ac = new AbortController();
+  const onClientAbort = () => ac.abort();
+  req.signal.addEventListener("abort", onClientAbort, { once: true });
 
-  return new Response(stream, {
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${baseUrl}/v1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-internal-token": internalToken },
+      body: JSON.stringify({
+        runId,
+        userId,
+        sessionId,
+        agentId,
+        message,
+        userMessageId: userRow.id,
+        referenceAssetIds: referenceIds,
+      }),
+      signal: ac.signal,
+    });
+  } catch (err) {
+    // 客户端已经走了：不再回滚（creation 可能已开跑并写入 assistant 行）
+    if (!req.signal.aborted) {
+      console.error("[chat] creation 不可达:", err);
+      await rollbackUserMessage(messageRepo, sessionId, userRow.id);
+    }
+    return Response.json(
+      { error: { code: "CREATION_UNAVAILABLE", message: "创作服务不可用，请稍后重试" } },
+      { status: 503 },
+    );
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    const failure = await readUpstreamError(upstream);
+    await rollbackUserMessage(messageRepo, sessionId, userRow.id);
+    return Response.json(
+      { error: { code: failure.code, message: failure.message } },
+      { status: upstream.status === 401 ? 502 : upstream.status },
+    );
+  }
+
+  return new Response(upstream.body, {
     headers: {
-      "Content-Type": "text/event-stream",
+      "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     },
   });
+}
+
+/** 引用图 → transcript 的图片块（只留引用线索，字节由 creation 读取，绝不进 web 落库路径）。 */
+function visionImageParts(assets: readonly Asset[]) {
+  return assets
+    .filter((a) => a.mimeType.startsWith("image/"))
+    .map((a) => ({
+      type: "image" as const,
+      data: "",
+      mimeType: a.mimeType,
+      assetId: a.id,
+      url: `/files/${a.storageKey}`,
+    }));
+}
+
+/**
+ * 已落库 user 行的回滚：仅当该会话**没有任何 assistant 行**时删除。
+ * 这是设计里明确接受的退化窗口（有 user 消息、无回复）的唯一收敛点。
+ */
+async function rollbackUserMessage(
+  repo: MessageRepo,
+  sessionId: string,
+  messageId: string,
+): Promise<void> {
+  try {
+    const rows = await repo.list(sessionId);
+    if (rows.some((r) => r.role === "assistant")) return;
+    await repo.remove(messageId);
+  } catch (err) {
+    console.error("[chat] 回滚 user 消息失败:", err);
+  }
+}
+
+async function readUpstreamError(res: Response): Promise<{ code: string; message: string }> {
+  try {
+    const body = (await res.json()) as { error?: { code?: string; message?: string } };
+    return {
+      code: body.error?.code ?? "CREATION_ERROR",
+      message: body.error?.message ?? "创作服务返回错误",
+    };
+  } catch {
+    return { code: "CREATION_ERROR", message: "创作服务返回错误" };
+  }
 }

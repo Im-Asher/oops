@@ -13,11 +13,12 @@ const h = vi.hoisted(() => ({
   updatedAgentId: null as string | null,
 }));
 
-vi.mock("@/server/agent", () => ({
-  agentRegistry: {
-    get: (id: string) =>
-      id === "atmosphere-designer" || id === "product-photographer" ? { id } : undefined,
-  },
+// Agent 目录已随创作域迁出 web：这里 mock 内网目录查询（false = 明确不存在）。
+vi.mock("@/server/creation/client", () => ({
+  isKnownAgent: vi.fn(
+    async (id: string) =>
+      id === "atmosphere-designer" || id === "product-photographer" ? true : false,
+  ),
 }));
 
 vi.mock("@oops/auth/require-user", () => ({
@@ -55,7 +56,7 @@ vi.mock("@oops/db/asset.repo", () => ({
     }),
   }),
 }));
-vi.mock("@/server/infra/storage/s3", () => ({
+vi.mock("@oops/storage/s3", () => ({
   defaultS3Client: {},
   createStorage: () => ({
     removeObject: vi.fn(async (key: string) => {

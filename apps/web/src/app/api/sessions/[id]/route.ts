@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { requireUser } from "@oops/auth/require-user";
-import { agentRegistry } from "@/server/agent";
-import { loadSessionMessages } from "@/server/agent/transcript";
+import { isKnownAgent } from "@/server/creation/client";
+import { loadSessionMessages } from "@/server/messages/transcript";
 import { createSessionRepo } from "@oops/db/session.repo";
 import { createAssetRepo } from "@oops/db/asset.repo";
-import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
+import { createStorage, defaultS3Client } from "@oops/storage/s3";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +95,8 @@ export async function PATCH(
   if (!parsed.success) {
     return Response.json({ error: { code: "INVALID", message: parsed.error.message } }, { status: 400 });
   }
-  if (parsed.data.agentId && !agentRegistry.get(parsed.data.agentId)) {
+  // Agent 目录在 creation 侧：查不到目录（null）时不拒绝，只拒绝明确不存在的 id。
+  if (parsed.data.agentId && (await isKnownAgent(parsed.data.agentId)) === false) {
     return Response.json(
       { error: { code: "INVALID_AGENT", message: "Agent 不存在" } },
       { status: 400 },

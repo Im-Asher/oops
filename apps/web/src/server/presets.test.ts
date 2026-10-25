@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import zhMessagesJson from "../../../messages/zh.json";
 import type { Messages } from "@/i18n/messages";
-// 引入真实 definitions 触发注册（仅读 prompt 文件，无重依赖）
-import "./definitions/atmosphere-designer";
-import "./definitions/product-photographer";
-import { agentRegistry } from "./registry";
 import { resolvePresets } from "./presets";
+
+// 「definitions 的 preset key 都能在 zh/en 词典解析」这条跨端一致性用例已随
+// definitions 搬到 apps/creation/src/agent/definitions.guard.test.ts：key 的一手
+// 来源在创作域，那里直接读 web 的词典文件做防漂移断言。
 
 /** 局部词典夹具：只含 presets 相关分支（类型断言后供被测函数使用）。 */
 const zhMessages = {
@@ -50,16 +49,5 @@ describe("resolvePresets", () => {
       "生成一张秋天树林里木桌旁的场景氛围图，暖色调逆光",
       "missingKey",
     ]);
-  });
-
-  it("所有 definitions 的 preset key 均能在 zh 词典解析（防漂移：key 未登记会静默透传给用户）", () => {
-    const realZh = zhMessagesJson as unknown as Messages;
-    for (const agent of agentRegistry.list()) {
-      const resolved = resolvePresets(realZh, agent.id, agent.presets);
-      expect(resolved).toHaveLength(agent.presets.length);
-      resolved.forEach((text, i) => {
-        expect(text, `${agent.id}#${agent.presets[i]}`).not.toBe(agent.presets[i]);
-      });
-    }
   });
 });
