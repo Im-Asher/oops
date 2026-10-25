@@ -73,7 +73,7 @@ vi.mock("@oops/db/tag.repo", async (importOriginal) => {
   };
 });
 
-vi.mock("@/server/infra/storage/s3", () => ({
+vi.mock("@oops/storage/s3", () => ({
   defaultS3Client: {},
   createStorage: () => ({
     removeObject: vi.fn(async (key: string) => {

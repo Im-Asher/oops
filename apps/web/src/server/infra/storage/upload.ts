@@ -1,4 +1,4 @@
-import { extFromMime, generateAssetKey, type Storage } from "./s3";
+import { extFromMime, generateAssetKey, type Storage } from "@oops/storage/s3";
 import type { AssetRepo } from "@oops/db/asset.repo";
 import type { MessageRepo } from "@oops/db/message.repo";
 

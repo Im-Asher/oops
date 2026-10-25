@@ -1,4 +1,4 @@
-import type { Storage } from "./s3";
+import type { Storage } from "@oops/storage/s3";
 
 /** 仅允许访问 assets/ 前缀，杜绝遍历其他对象。 */
 const KEY_PREFIX = "assets/";

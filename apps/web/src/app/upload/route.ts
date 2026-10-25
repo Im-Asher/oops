@@ -4,7 +4,7 @@ import {
   handleReferenceUpload,
   handleUpload,
 } from "@/server/infra/storage/upload";
-import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
+import { createStorage, defaultS3Client } from "@oops/storage/s3";
 import { requireUser } from "@oops/auth/require-user";
 import { createAssetRepo } from "@oops/db/asset.repo";
 import { createMessageRepo } from "@oops/db/message.repo";
