@@ -70,6 +70,42 @@ async function checkWeb(baseUrl: string): Promise<CheckResult> {
   );
 }
 
+// —— 2b. creation 服务可达 ——
+/**
+ * 创作域已拆成独立进程：web 活着但 creation 没起时，每条用例都会在 /api/chat 拿到 503。
+ * 这里的探针让「起漏了一个进程」在体检阶段就说清楚，而不是跑完一轮才看出一堆失败。
+ */
+async function checkCreation(): Promise<CheckResult> {
+  const base = (
+    process.env.CREATION_BASE_URL?.trim() ||
+    `http://localhost:${process.env.CREATION_PORT?.trim() || "3002"}`
+  ).replace(/\/$/, "");
+  const url = `${base}/health`;
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  } catch (err) {
+    const message = (err as Error)?.message ?? String(err);
+    return fail(
+      `连不上 ${url}：${message}`,
+      "创作域进程没起：pnpm dev 会一并拉起 web/admin/creation，或单独 pnpm dev:creation。",
+    );
+  }
+  const body = (await res.json().catch(() => null)) as {
+    ok?: boolean;
+    agents?: number;
+    renderer?: { fonts?: boolean };
+  } | null;
+  if (res.ok && body?.ok) {
+    return pass(`GET ${url} → 200（Agent ${body.agents ?? "?"}，渲染字体就绪）`);
+  }
+  const hint =
+    body?.renderer?.fonts === false
+      ? "字体产物缺失：确认 apps/creation/assets/fonts/*.ttf 存在（node scripts/build-subset-font.mjs 产出）。"
+      : "看 creation 进程日志（pnpm dev:creation）。";
+  return fail(`GET ${url} → ${res.status}`, hint);
+}
+
 // —— 3. Playwright 浏览器 ——
 /**
  * 与 playwright 的 channel:"chrome" 解析保持一致：稳定版 Chrome 的安装位置
@@ -151,6 +187,7 @@ async function main(): Promise<number> {
   const results: { name: string; result: CheckResult }[] = [
     { name: "VLM API key", result: checkApiKey() },
     { name: "web 服务", result: await checkWeb(baseUrl) },
+    { name: "creation 服务", result: await checkCreation() },
     { name: "浏览器", result: await checkBrowser() },
     { name: "数据库连接串", result: checkDatabaseUrl() },
   ];
