@@ -69,4 +69,30 @@ describe("writeReport", () => {
     expect(text).toMatch(/\| 002-low \| PASS（非阻断：judge_low） \|/);
     expect(text).toMatch(/\| 001-ok \| PASS \|/);
   });
+
+  it("repeat>1 时报告头说明每例跑了几次", () => {
+    const dir = mkdtempSync(join(tmpdir(), "report-"));
+    const report: Report = {
+      runAt: "2026-01-01T00:00:00.000Z",
+      total: 1,
+      passed: 1,
+      results: [result("003", [])],
+      repeat: 3,
+    };
+    const text = readFileSync(writeReport(dir, report), "utf8");
+    expect(text).toContain("通过 1/1（每例跑 3 次，失败按多数判定；仅 judge_low 不算失败）");
+  });
+
+  it("单跑模式报告头保持原文案", () => {
+    const dir = mkdtempSync(join(tmpdir(), "report-"));
+    const report: Report = {
+      runAt: "2026-01-01T00:00:00.000Z",
+      total: 1,
+      passed: 1,
+      results: [result("003", [])],
+    };
+    const text = readFileSync(writeReport(dir, report), "utf8");
+    expect(text).toContain("不算失败，明细中标注为非阻断");
+    expect(text).not.toContain("每例跑");
+  });
 });

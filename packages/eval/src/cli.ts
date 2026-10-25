@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { loadCases } from "./case";
 import { createClient } from "./http";
 import { createVlm } from "./vlm";
-import { executeCase } from "./execute";
 import { countPassed, isBlocking, writeReport, type CaseResult, type Report } from "./report";
 import { compareToBaseline, parseBaseline } from "./baseline";
+import { parseRepeat } from "./args";
+import { repeatCase } from "./repeat-run";
 import { closeBrowser } from "./judges/l2";
 
 const PKG = new URL("..", import.meta.url).pathname;
@@ -37,38 +38,25 @@ async function main(): Promise<number> {
     model: process.env.EVAL_VLM_MODEL ?? "qwen3.7-plus",
   });
 
-  // 本轮产物目录：报告 + 每个 case 的 HTML 与几何快照（诊断溢出到底卡在哪）
+  // 本轮产物目录：报告写在根上，每 case 每轮各开 `<id>-r<i>/` 子目录放 HTML 与几何快照
+  // （诊断溢出到底卡在哪；重复跑时不区分子目录会互相覆盖）
   const runDir = join(PKG, "runs", new Date().toISOString().replace(/[:.]/g, "-"));
+  const repeat = parseRepeat(argv);
 
   const results: CaseResult[] = [];
   for (const c of cases) {
-    process.stdout.write(`▶ ${c.id} ... `);
-    try {
-      const r = await executeCase(c, {
-        client,
-        vlm,
-        fixturesDir: join(PKG, "fixtures"),
-        l4Threshold: l4Threshold(),
-        artifactDir: runDir,
-      });
-      results.push(r);
-      process.stdout.write(
-        isBlocking(r) ? `FAIL ${r.failures.map((f) => f.code).join(",")}\n` : "PASS\n",
-      );
-    } catch (err) {
-      const message = (err as Error).message;
-      results.push({
-        id: c.id,
-        agent: c.agent,
-        durationMs: 0,
-        imageUrl: null,
-        failures: [{ code: "render_error", detail: message }],
-        l4: null,
-        toolCalls: [],
-        rawText: "",
-      });
-      process.stdout.write(`ERROR ${message}\n`);
-    }
+    results.push(
+      await repeatCase(
+        c,
+        {
+          client,
+          vlm,
+          fixturesDir: join(PKG, "fixtures"),
+          l4Threshold: l4Threshold(),
+        },
+        { runDir, n: repeat },
+      ),
+    );
   }
 
   const report: Report = {
@@ -76,6 +64,7 @@ async function main(): Promise<number> {
     total: results.length,
     passed: countPassed(results),
     results,
+    ...(repeat > 1 ? { repeat } : {}),
   };
   const md = writeReport(runDir, report);
   console.log(`\n报告：${md}`);

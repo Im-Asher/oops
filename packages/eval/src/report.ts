@@ -22,6 +22,8 @@ export interface Report {
   total: number;
   passed: number;
   results: CaseResult[];
+  /** 每个 case 跑了几次（失败按多数判定）。仅 N>1 时写入，单跑模式保持老报告结构。 */
+  repeat?: number;
 }
 
 /** 本 case 是否只有非阻断性失败（目前仅 judge_low，即 L4 分数偏低）。 */
@@ -54,10 +56,13 @@ export function writeReport(dir: string, report: Report): string {
   writeFileSync(join(dir, "report.json"), JSON.stringify(report, null, 2));
 
   const byCode = summarize(report);
+  const repeat = report.repeat ?? 1;
   const lines = [
     `# 评测报告 ${report.runAt}`,
     "",
-    `通过 ${report.passed}/${report.total}（仅 L4 评分偏低（\`judge_low\`）不算失败，明细中标注为非阻断）`,
+    repeat > 1
+      ? `通过 ${report.passed}/${report.total}（每例跑 ${repeat} 次，失败按多数判定；仅 judge_low 不算失败）`
+      : `通过 ${report.passed}/${report.total}（仅 L4 评分偏低（\`judge_low\`）不算失败，明细中标注为非阻断）`,
     "",
     "## 失败分布",
     "",
