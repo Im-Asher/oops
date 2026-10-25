@@ -16,11 +16,22 @@ Key characteristics:
   text & layout control); atmosphere/scene images use pure text-to-image APIs
   (Seedream / Wanxiang).
 - **Declarative agents** — every agent is a single config file under
-  `apps/web/src/server/agent/definitions/` (system prompt + tool list). Adding an
+  `apps/creation/src/agent/definitions/` (system prompt + tool list). Adding an
   agent requires **no** frontend or runtime code changes.
-- **All-in-one Next.js app** — no separate backend service. Route Handlers
-  stream agent events via SSE. Server-only code lives in `apps/web/src/server/` and is
-  protected from client imports by ESLint.
+- **Two Node processes, one product** — `apps/web` (UI + BFF) and
+  `apps/creation` (creative domain: agent runtime, tools, task executor,
+  rendering, providers; default port 3002). `/api/chat` authenticates, gates
+  credits, validates references and writes the user row, then POSTs
+  `/v1/runs` to creation and **pipes the SSE body back unchanged** — no parsing,
+  no re-assembly, no buffering. The wire contract (run request, SSE events with
+  `v: 1`, agent metadata) lives in `packages/contracts` zod schemas, so both
+  sides break at compile time instead of at runtime. Internal calls carry
+  `x-internal-token` (`INTERNAL_TOKEN`, shared only inside one machine).
+- **Single writer per row, not per table** — web writes user messages and
+  `assets.savedAt`; creation writes assistant/tool messages, `tasks`, new
+  assets and the credits ledger (freeze→settle must stay in one transaction; a
+  cross-service settle would leave permanent freezes). Both sides share
+  `@oops/db` and `@oops/domain`; never copy that logic.
 - **Task-based generation** — all image work runs through an in-process task
   executor with concurrency limits; tasks are persisted and retryable.
 - **In-session memory & compact** — every turn rebuilds LLM context from the
@@ -156,7 +167,9 @@ See `docs/ARCHITECTURE.md` for the full architecture and data model.
 ## Project structure
 
 pnpm workspace monorepo. The web app lives in `apps/web/` (package
-`@oops/web`); the admin console lives in `apps/admin/` (package `@oops/admin`,
+`@oops/web`); the creative domain runs as its own process in `apps/creation/`
+(package `@oops/creation`, native `node:http`, no build step — `tsx` runs the
+TypeScript sources); the admin console lives in `apps/admin/` (package `@oops/admin`,
 antd-only UI stack, dev port 3001, guarded by the same `oops_session` cookie;
 seven management surfaces live since M2: users / invite codes / credits ops /
 agent toggles / model config / dashboard+audit / message center); `packages/` holds shared
@@ -171,14 +184,24 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   ├── src/app/            # pages + Route Handlers (thin shell, same discipline as web)
 │   ├── src/i18n/           # next-intl assembly (zh single-locale, cookie mode like web)
 │   └── messages/           # next-intl dictionary (zh.json)
-├── apps/web/          # the web app
+├── apps/creation/     # creative domain process (:3002), tsx 直跑源码
+│   ├── assets/fonts/  # 子集字体（渲染期按模块位置定位）
+│   └── src/
+│       ├── index.ts        # 入口：loadAppEnv 后动态 import（@oops/db 求值期建池）
+│       ├── http/           # /v1/runs（SSE）· /v1/agents · /health · x-internal-token
+│       ├── agent/          # runtime / registry / compact / tools / definitions(+prompts)
+│       ├── tasks/          # generate_image / render_html 任务处理器注册
+│       ├── providers/      # 文本模型装配 + 万相 images provider
+│       ├── render/         # satori 管线（版式校验 → 出网闸门 → 内联 → 渲染）
+│       └── store/          # 引用资产读取 + vision 字节注入
+├── apps/web/          # the web app (UI + BFF)
 │   ├── src/
 │   │   ├── app/            # Thin routing shell: pages + Route Handlers only
-│   │   ├── server/         # SERVER-ONLY: domain (pure) + infra (impl) + agent runtime
-│   │   │   ├── domain/     # sessions / messages / assets / tasks：实体 + 仓储 + 领域逻辑
-│   │   │   ├── infra/      # db / storage(MinIO) / providers / render：具体技术实现
-│   │   │   ├── llm/        # LLM 装配层：模型目录 catalog（分文本/图像域+能力位）+ 角色解析 resolver（llm-assembly spec）；infra/providers 是其技术实现
-│   │   │   └── agent/      # 声明式 Agent 运行时（registry/runtime/compact/transcript/definitions/tools）
+│   │   ├── server/         # SERVER-ONLY: 产品域能力（认证/会话/资产/通知/creation 目录代理）
+│   │   │   ├── creation/   # creation /v1/agents 内网客户端（60s 目录缓存）
+│   │   │   ├── messages/   # 落库消息 → UIMessage parts（UI 视图重建）
+│   │   │   ├── moderation.ts / presets.ts
+│   │   │   └── infra/storage/  # serve / upload（S3 客户端在 @oops/storage）
 │   │   ├── components/     # React components (client)；layout/ 放跨页面壳层（home-sidebar 等）
 │   │   ├── i18n/           # next-intl 装配：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型（client-safe）
 │   │   ├── lib/            # Shared utilities (client-safe)
@@ -186,7 +209,7 @@ oops/                  # repo root = workspace orchestrator (scripts forward via
 │   ├── messages/      # next-intl 词典（zh.json + en.json）
 │   ├── public/        # 静态资源
 │   └── .env.local     # web 专属层（同名键覆盖根共享层；NEXT_PUBLIC_* 等）
-├── packages/          # shared packages：@oops/{config,db,domain,llm,auth,eval}（TS 源码直出 + transpilePackages；
+├── packages/          # shared packages：@oops/{config,db,domain,llm,auth,contracts,storage,eval}（TS 源码直出 + transpilePackages；
 │                      #   包间分层 config → db → {domain,llm} → auth 单向禁逆，app 只经 @oops/* exports 消费；
 │                      #   eval 为黑盒 HTTP 评测器，只依赖公开 HTTP 契约，见 ARCHITECTURE.md §4.1）
 ├── .env.local / .env.example  # 根共享 env 层：DATABASE_URL / S3_* / AUTH_SECRET / LLM_* / RENDER_* / QWEN_*
@@ -201,11 +224,12 @@ imported from client code (`apps/web/src/app/**/page.tsx`, `apps/web/src/compone
 
 ```bash
 pnpm install            # Install dependencies (workspace root)
-pnpm dev                # Dev server (http://localhost:3000) — forwards to @oops/web
-pnpm --filter @oops/admin dev  # Admin dev server (http://localhost:3001)
+pnpm dev                # web :3000 + admin :3001 + creation :3002（pnpm -r --parallel）
+pnpm dev:web            # 只起 web（creation 未起时 /api/chat 返回 503）
+pnpm dev:creation       # 只起创作域
 pnpm build              # Production build — forwards to @oops/web
 pnpm --filter @oops/admin build  # Admin production build
-pnpm start              # Start production server — forwards to @oops/web
+pnpm start              # web + creation 并发的生产启动（creation 仍是 tsx 入口）
 pnpm lint               # ESLint (includes import-boundary rules) — pnpm -r lint
 pnpm typecheck          # tsc --noEmit — pnpm -r typecheck
 pnpm test               # Run unit tests (Vitest) — pnpm -r test
@@ -218,6 +242,12 @@ pnpm db:migrate         # Apply migrations (requires running Postgres) — forwa
 
 Package manager is **pnpm 10** — do not use npm/yarn. Lockfile is
 `pnpm-lock.yaml` (single workspace lockfile) and must be committed.
+
+**Deployment.** The creative domain is a long-lived Node process with in-process
+task execution and SSE streams, so it cannot run on Vercel functions; the target
+form is "same repo, one command locally" (`docs/plans/2026-10-25-creation-service-design.md`).
+The Vercel notes below still describe the web app's build contract and are kept
+until the deployment doc is rewritten (P2):
 
 **Deployment (Vercel, Root Directory = `apps/web`)**: migration is part of the build,
 not a manual step. `apps/web/vercel.json` sets `buildCommand` to
@@ -251,31 +281,34 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   or proper types. Export explicit types from `src/types/` when shared.
 - **Layering convention:**
   - `src/app/` is a thin shell: pages, `route.ts` handlers, minimal glue.
-    Pure domain logic belongs in `src/server/domain/`; infrastructure
-    (providers/storage/db/render) lives in `src/server/infra/` behind
-    interfaces; `src/server/agent/` holds the declarative agent runtime.
+    In `apps/web`, `src/server/` keeps only product-domain capabilities
+    (auth, sessions/messages read, assets, notifications, creation client).
+    The creative domain (agent runtime, tools, providers, render, task
+    handlers) lives in `apps/creation/src` and must never be imported across
+    app boundaries — the only channel between the two is HTTP plus the
+    `packages/contracts` schemas.
   - **Shared packages (`packages/`) depend one-way: `config → db → {domain, llm} → auth`.**
     Never import `@oops/auth`/`@oops/llm`/`@oops/db` from `@oops/config`, and
     never create reverse edges between them; apps consume packages only via
     their `exports` subpaths. Env access goes exclusively through
     `@oops/config` domain getters (never raw `process.env` outside it).
     `@oops/domain` holds pure domain services (credits ledger + task executor
-    core) on top of `@oops/db`; web-specific task handlers stay in
-    `apps/web/src/server/domain/tasks/handlers.ts` and register via the
-    `import "@/server/agent"` side-effect chain.
+    core) on top of `@oops/db`; creation-specific task handlers live in
+    `apps/creation/src/tasks/handlers.ts` and register via the
+    `import "../agent"` side-effect chain in the creation entry.
   - Route Handlers validate input (zod), call server services, and return
     responses. They must stay short.
   - Shared UI helpers go in `src/lib/`; components in `src/components/`.
 - **Naming:** files `kebab-case.ts(x)`; components/Types `PascalCase`;
   functions/variables `camelCase`; constants `SCREAMING_SNAKE_CASE`.
 - **Agent definition (declarative):** one file per agent in
-  `src/server/agent/definitions/<agent-id>.ts` calling `defineAgent({...})`.
-  System prompts live in `src/server/agent/definitions/prompts/<agent-id>.md` —
+  `apps/creation/src/agent/definitions/<agent-id>.ts` calling `defineAgent({...})`.
+  System prompts live in the same tree under `definitions/prompts/<agent-id>.md` —
   never inline long prompts in code (the compact summary skeleton
   `session-summary.md` lives in the same directory). Tools are referenced
   **by name** from the ToolRegistry; do not implement ad-hoc tools inside
   agent files.
-- **Tools:** implementations live in `src/server/agent/tools/`, registered in
+- **Tools:** implementations live in `apps/creation/src/agent/tools/`, registered in
   the ToolRegistry with zod schemas for inputs. Tools return structured
   results; errors are returned as structured error payloads (the agent
   explains them in natural language) — never throw raw errors upward.
@@ -300,8 +333,9 @@ AUTH_SECRET / LLM_* / RENDER_* / QWEN_*）+ `apps/*/.env.local`（app 专属键�
   prefer server components. AI Elements components are the base for all chat
   UI — do not hand-roll message/attachment/tool UI.
 - **Async tasks:** image generation and HTML rendering must go through
-  `src/server/domain/tasks/task-executor.ts`. Never call provider APIs or
-  render directly from tools/route handlers with unbounded concurrency.
+  `@oops/domain/tasks/executor` (invoked from creation tools). Never call
+  provider APIs or render directly from tools/route handlers with unbounded
+  concurrency.
 - **Comments:** explain *why*, not *what*. No narration comments.
 - **Commits:** conventional commits (`feat:`, `fix:`, `chore:`, `docs:`...).
 

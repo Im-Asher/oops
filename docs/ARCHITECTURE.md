@@ -9,14 +9,18 @@
 
 ## 1. 总体架构
 
-一体化 Next.js 全栈应用（无独立后端），Route Handlers 承载 SSE 流与上传接口。
+**两个 Node 进程**：`apps/web`（产品域：UI + BFF）与 `apps/creation`（创作域：Agent 运行时、
+工具、任务执行、渲染、图像/文本 Provider）。浏览器只与 web 通信；web 完成认证、余额预检、
+校验与 user 行落库后，把回合转发给 creation，并把 creation 的 SSE 流**原样 pipe** 回浏览器
+（不解析、不重组、不缓存）。两个进程共享 `@oops/db` 与同一份领域逻辑，内网调用带
+`x-internal-token`。拆分动机与阶段见 `docs/plans/2026-10-25-creation-service-design.md`。
 
 ```
 浏览器 (shadcn/ui：/home 落地页 + /canvas AI 画布页——点阵画布全屏 + 左上悬浮聊天面板；明暗双主题)
    │  SSE 流式消息 / 工具调用状态
    ▼
-Route Handler /api/chat  ──桥接──►  pi-agent-core 运行时
-                                      │  agentLoop + 声明式 Agent（提示词 + 工具子集）
+Route Handler /api/chat  ──HTTP+SSE──►  apps/creation :3002
+（BFF：认证/校验/落 user 行）              │  pi-agent-core agentLoop + 声明式 Agent（提示词 + 工具子集）
                                       ├── tool: generate_image ──► 火山 Seedream / 通义万相
                                       ├── tool: render_html ──► 无浏览器渲染（satori + resvg）
                                       └── tool: save_asset ──► 图片存储
@@ -33,7 +37,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 产品形态 | MVP 多用户单部署（邀请码注册 + 用户名/密码登录），全表实装 `user_id` 隔离数据 |
 | LLM 接入 | 复用 pi 生态 `pi-ai` 多 Provider 统一协议，配置化切换 |
 | Agent 扩展 | 声明式配置文件（prompt + tools），新增 Agent 零代码改动 |
-| 任务执行 | 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
+| 任务执行 | creation 进程内 Worker + DB 任务表，限并发；未来可平滑换 BullMQ/Redis |
 | 前端骨架 | 三页结构：`/home` 轻量落地页（两级侧栏 + 创作输入/Agent 卡片入口 + 排版设计尺寸弹窗）+ `/canvas` 全屏 AI 画布页（无应用侧栏，聊天面板悬浮可收起）+ `/design` 设计工作台页（模板/素材/文字轻量编辑）；`/chat` 保留重定向；会话管理收敛到聊天面板头部时钟下拉 |
 | 主题 | 手写 ThemeProvider（零依赖）：html `dark` class 切换 + localStorage（`oops-theme`）持久化 + layout 首屏阻塞脚本防闪烁；明暗两套 CSS token |
 | i18n | next-intl cookie 模式（无 URL 路由）：zh/en 双语；层 A UI 文案进词典，层 B LLM 文本由 agent 语言跟随；防回流 = typed messages + lint 禁裸中文 + zh↔en 键对齐单测 |
@@ -52,7 +56,7 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 | 包管理 | pnpm 10 | |
 | 数据库 | PostgreSQL + Drizzle ORM | Docker Compose 部署；`drizzle-kit` 管理 migrations（pg 方言） |
 | 图像生成 Provider | DashScope 万相 `wan2.7-image`（经 pi-ai `createImagesProvider` 自定义接入，Token Plan China 同步端点，返回 base64） | 文本侧 LLM 走 `qwen-token-plan-cn`，共用 key `QWEN_TOKEN_PLAN_CN_API_KEY` |
-| 图片渲染 | `satori` + `satori-html` + `@resvg/resvg-js` | 无浏览器渲染：HTML → VDOM → SVG → PNG（`src/server/infra/render/`），子集字体内置，与生图共用执行器闸门 |
+| 图片渲染 | `satori` + `satori-html` + `@resvg/resvg-js` | 无浏览器渲染：HTML → VDOM → SVG → PNG（`apps/creation/src/render/`），子集字体内置，与生图共用执行器闸门（P2 计划换 Playwright + 完整思源黑体） |
 | 图片存储 | S3 兼容存储抽象（`@aws-sdk/client-s3`） | 后端由 `S3_*` env 决定（代码零 provider 分支）：本地 MinIO（Docker Compose）/ 云上 Supabase、OSS、COS |
 | 认证 | 用户名/密码（`crypto.scrypt`）+ 邀请码注册 + HMAC-SHA256 签名 cookie session（web 30 天 / 管理端 12 小时） | 自实现（HttpOnly/Secure/SameSite=Lax），不引入 next-auth；`AUTH_SECRET` 必填 ≥32 字符；载荷含会话版本 `tv`，与 `users.token_version` 不符即 401（改密 +1 并下发新 cookie，其他端下线）。管理端是另一套会话：`oops_admin_session` 不同名 + `ADMIN_AUTH_SECRET`（缺省回退 `AUTH_SECRET`），两侧互不相认 |
 | i18n | next-intl（无 URL 路由的 cookie 模式） | `messages/zh.json`（基准）+ `en.json`（键结构镜像，对齐单测强制）；typed messages 编译期 key 校验；locale 解析链在 `src/i18n/request.ts` |
@@ -73,12 +77,12 @@ Drizzle ORM (PostgreSQL)  +  存储抽象（S3 兼容：本地 MinIO / 云上 Su
 **两张注册表解耦：ToolRegistry + AgentRegistry。**
 
 - **ToolRegistry**：工具实现一次、集中注册，Agent 配置按名字引用（越权工具被拦截）。MVP 已落地工具：`generate_image`（生成→下载→落对象存储→assets 的原子语义）；`render_html`（HTML→无浏览器渲染→assets，海报链路）；`save_asset` 属刻意延后项。
-- **AgentRegistry**：启动时扫描 `src/server/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/icon/tools，不含 systemPrompt）给前端 `GET /api/agents`。
+- **AgentRegistry**：启动时扫描 `apps/creation/src/agent/definitions/` 自动加载，并导出轻量元数据（id/name/description/icon/presets/tools/vision，不含 systemPrompt）给 web：`GET /v1/agents` 由 creation 提供，web 的 `GET /api/agents` 补上 i18n 词典解析后转发给前端。
 
 新增 Agent = 新增一个文件：
 
 ```ts
-// src/server/agent/definitions/atmosphere-designer.ts
+// apps/creation/src/agent/definitions/atmosphere-designer.ts
 export const atmosphereDesigner = defineAgent({
   id: "atmosphere-designer",
   name: "氛围图设计师",
@@ -90,7 +94,7 @@ export const atmosphereDesigner = defineAgent({
 
 > 注：Agent 定义为 `{ id, name, description, icon, tools, systemPrompt }`（icon 为前端头像徽标 emoji）；`greeting` / `defaults` 已从契约中移除（从未有消费方），以代码为准。
 
-- system prompt 外置到 `src/server/agent/definitions/prompts/*.md`，独立调优（compact 摘要骨架 `session-summary.md` 同目录）。
+- system prompt 外置到 `apps/creation/src/agent/definitions/prompts/*.md`，独立调优（compact 摘要骨架 `session-summary.md` 同目录）。
 - 切换 Agent = 换 systemPrompt + tools 子集重新进入 `agentLoop`，无子 Agent 黑盒编排（符合 Pi 反黑盒理念）。
 - 前端 Agent 选择器消费元数据列表，新增 Agent 前端零改动。已有会话切换 Agent = composer 内 PATCH 重绑（持久化到 `chat_sessions.agent_id`，下一轮生效）；MVP 内置两个 Agent：氛围图设计师、产品摄影师。
 
@@ -177,8 +181,9 @@ CDP evaluate，不依赖页面脚本），出网请求全部拦截，`/files/*` 
 ⓪ 认证：proxy.ts 按 cookie 存在性引导页面（`/` → 已登录 `/home` 否则 `/login`；`/home`、`/canvas` 未登录 → 302 `/login`；旧路径 `/chat` 由页面级 redirect 到 `/canvas`）；
    业务 API 由 `requireUser` 完整验签 + 查 `users` active + 会话版本一致（唯一安全边界），未认证统一 401
 ① 前端：Composer 提交消息（引用 = 画布选中条目，可移除 chip）→ POST /api/chat { sessionId, agentId, message, referenceAssetIds? } → SSE 连接
-② Route Handler：requireUser 取 userId → 引用资产归属校验（存在/userId/sessionId 匹配，≤5）→
-   用户消息以"原文 + 引用块"落库（content 与 UI 文本保持原文）→ AgentRegistry 取配置 → 加载历史 → agentLoop
+② Route Handler（web，BFF）：requireUser 取 userId → 余额预检 → 引用资产归属校验（存在/userId/sessionId 匹配，≤5）→
+   用户消息以"原文 + 引用块"落库（content 与 UI 文本保持原文）→ POST creation `/v1/runs`（runId 幂等键）→
+   creation 侧 AgentRegistry 取配置 → 加载历史 → agentLoop；SSE 流由 web 原样 pipe 回浏览器
 ③ agentLoop：LLM 流式推理 → 事件桥接 SSE（text-delta / tool-start / tool-result / finish），边推边落库
 ④ 工具执行：generate_image（出图 → 下载转 base64 → 落对象存储 → assets 落库，userId 源自工具上下文）返回自有 `/files` URL
 ⑤ agent 拿到图片 URL 继续推理 → 输出总结 → finish
@@ -416,7 +421,7 @@ user_notifications
 
 > 注：`chat-image-gen` 已落地：① `chat_sessions` 新增 `agent_id` 列（迁移 `0001`）；
 > ② 消息持久化采用 MVP 实际 schema（`content` 文本 + `tool_calls` jsonb），由
-> `src/server/agent/transcript.ts` 确定性重建为可直接渲染的 UIMessage parts（零转换，前端不需字段映射）；
+> `apps/web/src/server/messages/transcript.ts` 确定性重建为可直接渲染的 UIMessage parts（零转换，前端不需字段映射）；
 > ③ `assets` 记录生成来源（`prompt`/`model`/`meta` 含 provider/size/taskId）。
 > `canvas-editing` 新增 `asset_kind=edited` 派生图：由画布导出得到，与原始生成图（`image`）区分，
 > `meta` 记录 `sourceAssetId` 与编辑摘要（`crop`/`filters`），原始资产字节不被改动。
@@ -517,20 +522,12 @@ oops/
 │   ├── server/                     # 服务端专属（ESLint 禁止客户端 import）
 │   │   ├── auth/                   # → @oops/auth（packages/auth：password / session-cookie / require-user / require-admin / register / authenticate / rate-limit / oops-id）
 │   │   ├── db/                     # → @oops/db（packages/db：schema + 6 仓储 + drizzle/ 迁移与 drizzle.config.ts 共址）
-│   │   ├── infra/
-│   │       ├── storage/            # 存储抽象（S3 兼容，env 切换后端）
-│   │           ├── s3.ts           # S3Client 封装 + key 生成
-│   │           ├── serve.ts        # 资产响应构建（内联 vs 强制下载）
-│   │           ├── upload.ts       # 上传处理：purpose=reference（参考图）/ =design（设计成果，无会话归属）/ 带 sessionId（画布派生导出）/ 缺省（userId-only）
-│   │   │   └── providers/          # 外部 Provider 接入
-│   │   │       ├── llm.ts          # qwen-token-plan-cn 文本模型装配
-│   │   │       └── dashscope-images.ts # 万相 wan2.7-image 自定义 images provider
-│   │   ├── domain/
-│   │   │   └── tasks/handlers.ts    # generate_image / render_html 任务处理器（经 @oops/domain/tasks 执行器跑）
-│   │   └── agent/                  # 声明式 Agent 运行时
-│   │       ├── registry.ts / runtime.ts / types.ts / transcript.ts / moderation.ts / compact.ts
-│   │       ├── definitions/        # 各 Agent 定义 + prompts/<id>.md（含 compact 摘要骨架）
-│   │       └── tools/              # ToolRegistry（ToolExecutionContext 注入 userId）+ 工具实现
+│   │   ├── creation/client.ts      # creation /v1/agents 内网客户端（60s 目录缓存）
+│   │   ├── messages/transcript.ts  # 落库消息 → UIMessage parts（UI 视图重建）
+│   │   ├── moderation.ts           # 入口敏感词初筛（必须在 user 行落库前拒绝）
+│   │   ├── presets.ts              # 灵感卡 key → 词典文案（i18n 只在 web）
+│   │   ├── profile/profile.ts      # 昵称/改密领域辅助
+│   │   └── infra/storage/          # serve.ts（资产响应）/ upload.ts（上传处理）；S3Client 在 @oops/storage
 │   ├── components/                 # shadcn/ui + AI Elements（仅 UI，无业务逻辑）
 │   │   ├── canvas/                 # 画布工作台（多作品平面 stage / 编辑工具条 / 滤镜面板 / 裁剪 / 空态）
 │   │   ├── design/                 # 设计工作台（缩放适配画布 surface / 选中手柄 / 左轨 / 模版-素材-文字面板 / 尺寸前置弹窗）
@@ -539,6 +536,17 @@ oops/
 │   ├── i18n/                       # next-intl 装配（client-safe）：locale.ts/request.ts locale 解析链 + messages.ts 词典装载与类型
 │   ├── lib/                        # 客户端安全共享：utils / canvas（reducer/coords/layout/存储）/ design（reducer 历史栈、模版-素材-字体目录、presets、草稿存储、snapdom 导出封装，均含单测）
 │   └── types/                      # 共享 TypeScript 类型
+├── apps/creation/                  # 创作域进程 @oops/creation（:3002）——纯 Node（tsx 直跑源码，无构建产物）
+│   ├── assets/fonts/               # 子集字体产物（渲染期按模块位置定位，不依赖 cwd）
+│   ├── src/
+│   │   ├── index.ts                # 入口：先 loadAppEnv，再动态 import 业务模块（@oops/db 在求值期建池）
+│   │   ├── http/                   # 原生 node:http：/v1/runs（SSE）· /v1/agents · /health
+│   │   ├── agent/                  # 运行时 + definitions/（prompts/<id>.md 同址）+ tools/ + compact/moderation
+│   │   ├── tasks/handlers.ts       # generate_image / render_html 任务处理器（经 @oops/domain/tasks 执行器跑）
+│   │   ├── providers/              # qwen-token-plan-cn 文本装配 + 万相 wan2.7-image images provider
+│   │   ├── render/                 # satori 管线（版式校验 → 出网闸门 → 内联 → 渲染）
+│   │   └── store/vision.ts         # 引用资产读取与 vision 字节注入
+│   └── vitest.config.ts / eslint.config.mjs
 ├── apps/admin/                     # 管理端应用包 @oops/admin（M0.3 scaffold）——antd-only 栈（无 Tailwind），
 │   │                               #   dev 端口 3001；门卫三层：proxy 存在性 → (console)/layout 全量校验 → 放行
 │   ├── src/
@@ -559,6 +567,8 @@ oops/
 │   ├── domain/                     # @oops/domain：积分账本服务（credits/）+ 任务执行器 core（tasks/，并发/注册/终态结算钩子）
 │   ├── llm/                        # @oops/llm：模型目录 catalog + 角色 resolver（llm-assembly）
 │   ├── auth/                       # @oops/auth：password / session / require-user / require-admin / register / authenticate / rate-limit
+│   ├── contracts/                  # @oops/contracts：web⇄creation 的 zod 契约（run 请求体、SSE 事件 v1、Agent 元数据）
+│   ├── storage/                    # @oops/storage：S3 兼容客户端 + key 生成（web 与 creation 共用）
 │   └── eval/                       # @oops/eval：黑盒 HTTP 生成质量评测器（不 import 服务端代码，见 §4.1）
 │       ├── src/                    # cli / run / execute / http / sse / judges(L1-L4) / report / taxonomy / baseline / seed / doctor
 │       ├── cases/                  # 样本用例（YAML，入库）
@@ -566,13 +576,16 @@ oops/
 │       └── baseline.json           # 回归基线（入库；尚未生成，见 §4.1）
 ├── docker-compose.yaml             # postgres:16 + minio + minio-init（自动建桶）
 ├── pnpm-workspace.yaml             # workspace 声明（apps/* + packages/*）
-├── package.json                    # 根编排壳：dev/build/start → --filter @oops/web、db:* → --filter @oops/db、lint/typecheck/test → -r
+├── package.json                    # 根编排壳：dev/start 并发 web+admin+creation、build → @oops/web、db:* → @oops/db、lint/typecheck/test → -r
 └── pnpm-lock.yaml                  # workspace 单一锁文件
 ```
 
 **分层边界**：`src/app` 只做路由薄壳；`src/server` 服务端专属，禁止被客户端代码 import
 （ESLint `no-restricted-imports` 强制，覆盖 `src/components`、`src/hooks`）；`src/lib` 前后端共享且不含服务端实现。
 领域仓储层为 `@oops/db`（纯 Drizzle，不依赖具体 Provider / 框架），`src/server/infra/storage` 为基础设施实现。
+创作域 `apps/creation/src` 是独立进程：`http/`（`/v1/runs`·`/v1/agents`·`/health`）、`agent/`（运行时 + definitions + tools）、
+`tasks/`（任务处理器）、`render/`、`providers/`、`store/`。web 的 `src/server` 只剩产品域能力（认证、会话/消息读取、
+资产读取、通知、creation 目录代理）。SSE 契约与请求体在 `packages/contracts`（zod，编译期锁死两侧）。
 共享包依赖单向：`config → db → llm → auth` 禁逆；app 只经 `@oops/*` 公共 API（exports 子路径）消费，env 全部经 `@oops/config` 域 getter 读取。
 
 > `src/server/infra/render/`（无浏览器渲染，对应 `render_html` 工具）已落地：

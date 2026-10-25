@@ -1,7 +1,7 @@
 # 设计：拆分创作域为独立服务（apps/creation）+ 浏览器渲染回归 + 评测闭环
 
 > 日期：2026-10-25
-> 状态：已确认设计（待实现）
+> 状态：P0（评测闭环）已落地；**P1（抽 creation 进程）已落地（2026-10-25）**；P2–P4 待做
 > 关联：翻转 `docs/ARCHITECTURE.md` §8 的 satori 决策；重写 `docs/DEPLOYMENT.md`；本设计不进入 Vercel 部署路径
 
 ## 1. 背景与问题
@@ -269,3 +269,34 @@ P1 与 P2 必须分开：混在一起时无法区分「搬家搬坏了」与「�
 | VLM judge 抖动导致误报 | L4 不进闸门，只报趋势；L1–L3 全为确定性判定 |
 | 完整字体增大镜像 | 字体放对象存储/构建期下载，不塞进 git；体积对本地运行无影响 |
 | 边界过度设计（两个服务却只有一个消费方） | 服务形态保持最薄：同仓库、一条命令起、无独立 CI；边界是真的，运维是零的 |
+
+## 12. P1 实施记录（2026-10-25）
+
+已落地的部分与设计有四处**刻意偏差**，原因记录在此，避免下次重新争论：
+
+1. **HTTP 框架用原生 `node:http`**，未引入 hono/fastify。三个端点 + SSE，框架带来的是依赖与
+   抽象成本；原生 `writeHead`/`write` 对「原样 pipe」这条链路更透明。路由表在
+   `apps/creation/src/http/server.ts`，鉴权只认 `x-internal-token`。
+2. **新增 `packages/storage`**（S3 客户端）。设计与 §3 只列了 contracts，但存储同时被 web
+   （`/files`、上传、资产删除）与 creation（任务产物、render 内联、vision 取字节）消费，
+   复制一份会分叉。按「两个消费方才抽包」的原则抽取，web 侧的 `serve.ts`/`upload.ts` 留在原地。
+3. **`buildReferenceBlock` 落在 `@oops/domain/messages/reference.ts`**，不是各写一份。web 用它
+   写 user 行 transcript，creation 用它拼 prompt 输入；两侧必须逐字一致。
+4. **入口初筛（`screenInput`）留在 web**：命中必须在 user 行落库**之前**拒绝，creation 拿不到
+   这个时机。它不是创作域逻辑，是 BFF 的输入闸门。
+
+其它落地细节：
+
+- 事件契约 `@oops/contracts/events`：`v: 1` 由 `encodeSseFrame` 在出线处附加，emit 点不手写；
+  SSE 帧格式与拆分前逐字节一致（仅多一个 `v` 字段），前端零改动。
+- Agent 元数据新增 `vision: boolean`：web 需要它决定 user 行 transcript 是否带图片块。
+  查询失败（creation 不可达）时退化为纯文本口径，不阻断回合。
+- `transcript` 的 LLM 视图（`sanitizeTranscript` / `buildReplayHistory`）搬到 `@oops/llm/transcript`：
+  web 写 user 行、creation 写 assistant 行，共用一份实现；UI 视图重建留在 web。
+- 渲染仍是 satori（P2 才换 Playwright）；`assets/fonts` 随代码迁到 `apps/creation/assets/fonts`，
+  字体目录改为**模块相对定位**（原先按 cwd，只在 web 的启动方式下成立）。
+- 启动对账（`recoverInterruptedTasks` + `reconcileFrozen`）从 web 的 `instrumentation.ts`
+  搬到 creation 入口；web 的 `instrumentation.ts` 只保留通知保留期清理。
+- web `/api/chat` 在建连失败（creation 不可达或非 2xx）时回滚刚写的 user 行，且**仅当会话内
+  没有任何 assistant 行**；客户端已断开时不做回滚（creation 可能已开跑）。
+- 根 `pnpm dev` = `pnpm -r --parallel` 起 web/admin/creation；`pnpm dev:web` / `dev:creation` 可单起。
