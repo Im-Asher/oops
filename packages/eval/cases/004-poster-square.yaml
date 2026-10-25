@@ -1,0 +1,10 @@
+id: 004-poster-square
+agent: poster-designer
+message: 做一张适合电商主图的方形海报，突出「新品上市」
+references: [product.png]
+tags: [poster, smoke]
+assert:
+  size: [750, 1000]
+  mustContainText: ["新品上市"]
+  maxOverflowPx: 0
+  denyCss: ["display:grid", "float:"]

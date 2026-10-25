@@ -1,0 +1,9 @@
+id: 005-atmosphere
+agent: atmosphere-designer
+message: 生成一张清晨阳光下的木质桌面场景图，画面里放一只陶瓷保温杯
+tags: [image, smoke]
+assert:
+  size: [768, 1344]
+  mustContainText: []
+  maxOverflowPx: 0
+  denyCss: []

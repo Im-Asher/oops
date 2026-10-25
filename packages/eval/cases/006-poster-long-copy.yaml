@@ -1,0 +1,10 @@
+id: 006-poster-long-copy
+agent: poster-designer
+message: 做一张长版详情海报，标题「一整天的温度」，正文讲清楚 6 层锁温结构，底部放一句品牌 slogan「陪你到最后一度」
+references: [product.png]
+tags: [poster, smoke]
+assert:
+  size: [750, 1654]
+  mustContainText: ["一整天的温度", "陪你到最后一度"]
+  maxOverflowPx: 0
+  denyCss: ["display:grid", "float:"]
