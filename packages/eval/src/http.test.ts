@@ -37,4 +37,14 @@ describe("createClient", () => {
     });
     await expect(c.login("u", "p")).rejects.toThrow(/登录失败/);
   });
+
+  it("上传参考图返回 assetId 与 /files/ url", async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const c = createClient({ baseUrl: "http://x", fetchImpl: fakeFetch(calls) });
+    await c.login("u", "p");
+    const uploaded = await c.uploadReference("s1", new Blob([new Uint8Array([1])]), "x.png");
+    expect(uploaded).toEqual({ assetId: "a1", url: "/files/x.png" });
+    const headers = calls[1].init?.headers as Record<string, string>;
+    expect(headers.cookie).toContain("oops_session=abc");
+  });
 });

@@ -6,7 +6,12 @@ export interface ClientOptions {
 export interface EvalClient {
   login(username: string, password: string): Promise<void>;
   createSession(agentId: string, title?: string): Promise<string>;
-  uploadReference(sessionId: string, file: Blob, name: string): Promise<string>;
+  /** 同时返回 `assetId`（喂给 chat）与 `url`（`/files/...`，L2 回填图片字节用）。 */
+  uploadReference(
+    sessionId: string,
+    file: Blob,
+    name: string,
+  ): Promise<{ assetId: string; url: string }>;
   getFile(url: string): Promise<Uint8Array>;
   chat(body: {
     sessionId: string;
@@ -62,8 +67,8 @@ export function createClient(opts: ClientOptions): EvalClient {
         body: form,
       });
       if (!res.ok) throw new Error(`参考图上传失败（${res.status}）`);
-      const json = (await res.json()) as { assetId: string };
-      return json.assetId;
+      const json = (await res.json()) as { assetId: string; url: string };
+      return { assetId: json.assetId, url: json.url };
     },
 
     async getFile(url) {

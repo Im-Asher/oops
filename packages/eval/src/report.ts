@@ -1,13 +1,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { FAILURE_LABELS, type FailureCode } from "./taxonomy";
+import { FAILURE_LABELS, type Failure, type FailureCode } from "./taxonomy";
 
 export interface CaseResult {
   id: string;
   agent: string;
   durationMs: number;
   imageUrl: string | null;
-  failures: { code: string; detail: string }[];
+  /** 只允许封闭分类，服务端开放错误码由 execute 侧收敛后写入。 */
+  failures: Failure[];
   l4: { score: number | null; reason: string } | null;
   toolCalls: string[];
   rawText: string;
