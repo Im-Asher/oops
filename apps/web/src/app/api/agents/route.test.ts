@@ -4,20 +4,20 @@ vi.mock("@oops/auth/require-user", () => ({
   requireUser: vi.fn(),
 }));
 
-vi.mock("@/server/agent", () => ({
-  agentRegistry: {
-    metadata: vi.fn(() => [
-      {
-        id: "product-photographer",
-        name: "产品摄影师",
-        description: "d",
-        icon: "📸",
-        // definitions 中的 presets 是词典 key；route 按请求 locale 解析为文案
-        presets: ["thermosWhiteMain", "coffeeScene", "creamMain"],
-        tools: ["generate_image"],
-      },
-    ]),
-  },
+// Agent 目录来自 creation 的 /v1/agents（内网调用，测试里 mock 掉）。
+vi.mock("@/server/creation/client", () => ({
+  listAgents: vi.fn(async () => [
+    {
+      id: "product-photographer",
+      name: "产品摄影师",
+      description: "d",
+      icon: "📸",
+      // definitions 中的 presets 是词典 key；route 按请求 locale 解析为文案
+      presets: ["thermosWhiteMain", "coffeeScene", "creamMain"],
+      tools: ["generate_image"],
+      vision: false,
+    },
+  ]),
 }));
 
 // getMessages 按请求 locale 返回词典——测试固定用 zh 词典断言解析结果
@@ -46,6 +46,15 @@ describe("GET /api/agents", () => {
       ],
     });
     expect(body.agents[0]).not.toHaveProperty("systemPrompt");
+  });
+
+  it("creation 不可达返回 503（不返回空列表冒充正常）", async () => {
+    const { listAgents } = await import("@/server/creation/client");
+    vi.mocked(listAgents).mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const res = await GET(new Request("http://localhost/api/agents"));
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("CREATION_UNAVAILABLE");
   });
 
   it("未认证返回 401", async () => {

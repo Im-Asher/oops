@@ -1,0 +1,11 @@
+id: 001-poster-minimal
+agent: poster-designer
+message: 做一张极简风格海报，商品是这款保温杯，主标题「恒温 12 小时」，不要促销元素
+references: [product.png]
+tags: [poster, smoke]
+assert:
+  size: [750, 1334]
+  allowedHeights: [1000, 1334, 1654]
+  mustContainText: ["恒温 12 小时"]
+  maxOverflowPx: 0
+  denyCss: ["display:grid", "float:"]

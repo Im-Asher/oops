@@ -112,6 +112,21 @@ const renderShape = {
   RENDER_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 };
 
+/**
+ * 创作域进程（apps/creation）：
+ * - INTERNAL_TOKEN 是 web ⇄ creation 的内网共享密钥；本地默认值让 clone 即用成立，
+ *   两种部署都在同一台机器上，密钥不跨越信任边界。
+ * - CREATION_BASE_URL 缺省由端口推导，避免两个地方各写一遍地址。
+ */
+const creationShape = {
+  CREATION_PORT: z.coerce.number().int().positive().default(3002),
+  INTERNAL_TOKEN: z
+    .string()
+    .min(16, "INTERNAL_TOKEN 需至少 16 字符（web 与 creation 共享）")
+    .default("oops-local-internal-token"),
+  CREATION_BASE_URL: z.string().url("CREATION_BASE_URL 必须是完整 URL").optional(),
+};
+
 const coreSchema = z.object(coreShape);
 const authSchema = z.object(authShape);
 const adminAuthSchema = z.object(adminAuthShape);
@@ -120,6 +135,7 @@ const s3Schema = z.object(s3Shape);
 const llmSchema = z.object(llmShape);
 const imageSchema = z.object(imageShape);
 const renderSchema = z.object(renderShape);
+const creationSchema = z.object(creationShape);
 
 const envSchema = z.object({
   ...coreShape,
@@ -130,6 +146,7 @@ const envSchema = z.object({
   ...llmShape,
   ...imageShape,
   ...renderShape,
+  ...creationShape,
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -265,5 +282,23 @@ export function getRenderConfig(env: Env = process.env): RenderConfig {
   return {
     allowedHosts: v.RENDER_ALLOWED_HOSTS,
     timeoutMs: v.RENDER_TIMEOUT_MS,
+  };
+}
+
+export interface CreationConfig {
+  port: number;
+  /** web ⇄ creation 的内网共享密钥（`x-internal-token`）。 */
+  internalToken: string;
+  /** web 侧访问 creation 的基地址。 */
+  baseUrl: string;
+}
+
+/** 创作域进程域（CREATION_* / INTERNAL_TOKEN）：两个进程各自读不同的字段。 */
+export function getCreationConfig(env: Env = process.env): CreationConfig {
+  const v = creationSchema.parse(env);
+  return {
+    port: v.CREATION_PORT,
+    internalToken: v.INTERNAL_TOKEN,
+    baseUrl: v.CREATION_BASE_URL ?? `http://localhost:${v.CREATION_PORT}`,
   };
 }

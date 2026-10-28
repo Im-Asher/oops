@@ -40,7 +40,7 @@ vi.mock("@/server/infra/storage/upload", () => ({
   }),
 }));
 
-vi.mock("@/server/infra/storage/s3", () => ({
+vi.mock("@oops/storage/s3", () => ({
   createStorage: vi.fn(() => ({ putObject: async () => undefined })),
   defaultS3Client: {},
 }));

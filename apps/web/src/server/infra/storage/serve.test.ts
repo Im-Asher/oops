@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAssetResponse } from "./serve";
-import type { Storage } from "./s3";
+import type { Storage } from "@oops/storage/s3";
 
 function fakeStorage(object?: unknown, throws?: { name: string }): Storage {
   return {

@@ -1,0 +1,11 @@
+id: 003-poster-tall
+agent: poster-designer
+message: 做一张信息较多的长版海报，讲清这款保温杯的 3 个卖点：316 内胆、24 小时保温、一键开盖
+references: [product.png]
+tags: [poster, smoke]
+assert:
+  size: [750, 1654]
+  allowedHeights: [1000, 1334, 1654]
+  mustContainText: ["316", "24 小时"]
+  maxOverflowPx: 0
+  denyCss: ["display:grid", "float:"]

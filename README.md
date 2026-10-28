@@ -23,7 +23,7 @@
 | 👥 **Who** 给谁用 | 电商卖家 / 运营人员（无设计背景），以及想低门槛接入 AI 生图能力的开发者 |
 | 🕐 **When** 何时用 | 上架前批量出图、大促海报快速迭代、场景图补齐、单品多版本比稿 |
 | 🌍 **Where** 在哪用 | 浏览器访问（公开落地页 `/` + 工作台 `/home` + 全屏 AI 画布 `/canvas`）；自托管部署（Node 22+ / Docker） |
-| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `.env.local`（根共享层，对照 `.env.example`）→ `pnpm db:migrate` → `pnpm dev` |
+| 🛠️ **How** 怎么做 | `pnpm install` → `docker compose up -d` → 配置 `.env.local`（根共享层，对照 `.env.example`）→ `pnpm db:migrate` → `pnpm dev`（web + admin + creation 三进程） |
 | 💰 **How much** 花多少 | LLM + 生图 API 按量计费；进程内任务限并发（生图 2 / 截图 1~2），无额外中间件成本 |
 
 ---
@@ -76,8 +76,8 @@
   - `/` —— 公开营销落地页（未登录可见；已登录访问会直达 `/home`）
   - `/home` —— 工作台首页（创作输入 + Agent 卡片入口）
   - `/canvas` —— 全屏 AI 画布工作台（悬浮聊天面板 + 点阵画布）
-- ☁️ **部署**：任意可运行 Node.js 22+ 的主机（无浏览器渲染，无需 Chromium）；依赖 Postgres + MinIO（S3 兼容），`docker-compose.yaml` 一键拉起
-  - **Vercel**：Root Directory 设为 `apps/web`，构建命令由 `apps/web/vercel.json` 前置执行数据库迁移（`pnpm --filter @oops/db db:migrate && pnpm build`），首次部署会把全部迁移一次性应用，无需手动跑脚本
+- ☁️ **部署**：需要两个 Node 进程——`apps/web`（UI + BFF）与 `apps/creation`（创作域：Agent 运行时 / 任务执行 / 渲染），依赖 Postgres + MinIO（S3 兼容），`docker-compose.yaml` 一键拉起
+  - **Vercel**：只覆盖 `apps/web`；creation 是长驻进程（进程内任务执行 + SSE 流），不能跑在函数里，需另行运行（目标形态是「同仓库、一条命令本地起」，见 `docs/plans/2026-10-25-creation-service-design.md`）
 
 ## 🛠️ How · 怎么用
 
@@ -88,13 +88,13 @@ pnpm install
 # 2️⃣ 启动本地基础设施（PostgreSQL + MinIO，自动建桶）
 docker compose up -d
 
-# 3️⃣ 配置环境变量（数据库 / MinIO / LLM 与生图 API Key）
-cp apps/web/.env.example apps/web/.env.local
+# 3️⃣ 配置环境变量（数据库 / MinIO / LLM 与生图 API Key；根共享层）
+cp .env.example .env.local
 
 # 4️⃣ 初始化数据库
 pnpm db:migrate
 
-# 5️⃣ 启动开发服务器
+# 5️⃣ 启动开发服务器（web :3000 / admin :3001 / creation :3002）
 pnpm dev
 ```
 
@@ -104,7 +104,8 @@ pnpm dev
 
 | 命令 | 用途 |
 | --- | --- |
-| `pnpm dev` | 开发服务器（web，端口 3000） |
+| `pnpm dev` | 开发服务器（web :3000 + admin :3001 + creation :3002） |
+| `pnpm dev:web` / `pnpm dev:creation` | 只起单个进程（creation 未起时 `/api/chat` 返回 503） |
 | `pnpm --filter @oops/admin dev` | 管理端开发服务器（端口 3001） |
 | `pnpm build` / `pnpm start` | 生产构建 / 启动 |
 | `pnpm lint` | ESLint（含分层边界检查） |

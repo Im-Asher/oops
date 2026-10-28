@@ -94,23 +94,20 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
 
-  apps/web:
+  apps/creation:
     dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.1141.0
-        version: 3.1141.0
       '@earendil-works/pi-agent-core':
         specifier: 0.87.1
         version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
       '@earendil-works/pi-ai':
         specifier: 0.87.1
         version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
-      '@oops/auth':
-        specifier: workspace:*
-        version: link:../../packages/auth
       '@oops/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@oops/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@oops/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -120,9 +117,61 @@ importers:
       '@oops/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@oops/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@resvg/resvg-js':
         specifier: ^2.6.2
         version: 2.6.2
+      satori:
+        specifier: ^0.63.2
+        version: 0.63.2
+      satori-html:
+        specifier: ^0.3.2
+        version: 0.3.2
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      tsx:
+        specifier: ^4.20.6
+        version: 4.23.15
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+
+  apps/web:
+    dependencies:
+      '@earendil-works/pi-ai':
+        specifier: 0.87.1
+        version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
+      '@oops/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@oops/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@oops/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@oops/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@oops/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@oops/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@oops/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@streamdown/cjk':
         specifier: ^1.0.3
         version: 1.0.3(@types/mdast@4.0.4)(micromark-util-types@2.0.3)(micromark@4.0.3)(react@19.2.8)(unified@11.0.5)
@@ -174,12 +223,6 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
-      satori:
-        specifier: ^0.63.2
-        version: 0.63.2
-      satori-html:
-        specifier: ^0.3.2
-        version: 0.3.2
       shadcn:
         specifier: ^4.21.0
         version: 4.21.0(typescript@5.9.3)
@@ -277,6 +320,22 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
 
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+
   packages/db:
     dependencies:
       '@oops/config':
@@ -330,8 +389,67 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
 
+  packages/eval:
+    dependencies:
+      '@oops/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@oops/config':
+        specifier: workspace:*
+        version: link:../config
+      '@oops/db':
+        specifier: workspace:*
+        version: link:../db
+      '@oops/domain':
+        specifier: workspace:*
+        version: link:../domain
+      yaml:
+        specifier: ^2.6.1
+        version: 2.9.0
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      playwright:
+        specifier: ^1.56.0
+        version: 1.64.1
+      tsx:
+        specifier: ^4.20.6
+        version: 4.23.15
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+
   packages/llm:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: 0.87.1
+        version: 0.87.1(@modelcontextprotocol/sdk@1.30.1(zod@4.6.5))(ws@8.22.0)(zod@4.6.5)
+      '@oops/config':
+        specifier: workspace:*
+        version: link:../config
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@20.19.43)(jsdom@30.1.2)(vite@8.3.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+
+  packages/storage:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1141.0
+        version: 3.1141.0
       '@oops/config':
         specifier: workspace:*
         version: link:../config
@@ -6159,6 +6277,16 @@ packages:
   pkg-up@3.1.0:
     resolution: {integrity: sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA==}
     engines: {node: '>=8'}
+
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.1:
+    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   po-parser@2.2.0:
     resolution: {integrity: sha512-NdTrKgh0oO7+y+RFX8KKhOB438x/j94UGXEFzl/7pHH0JjWSn42iJ9tgmPksIO6n1JKDHmNDcejPJfKspljB9g==}
@@ -13451,6 +13579,12 @@ snapshots:
   pkg-up@3.1.0:
     dependencies:
       find-up: 3.0.0
+
+  playwright-core@1.64.1: {}
+
+  playwright@1.64.1:
+    dependencies:
+      playwright-core: 1.64.1
 
   po-parser@2.2.0: {}
 

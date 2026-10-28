@@ -1,0 +1,11 @@
+id: 002-poster-promo
+agent: poster-designer
+message: 做一张促销海报，主题「秋季新款直降」，突出价格 129 元，要有明显的价格块
+references: [product.png]
+tags: [poster, smoke]
+assert:
+  size: [750, 1334]
+  allowedHeights: [1000, 1334, 1654]
+  mustContainText: ["129"]
+  maxOverflowPx: 0
+  denyCss: ["display:grid", "float:"]

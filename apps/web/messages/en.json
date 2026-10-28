@@ -29,7 +29,8 @@
       "invalidReference": "The referenced image does not exist or may not be used",
       "tooLarge": "File too large",
       "unsupportedType": "Unsupported file type",
-      "assetDeleteFailed": "Failed to delete the image, please try again later"
+      "assetDeleteFailed": "Failed to delete the image, please try again later",
+      "creationUnavailable": "The creation service is unavailable. Please try again later."
     }
   },
   "landing": {

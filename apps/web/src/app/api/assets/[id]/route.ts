@@ -10,7 +10,7 @@ import {
   TooManyTagsError,
 } from "@oops/db/tag.repo";
 import { requireUser } from "@oops/auth/require-user";
-import { createStorage, defaultS3Client } from "@/server/infra/storage/s3";
+import { createStorage, defaultS3Client } from "@oops/storage/s3";
 
 export const dynamic = "force-dynamic";
 

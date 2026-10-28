@@ -1,0 +1,33 @@
+{
+  "name": "@oops/creation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.87.1",
+    "@earendil-works/pi-ai": "0.87.1",
+    "@oops/config": "workspace:*",
+    "@oops/contracts": "workspace:*",
+    "@oops/db": "workspace:*",
+    "@oops/domain": "workspace:*",
+    "@oops/llm": "workspace:*",
+    "@oops/storage": "workspace:*",
+    "@resvg/resvg-js": "^2.6.2",
+    "satori": "^0.63.2",
+    "satori-html": "^0.3.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.20.6",
+    "typescript": "^5",
+    "vitest": "^5.0.2"
+  }
+}

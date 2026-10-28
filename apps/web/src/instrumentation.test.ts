@@ -2,17 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
-  recoverMock: vi.fn(),
-  reconcileMock: vi.fn(),
   cleanupMock: vi.fn(),
   log: vi.fn(),
   error: vi.fn(),
 }));
 
-vi.mock("@oops/domain/tasks/executor", () => ({ recoverInterruptedTasks: h.recoverMock }));
-vi.mock("@oops/domain/credits/service", () => ({
-  creditsService: { reconcileFrozen: h.reconcileMock },
-}));
 vi.mock("@oops/domain/notifications/service", () => ({
   notificationsService: { cleanupExpired: h.cleanupMock },
 }));
@@ -26,8 +20,6 @@ async function register() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.recoverMock.mockResolvedValue(0);
-  h.reconcileMock.mockResolvedValue(0);
   h.cleanupMock.mockResolvedValue(0);
   vi.spyOn(console, "log").mockImplementation(h.log);
   vi.spyOn(console, "error").mockImplementation(h.error);
@@ -61,7 +53,6 @@ describe("startup register", () => {
     process.env.NEXT_RUNTIME = "edge";
     const mod = await import("./instrumentation");
     await mod.register();
-    expect(h.recoverMock).not.toHaveBeenCalled();
     expect(h.cleanupMock).not.toHaveBeenCalled();
   });
 });

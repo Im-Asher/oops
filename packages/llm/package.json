@@ -13,6 +13,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.87.1",
     "@oops/config": "workspace:*"
   },
   "devDependencies": {
